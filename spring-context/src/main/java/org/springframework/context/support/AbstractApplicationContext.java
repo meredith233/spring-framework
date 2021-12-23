@@ -208,7 +208,7 @@ public abstract class AbstractApplicationContext extends DefaultResourceLoader
 	/**
 	 * ResourcePatternResolver used by this context.
 	 */
-	private ResourcePatternResolver resourcePatternResolver;
+	private final ResourcePatternResolver resourcePatternResolver;
 
 	/**
 	 * LifecycleProcessor for managing the lifecycle of beans within this context.
@@ -759,8 +759,11 @@ public abstract class AbstractApplicationContext extends DefaultResourceLoader
 	 * @return the fresh BeanFactory instance
 	 * @see #refreshBeanFactory()
 	 * @see #getBeanFactory()
+	 *
+	 * 获取bean工厂入口
 	 */
 	protected ConfigurableListableBeanFactory obtainFreshBeanFactory() {
+		// 模板涉及模式，子类实现钩子方法。
 		refreshBeanFactory();
 		return getBeanFactory();
 	}
