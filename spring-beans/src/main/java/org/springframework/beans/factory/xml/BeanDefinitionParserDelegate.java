@@ -378,6 +378,15 @@ public class BeanDefinitionParserDelegate {
 	 * {@link org.springframework.beans.factory.parsing.ProblemReporter}.
 	 * <p>
 	 * 解析 Element 并返回 BeanDefinitionHolder 持有者
+	 * <p>
+	 * 返回的BeanDefinitionHolder为后续BeanDefinition注册做准备，
+	 * BeanDefinitionReaderUtils类的registerBeanDefinition()方法需要BeanDefinitionHolder对象作为入参进行注册。
+	 * 在BeanDefinitionHolder 对象中持有beanDefinition和beanName两个重要属性。
+	 * <p>
+	 * private final BeanDefinition beanDefinition;
+	 * private final String beanName;
+	 * private final String[] aliases;
+	 * aliases作用：通过aliases找到beanName，根据beanName拿到beanDefinition对象。
 	 */
 	@Nullable
 	public BeanDefinitionHolder parseBeanDefinitionElement(Element ele, @Nullable BeanDefinition containingBean) {
