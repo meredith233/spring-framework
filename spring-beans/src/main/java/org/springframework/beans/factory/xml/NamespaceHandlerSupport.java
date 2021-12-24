@@ -16,16 +16,15 @@
 
 package org.springframework.beans.factory.xml;
 
-import java.util.HashMap;
-import java.util.Map;
-
+import org.springframework.beans.factory.config.BeanDefinition;
+import org.springframework.beans.factory.config.BeanDefinitionHolder;
+import org.springframework.lang.Nullable;
 import org.w3c.dom.Attr;
 import org.w3c.dom.Element;
 import org.w3c.dom.Node;
 
-import org.springframework.beans.factory.config.BeanDefinition;
-import org.springframework.beans.factory.config.BeanDefinitionHolder;
-import org.springframework.lang.Nullable;
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * Support class for implementing custom {@link NamespaceHandler NamespaceHandlers}.
@@ -66,21 +65,32 @@ public abstract class NamespaceHandlerSupport implements NamespaceHandler {
 	/**
 	 * Parses the supplied {@link Element} by delegating to the {@link BeanDefinitionParser} that is
 	 * registered for that {@link Element}.
+	 * <p>
+	 * 委托BeanDefinitionParser类解析元素
 	 */
 	@Override
 	@Nullable
 	public BeanDefinition parse(Element element, ParserContext parserContext) {
+		// 获取自定义组件名 对应的解析方法
 		BeanDefinitionParser parser = findParserForElement(element, parserContext);
+		// 调用ComponentScanBeanDefinitionParser实现类中的 parse方法
 		return (parser != null ? parser.parse(element, parserContext) : null);
 	}
 
 	/**
 	 * Locates the {@link BeanDefinitionParser} from the register implementations using
 	 * the local name of the supplied {@link Element}.
+	 *
+	 * 从map中根据组件名称获取绑定的解析方法
+	 *
+	 * 此处this.parsers.get()之所以有值，是因为在/META-INF/spring.handers中URI对应的Hander处理类初始化的时候
+	 * 通过init()方法中 执行registerBeanDefinitionParser()，来调用this.parsers.set('标签元素','解析类')设置的。
 	 */
 	@Nullable
 	private BeanDefinitionParser findParserForElement(Element element, ParserContext parserContext) {
+		// 获取组件名称
 		String localName = parserContext.getDelegate().getLocalName(element);
+		// Map<String, BeanDefinitionParser> parsers = new HashMap<>()
 		BeanDefinitionParser parser = this.parsers.get(localName);
 		if (parser == null) {
 			parserContext.getReaderContext().fatal(

@@ -474,6 +474,12 @@ public class BeanDefinitionParserDelegate {
 	/**
 	 * Parse the bean definition itself, without regard to name or aliases. May return
 	 * {@code null} if problems occurred during the parsing of the bean definition.
+	 * <p>
+	 * 解析BeanDefinitionElement
+	 *
+	 * <bean>标签 解析完成，会统一放到BeanDefinition中。
+	 * <lookup-method>、<replaced-method>、<property>这种子标签会放到MutablePropertyValues 类中。
+	 * <constructor-arg>子标签会放到 ConstructorArgumentValues 类中。
 	 */
 	@Nullable
 	public AbstractBeanDefinition parseBeanDefinitionElement(
@@ -491,17 +497,22 @@ public class BeanDefinitionParserDelegate {
 		}
 
 		try {
+			// 创建GenericBeanDefinition对象
 			AbstractBeanDefinition bd = createBeanDefinition(className, parent);
-
+			// 解析bean标签的属性，并把解析出来的属性设置到BeanDefinition对象中
 			parseBeanDefinitionAttributes(ele, beanName, containingBean, bd);
 			bd.setDescription(DomUtils.getChildElementValueByTagName(ele, DESCRIPTION_ELEMENT));
-
+			// 解析bean中的meta标签
 			parseMetaElements(ele, bd);
+			// 解析bean中的lookup-method标签  可看可不看
 			parseLookupOverrideSubElements(ele, bd.getMethodOverrides());
+			// 解析bean中的replaced-method标签  可看可不看
 			parseReplacedMethodSubElements(ele, bd.getMethodOverrides());
-
+			// 解析bean中的constructor-arg标签  可看可不看
 			parseConstructorArgElements(ele, bd);
+			// 解析bean中的property标签  可看可不看
 			parsePropertyElements(ele, bd);
+			// 可以不看，用不到
 			parseQualifierElements(ele, bd);
 
 			bd.setResource(this.readerContext.getResource());
@@ -531,6 +542,9 @@ public class BeanDefinitionParserDelegate {
 	 * @param beanName bean name
 	 * @param containingBean containing bean definition
 	 * @return a bean definition initialized according to the bean element attributes
+	 *
+	 * 最终的BeanDefinition属性在这里统一解析。
+	 * BeanDefinitionParserDelegate 委托类包含了所有bean 标签元素的属性常量。
 	 */
 	public AbstractBeanDefinition parseBeanDefinitionAttributes(Element ele, String beanName,
 			@Nullable BeanDefinition containingBean, AbstractBeanDefinition bd) {
@@ -563,7 +577,7 @@ public class BeanDefinitionParserDelegate {
 			String dependsOn = ele.getAttribute(DEPENDS_ON_ATTRIBUTE);
 			bd.setDependsOn(StringUtils.tokenizeToStringArray(dependsOn, MULTI_VALUE_ATTRIBUTE_DELIMITERS));
 		}
-
+		// 这个属性有代码案例演示，请参看案例
 		String autowireCandidate = ele.getAttribute(AUTOWIRE_CANDIDATE_ATTRIBUTE);
 		if (isDefaultValue(autowireCandidate)) {
 			String candidatePattern = this.defaults.getAutowireCandidates();
@@ -575,11 +589,11 @@ public class BeanDefinitionParserDelegate {
 		else {
 			bd.setAutowireCandidate(TRUE_VALUE.equals(autowireCandidate));
 		}
-
+		// 这个属性有代码案例演示，请参看案例
 		if (ele.hasAttribute(PRIMARY_ATTRIBUTE)) {
 			bd.setPrimary(TRUE_VALUE.equals(ele.getAttribute(PRIMARY_ATTRIBUTE)));
 		}
-
+		// 这个属性有代码案例演示，请参看案例
 		if (ele.hasAttribute(INIT_METHOD_ATTRIBUTE)) {
 			String initMethodName = ele.getAttribute(INIT_METHOD_ATTRIBUTE);
 			bd.setInitMethodName(initMethodName);
@@ -588,7 +602,7 @@ public class BeanDefinitionParserDelegate {
 			bd.setInitMethodName(this.defaults.getInitMethod());
 			bd.setEnforceInitMethod(false);
 		}
-
+		// 这个属性有代码案例演示，请参看案例
 		if (ele.hasAttribute(DESTROY_METHOD_ATTRIBUTE)) {
 			String destroyMethodName = ele.getAttribute(DESTROY_METHOD_ATTRIBUTE);
 			bd.setDestroyMethodName(destroyMethodName);
@@ -597,10 +611,11 @@ public class BeanDefinitionParserDelegate {
 			bd.setDestroyMethodName(this.defaults.getDestroyMethod());
 			bd.setEnforceDestroyMethod(false);
 		}
-
+		// 这个属性有代码案例演示，请参看案例
 		if (ele.hasAttribute(FACTORY_METHOD_ATTRIBUTE)) {
 			bd.setFactoryMethodName(ele.getAttribute(FACTORY_METHOD_ATTRIBUTE));
 		}
+		// 这个属性有代码案例演示，请参看案例
 		if (ele.hasAttribute(FACTORY_BEAN_ATTRIBUTE)) {
 			bd.setFactoryBeanName(ele.getAttribute(FACTORY_BEAN_ATTRIBUTE));
 		}
@@ -1355,18 +1370,23 @@ public class BeanDefinitionParserDelegate {
 	 * @param ele the element to parse
 	 * @param containingBd the containing bean definition (if any)
 	 * @return the resulting bean definition
+	 *
+	 * 自定义标签交给BeanDefinitionParserDelegate 委托类来解析
 	 */
 	@Nullable
 	public BeanDefinition parseCustomElement(Element ele, @Nullable BeanDefinition containingBd) {
+		// 获取命名空间的URI
 		String namespaceUri = getNamespaceURI(ele);
 		if (namespaceUri == null) {
 			return null;
 		}
+		// SPI设计，获取/META-INF/spring.handers中URI对应的Hander处理类
 		NamespaceHandler handler = this.readerContext.getNamespaceHandlerResolver().resolve(namespaceUri);
 		if (handler == null) {
 			error("Unable to locate Spring NamespaceHandler for XML schema namespace [" + namespaceUri + "]", ele);
 			return null;
 		}
+		// 执行 实现类NamespaceHandlerSupport 中的parse 方法
 		return handler.parse(ele, new ParserContext(this.readerContext, this, containingBd));
 	}
 
