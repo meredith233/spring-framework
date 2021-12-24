@@ -605,7 +605,7 @@ public abstract class AbstractApplicationContext extends DefaultResourceLoader
 			 * 		c、根据 namespaceUri 从映射关系中找到对应的实现了 NamespaceHandler 接口的类
 			 * 		d、调用类的 init 方法， init 方法是注册了各种自定义标签的解析类
 			 * 		e、根据 namespaceUri 找到对应的解析类，然后调用 paser 方法完成标签解析
-			 *
+			 * KEY
 			 * 3、把解析出来的xml标签封装成 BeanDefinition 对象
 			 */
 			ConfigurableListableBeanFactory beanFactory = obtainFreshBeanFactory();
@@ -672,6 +672,7 @@ public abstract class AbstractApplicationContext extends DefaultResourceLoader
 				 * 3、注解支持
 				 * 4、BeanPostProcessor的执行
 				 * 5、Aop的入口
+				 * KEY
 				 */
 				finishBeanFactoryInitialization(beanFactory);
 
@@ -984,8 +985,16 @@ public abstract class AbstractApplicationContext extends DefaultResourceLoader
 	/**
 	 * Finish the initialization of this context's bean factory,
 	 * initializing all remaining singleton beans.
+	 * <p>
+	 * KEY 初始化所有的单例Bean(非延迟加载的)，spring中最重要的方法之一
+	 * 1、bean实例化过程
+	 * 2、ioc
+	 * 3、注解支持
+	 * 4、BeanPostProcessor的执行
+	 * 5、Aop的入口
 	 */
 	protected void finishBeanFactoryInitialization(ConfigurableListableBeanFactory beanFactory) {
+		// 设置类型转换器
 		// Initialize conversion service for this context.
 		if (beanFactory.containsBean(CONVERSION_SERVICE_BEAN_NAME) &&
 				beanFactory.isTypeMatch(CONVERSION_SERVICE_BEAN_NAME, ConversionService.class)) {
@@ -996,11 +1005,13 @@ public abstract class AbstractApplicationContext extends DefaultResourceLoader
 		// Register a default embedded value resolver if no BeanFactoryPostProcessor
 		// (such as a PropertySourcesPlaceholderConfigurer bean) registered any before:
 		// at this point, primarily for resolution in annotation attribute values.
+		// 暂时不要看
 		if (!beanFactory.hasEmbeddedValueResolver()) {
 			beanFactory.addEmbeddedValueResolver(strVal -> getEnvironment().resolvePlaceholders(strVal));
 		}
 
 		// Initialize LoadTimeWeaverAware beans early to allow for registering their transformers early.
+		// 暂时不看
 		String[] weaverAwareNames = beanFactory.getBeanNamesForType(LoadTimeWeaverAware.class, false, false);
 		for (String weaverAwareName : weaverAwareNames) {
 			getBean(weaverAwareName);
@@ -1013,6 +1024,7 @@ public abstract class AbstractApplicationContext extends DefaultResourceLoader
 		beanFactory.freezeConfiguration();
 
 		// Instantiate all remaining (non-lazy-init) singletons.
+		// KEY 重点看这个方法
 		beanFactory.preInstantiateSingletons();
 	}
 
