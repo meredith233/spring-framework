@@ -141,10 +141,10 @@ public class ClassPathXmlApplicationContext extends AbstractXmlApplicationContex
 			throws BeansException {
 		// 实例化的时候，调用父类的构造函数
 		super(parent);
-		//创建解析器，解析configLocations
+		// 创建解析器，解析configLocations
 		setConfigLocations(configLocations);
 		if (refresh) {
-			//Spring容器初始化的核心方法
+			// Spring容器初始化的核心方法
 			refresh();
 		}
 	}
