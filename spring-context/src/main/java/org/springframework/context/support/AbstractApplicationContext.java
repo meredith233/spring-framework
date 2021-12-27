@@ -629,7 +629,7 @@ public abstract class AbstractApplicationContext extends DefaultResourceLoader
 				 * 激活各种 BeanFactory 处理器，并调用 BeanFactoryPostProcessor 各个实现类
 				 * 的 postProcessBeanFactory(factory) 方法
 				 *
-				 * BeanDefinitionRegistryPostProcessor
+				 * BeanDefinitionRegistryPostProcessor 完成对BeanDefinition的新增、修改
 				 * BeanFactoryPostProcessor
 				 * 完成对这两个接口的调用
 				 */
@@ -639,6 +639,11 @@ public abstract class AbstractApplicationContext extends DefaultResourceLoader
 				/*
 				 * 注册拦截 Bean创建的 Bean处理器，即注册 BeanPostProcessor
 				 * 把实现了BeanPostProcessor接口的类实例化，并且加入到BeanFactory中
+				 *
+				 * 主要是针对实现BeanPostProcessor接口的类调用和实例化过程。
+				 * BeanPostProcessor接口类型实例是针对某种特定功能的埋点，
+				 * 在这个点会根据接口类型来过滤掉不关注这个点的其他类，
+				 * 只有真正关注的类才会在这个点进行相应的功能实现。
 				 */
 				registerBeanPostProcessors(beanFactory);
 				beanPostProcess.end();
