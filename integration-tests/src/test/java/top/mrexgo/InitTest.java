@@ -20,7 +20,7 @@ public class InitTest {
 //		ApplicationContext applicationContext = new FileSystemXmlApplicationContext("E:\\idea\\springdemo\\spring.xml");
 
 		// 无配置文件加载容器
-//		ApplicationContext applicationContext = new AnnotationConfigApplicationContext("com.xx.jack");
+//		ApplicationContext applicationContext = new AnnotationConfigApplicationContext("org.springframework.test");
 
 		// springboot 加载容器
 //		ApplicationContext applicationContext = new EmbeddedWebApplicationContext();
