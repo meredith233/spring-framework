@@ -36,13 +36,12 @@ import org.springframework.core.annotation.AliasFor;
  *
  * <pre class="code">
  * &#064;Configuration
- * &#064;RegisterReflectionForBinding({ Foo.class, Bar.class })
+ * &#064;RegisterReflectionForBinding({Foo.class, Bar.class})
  * public class MyConfig {
  *     // ...
  * }</pre>
  *
- * <p>The annotated element can be any Spring bean class, constructor, field,
- * or method &mdash; for example:
+ * <p>The annotated element can be any Spring bean class or method &mdash; for example:
  *
  * <pre class="code">
  * &#064;Service
@@ -77,8 +76,7 @@ public @interface RegisterReflectionForBinding {
 
 	/**
 	 * Classes for which reflection hints should be registered.
-	 * <p>At least one class must be specified either via {@link #value} or
-	 * {@link #classes}.
+	 * <p>At least one class must be specified either via {@link #value} or {@code classes}.
 	 * @see #value()
 	 */
 	@AliasFor("value")

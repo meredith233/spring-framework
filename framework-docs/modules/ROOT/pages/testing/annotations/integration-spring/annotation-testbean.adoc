@@ -1,17 +1,32 @@
 [[spring-testing-annotation-beanoverriding-testbean]]
 = `@TestBean`
 
-`@TestBean` is used on a test class field to override a specific bean with an instance
-provided by a conventionally named static factory method.
+`@TestBean` is used on a field in a test class to override a specific bean in the test's
+`ApplicationContext` with an instance provided by a factory method.
 
-By default, the bean name and the associated factory method name are derived from the
-annotated field's name but the annotation allows for specific values to be provided.
+The associated factory method name is derived from the annotated field's name, or the
+bean name if specified. The factory method must be `static`, accept no arguments, and
+have a return type compatible with the type of the bean to override. To make things more
+explicit, or if you'd rather use a different name, the annotation allows for a specific
+method name to be provided.
 
-The `@TestBean` annotation uses the `REPLACE_DEFINITION`
-xref:testing/testcontext-framework/bean-overriding.adoc#spring-testing-beanoverriding-extending[strategy for test bean overriding].
+By default, the annotated field's type is used to search for candidate bean definitions
+to override. If multiple candidates match, `@Qualifier` can be provided to narrow the
+candidate to override. Alternatively, a candidate whose bean definition name matches the
+name of the field will match.
 
-The following example shows how to fully configure the `@TestBean` annotation, with
-explicit values equivalent to the default:
+To use a by-name override rather than a by-type override, specify the `name` attribute
+of the annotation.
+
+[WARNING]
+====
+Qualifiers, including the name of the field, are used to determine if a separate
+`ApplicationContext` needs to be created. If you are using this feature to override the
+same bean in several tests, make sure to name the field consistently to avoid creating
+unnecessary contexts.
+====
+
+The following example shows how to use the default behavior of the `@TestBean` annotation:
 
 [tabs]
 ======
@@ -20,20 +35,55 @@ Java::
 [source,java,indent=0,subs="verbatim,quotes",role="primary"]
 ----
 	class OverrideBeanTests {
-		@TestBean(name = "service", methodName = "serviceTestOverride")  // <1>
-		private CustomService service;
+		@TestBean // <1>
+		private CustomService customService;
 
 		// test case body...
 
-		private static CustomService serviceTestOverride() { // <2>
+		private static CustomService customService() { // <2>
 			return new MyFakeCustomService();
 		}
 	}
 ----
-<1> Mark a field for bean overriding in this test class
-<2> The result of this static method will be used as the instance and injected into the field
+<1> Mark a field for overriding the bean with type `CustomService`.
+<2> The result of this static method will be used as the instance and injected into the field.
 ======
 
-NOTE: The method to invoke is searched in the test class and any enclosing class it might
-have, as well as its hierarchy. This typically allows nested test class to rely on the
-factory method in the root test class.
+In the example above, we are overriding the bean with type `CustomService`. If more than
+one bean of that type exists, the bean named `customService` is considered. Otherwise,
+the test will fail, and you will need to provide a qualifier of some sort to identify
+which of the `CustomService` beans you want to override.
+
+The following example uses a by-name lookup, rather than a by-type lookup:
+
+[tabs]
+======
+Java::
++
+[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+----
+	class OverrideBeanTests {
+		@TestBean(name = "service", methodName = "createCustomService") // <1>
+		private CustomService customService;
+
+		// test case body...
+
+		private static CustomService createCustomService() { // <2>
+			return new MyFakeCustomService();
+		}
+	}
+----
+<1> Mark a field for overriding the bean with name `service`, and specify that the
+    factory method is named `createCustomService`.
+<2> The result of this static method will be used as the instance and injected into the field.
+======
+
+[NOTE]
+====
+Spring searches for the factory method to invoke in the test class, in the test class
+hierarchy, and in the enclosing class hierarchy for a `@Nested` test class.
+
+Alternatively, a factory method in an external class can be referenced via its
+fully-qualified method name following the syntax `<fully-qualified class name>#<method name>`
+– for example, `methodName = "org.example.TestUtils#createCustomService"`.
+====

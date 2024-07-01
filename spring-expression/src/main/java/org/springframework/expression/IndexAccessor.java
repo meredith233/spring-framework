@@ -19,8 +19,8 @@ package org.springframework.expression;
 import org.springframework.lang.Nullable;
 
 /**
- * An index accessor is able to read from (and possibly write to) an indexed
- * structure of an object.
+ * An index accessor is able to read from and possibly write to an indexed
+ * structure of a target object.
  *
  * <p>This interface places no restrictions on what constitutes an indexed
  * structure. Implementors are therefore free to access indexed values any way
@@ -44,18 +44,6 @@ import org.springframework.lang.Nullable;
  * @see PropertyAccessor
  */
 public interface IndexAccessor extends TargetedAccessor {
-
-	/**
-	 * Get the set of classes for which this index accessor should be called.
-	 * <p>Returning {@code null} or an empty array indicates this is a generic
-	 * index accessor that can be called in an attempt to access an index on any
-	 * type.
-	 * @return an array of classes that this index accessor is suitable for
-	 * (or {@code null} or an empty array if a generic index accessor)
-	 */
-	@Override
-	@Nullable
-	Class<?>[] getSpecificTargetClasses();
 
 	/**
 	 * Determine if this index accessor is able to read a specified index on a

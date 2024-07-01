@@ -17,18 +17,17 @@
 package org.springframework.test.context.bean.override;
 
 import java.lang.reflect.Field;
+import java.util.List;
 import java.util.function.BiConsumer;
 
 import org.springframework.test.context.TestContext;
-import org.springframework.test.context.TestExecutionListener;
 import org.springframework.test.context.support.AbstractTestExecutionListener;
 import org.springframework.test.context.support.DependencyInjectionTestExecutionListener;
 import org.springframework.util.ReflectionUtils;
 
 /**
- * {@link TestExecutionListener} implementation that enables Bean Override
- * support in tests, injecting overridden beans in appropriate fields of the
- * test instance.
+ * {@code TestExecutionListener} that enables Bean Override support in tests,
+ * injecting overridden beans in appropriate fields of the test instance.
  *
  * @author Simon Baslé
  * @since 6.2
@@ -54,9 +53,9 @@ public class BeanOverrideTestExecutionListener extends AbstractTestExecutionList
 	}
 
 	/**
-	 * Process the test instance and make sure that flagged fields for bean
-	 * overriding are processed. Each field get is value updated with the
-	 * overridden bean instance.
+	 * Process the test instance and make sure that fields flagged for bean
+	 * overriding are processed.
+	 * <p>Each field's value will be updated with the overridden bean instance.
 	 */
 	protected void injectFields(TestContext testContext) {
 		postProcessFields(testContext, (testMetadata, overrideRegistrar) -> overrideRegistrar.inject(
@@ -64,9 +63,10 @@ public class BeanOverrideTestExecutionListener extends AbstractTestExecutionList
 	}
 
 	/**
-	 * Process the test instance and make sure that flagged fields for bean
-	 * overriding are processed. If a fresh instance is required, the field
-	 * is nulled out and then re-injected with the overridden bean instance.
+	 * Process the test instance and make sure that fields flagged for bean
+	 * overriding are processed.
+	 * <p>If a fresh instance is required, the field is nulled out and then
+	 * re-injected with the overridden bean instance.
 	 * <p>This method does nothing if the
 	 * {@link DependencyInjectionTestExecutionListener#REINJECT_DEPENDENCIES_ATTRIBUTE}
 	 * attribute is not present in the {@code TestContext}.
@@ -75,12 +75,12 @@ public class BeanOverrideTestExecutionListener extends AbstractTestExecutionList
 		if (Boolean.TRUE.equals(
 				testContext.getAttribute(DependencyInjectionTestExecutionListener.REINJECT_DEPENDENCIES_ATTRIBUTE))) {
 
-			postProcessFields(testContext, (testMetadata, postProcessor) -> {
+			postProcessFields(testContext, (testMetadata, registrar) -> {
 				Object testInstance = testMetadata.testInstance;
 				Field field = testMetadata.overrideMetadata.getField();
 				ReflectionUtils.makeAccessible(field);
 				ReflectionUtils.setField(field, testInstance, null);
-				postProcessor.inject(testInstance, testMetadata.overrideMetadata);
+				registrar.inject(testInstance, testMetadata.overrideMetadata);
 			});
 		}
 	}
@@ -91,13 +91,11 @@ public class BeanOverrideTestExecutionListener extends AbstractTestExecutionList
 		Class<?> testClass = testContext.getTestClass();
 		Object testInstance = testContext.getTestInstance();
 
-		if (BeanOverrideParsingUtils.hasBeanOverride(testClass)) {
+		List<OverrideMetadata> metadataForFields = OverrideMetadata.forTestClass(testClass);
+		if (!metadataForFields.isEmpty()) {
 			BeanOverrideRegistrar registrar =
 					testContext.getApplicationContext().getBean(BeanOverrideRegistrar.class);
-			for (OverrideMetadata metadata : registrar.getOverrideMetadata()) {
-				if (!metadata.getField().getDeclaringClass().isAssignableFrom(testClass)) {
-					continue;
-				}
+			for (OverrideMetadata metadata : metadataForFields) {
 				consumer.accept(new TestContextOverrideMetadata(testInstance, metadata), registrar);
 			}
 		}

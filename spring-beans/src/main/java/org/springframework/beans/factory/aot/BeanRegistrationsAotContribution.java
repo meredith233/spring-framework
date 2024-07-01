@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2023 the original author or authors.
+ * Copyright 2002-2024 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,7 +16,7 @@
 
 package org.springframework.beans.factory.aot;
 
-import java.util.Map;
+import java.util.List;
 
 import javax.lang.model.element.Modifier;
 
@@ -30,10 +30,10 @@ import org.springframework.aot.hint.MemberCategory;
 import org.springframework.aot.hint.ReflectionHints;
 import org.springframework.aot.hint.RuntimeHints;
 import org.springframework.beans.factory.support.DefaultListableBeanFactory;
+import org.springframework.beans.factory.support.RegisteredBean;
 import org.springframework.javapoet.ClassName;
 import org.springframework.javapoet.CodeBlock;
 import org.springframework.javapoet.MethodSpec;
-import org.springframework.util.ClassUtils;
 
 /**
  * AOT contribution from a {@link BeanRegistrationsAotProcessor} used to
@@ -51,10 +51,10 @@ class BeanRegistrationsAotContribution
 
 	private static final String BEAN_FACTORY_PARAMETER_NAME = "beanFactory";
 
-	private final Map<BeanRegistrationKey, Registration> registrations;
+	private final List<Registration> registrations;
 
 
-	BeanRegistrationsAotContribution(Map<BeanRegistrationKey, Registration> registrations) {
+	BeanRegistrationsAotContribution(List<Registration> registrations) {
 		this.registrations = registrations;
 	}
 
@@ -85,13 +85,22 @@ class BeanRegistrationsAotContribution
 		method.addModifiers(Modifier.PUBLIC);
 		method.addParameter(DefaultListableBeanFactory.class, BEAN_FACTORY_PARAMETER_NAME);
 		CodeBlock.Builder code = CodeBlock.builder();
-		this.registrations.forEach((registeredBean, registration) -> {
-			MethodReference beanDefinitionMethod = registration.methodGenerator
-					.generateBeanDefinitionMethod(generationContext, beanRegistrationsCode);
-			CodeBlock methodInvocation = beanDefinitionMethod.toInvokeCodeBlock(
-					ArgumentCodeGenerator.none(), beanRegistrationsCode.getClassName());
-			code.addStatement("$L.registerBeanDefinition($S, $L)",
-				BEAN_FACTORY_PARAMETER_NAME, registeredBean.beanName(), methodInvocation);
+		this.registrations.forEach(registration -> {
+			try {
+				MethodReference beanDefinitionMethod = registration.methodGenerator
+						.generateBeanDefinitionMethod(generationContext, beanRegistrationsCode);
+				CodeBlock methodInvocation = beanDefinitionMethod.toInvokeCodeBlock(
+						ArgumentCodeGenerator.none(), beanRegistrationsCode.getClassName());
+				code.addStatement("$L.registerBeanDefinition($S, $L)",
+					BEAN_FACTORY_PARAMETER_NAME, registration.beanName(), methodInvocation);
+			}
+			catch (AotException ex) {
+				throw ex;
+			}
+			catch (Exception ex) {
+				throw new AotBeanProcessingException(registration.registeredBean,
+						"failed to generate code for bean definition", ex);
+			}
 		});
 		method.addCode(code.build());
 	}
@@ -101,43 +110,37 @@ class BeanRegistrationsAotContribution
 		method.addModifiers(Modifier.PUBLIC);
 		method.addParameter(DefaultListableBeanFactory.class, BEAN_FACTORY_PARAMETER_NAME);
 		CodeBlock.Builder code = CodeBlock.builder();
-		this.registrations.forEach((registeredBean, registration) -> {
-			for (String alias : registration.aliases) {
+		this.registrations.forEach(registration -> {
+			for (String alias : registration.aliases()) {
 				code.addStatement("$L.registerAlias($S, $S)", BEAN_FACTORY_PARAMETER_NAME,
-						registeredBean.beanName(), alias);
+						registration.beanName(), alias);
 			}
 		});
 		method.addCode(code.build());
 	}
 
-	private void generateRegisterHints(RuntimeHints runtimeHints, Map<BeanRegistrationKey, Registration> registrations) {
-		registrations.keySet().forEach(beanRegistrationKey -> {
+	private void generateRegisterHints(RuntimeHints runtimeHints, List<Registration> registrations) {
+		registrations.forEach(registration -> {
 			ReflectionHints hints = runtimeHints.reflection();
-			Class<?> beanClass = beanRegistrationKey.beanClass();
+			Class<?> beanClass = registration.registeredBean.getBeanClass();
 			hints.registerType(beanClass, MemberCategory.INTROSPECT_PUBLIC_METHODS, MemberCategory.INTROSPECT_DECLARED_METHODS);
-			introspectPublicMethodsOnAllInterfaces(hints, beanClass);
+			hints.registerForInterfaces(beanClass, typeHint -> typeHint.withMembers(MemberCategory.INTROSPECT_PUBLIC_METHODS));
 		});
-	}
-
-	private void introspectPublicMethodsOnAllInterfaces(ReflectionHints hints, Class<?> type) {
-		Class<?> currentClass = type;
-		while (currentClass != null && currentClass != Object.class) {
-			for (Class<?> interfaceType : currentClass.getInterfaces()) {
-				if (!ClassUtils.isJavaLanguageInterface(interfaceType)) {
-					hints.registerType(interfaceType, MemberCategory.INTROSPECT_PUBLIC_METHODS);
-					introspectPublicMethodsOnAllInterfaces(hints, interfaceType);
-				}
-			}
-			currentClass = currentClass.getSuperclass();
-		}
 	}
 
 	/**
 	 * Gather the necessary information to register a particular bean.
+	 * @param registeredBean the bean to register
 	 * @param methodGenerator the {@link BeanDefinitionMethodGenerator} to use
 	 * @param aliases the bean aliases, if any
 	 */
-	record Registration(BeanDefinitionMethodGenerator methodGenerator, String[] aliases) {}
+	record Registration(RegisteredBean registeredBean, BeanDefinitionMethodGenerator methodGenerator, String[] aliases) {
+
+		String beanName() {
+			return this.registeredBean.getBeanName();
+		}
+
+	}
 
 
 	/**

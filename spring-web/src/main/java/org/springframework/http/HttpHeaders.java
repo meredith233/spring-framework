@@ -509,7 +509,20 @@ public class HttpHeaders implements MultiValueMap<String, String>, Serializable 
 	 */
 	public List<Locale.LanguageRange> getAcceptLanguage() {
 		String value = getFirst(ACCEPT_LANGUAGE);
-		return (StringUtils.hasText(value) ? Locale.LanguageRange.parse(value) : Collections.emptyList());
+		if (StringUtils.hasText(value)) {
+			try {
+				return Locale.LanguageRange.parse(value);
+			}
+			catch (IllegalArgumentException ignored) {
+				String[] tokens = StringUtils.tokenizeToStringArray(value, ",");
+				for (int i = 0; i < tokens.length; i++) {
+					tokens[i] = StringUtils.trimTrailingCharacter(tokens[i], ';');
+				}
+				value = StringUtils.arrayToCommaDelimitedString(tokens);
+				return Locale.LanguageRange.parse(value);
+			}
+		}
+		return Collections.emptyList();
 	}
 
 	/**
@@ -969,8 +982,13 @@ public class HttpHeaders implements MultiValueMap<String, String>, Serializable 
 	/**
 	 * Set the length of the body in bytes, as specified by the
 	 * {@code Content-Length} header.
+	 * @param contentLength content length (greater than or equal to zero)
+	 * @throws IllegalArgumentException if the content length is negative
 	 */
 	public void setContentLength(long contentLength) {
+		if (contentLength < 0) {
+			throw new IllegalArgumentException("Content-Length must be a non-negative number");
+		}
 		set(CONTENT_LENGTH, Long.toString(contentLength));
 	}
 
@@ -1769,6 +1787,10 @@ public class HttpHeaders implements MultiValueMap<String, String>, Serializable 
 		return this.headers.toSingleValueMap();
 	}
 
+	@Override
+	public Map<String, String> asSingleValueMap() {
+		return this.headers.asSingleValueMap();
+	}
 
 	// Map implementation
 
