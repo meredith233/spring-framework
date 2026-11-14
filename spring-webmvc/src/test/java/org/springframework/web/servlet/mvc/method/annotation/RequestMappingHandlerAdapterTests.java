@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -30,6 +30,7 @@ import java.util.Map;
 
 import jakarta.servlet.AsyncEvent;
 import org.apache.groovy.util.Maps;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -41,16 +42,15 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageConverter;
 import org.springframework.http.converter.StringHttpMessageConverter;
-import org.springframework.http.converter.json.MappingJackson2HttpMessageConverter;
-import org.springframework.http.converter.json.MappingJacksonValue;
+import org.springframework.http.converter.json.JacksonJsonHttpMessageConverter;
 import org.springframework.http.server.ServerHttpRequest;
 import org.springframework.http.server.ServerHttpResponse;
 import org.springframework.http.server.ServletServerHttpResponse;
-import org.springframework.lang.Nullable;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.bind.annotation.SessionAttributes;
 import org.springframework.web.context.request.async.AsyncRequestNotUsableException;
@@ -205,6 +205,21 @@ class RequestMappingHandlerAdapterTests {
 		assertMethodProcessorCount(RESOLVER_COUNT, INIT_BINDER_RESOLVER_COUNT, 1);
 	}
 
+	@Test // gh-35153
+	void responseEntityWithWildCardAndConditionalStream() throws Exception {
+		HandlerMethod handlerMethod = handlerMethod(new SseController(), "handle", String.class);
+		this.handlerAdapter.afterPropertiesSet();
+
+		this.request.setAsyncSupported(true);
+		this.request.addParameter("q", "sse");
+
+		this.handlerAdapter.handle(this.request, this.response, handlerMethod);
+
+		assertThat(this.response.getStatus()).isEqualTo(200);
+		assertThat(this.response.getHeader("Content-Type")).isEqualTo("text/event-stream");
+		assertThat(this.response.getContentAsString()).isEqualTo("data: event 1\n\ndata: event 2\n\n");
+	}
+
 	@Test
 	void modelAttributeAdvice() throws Exception {
 		this.webAppContext.registerSingleton("maa", ModelAttributeAdvice.class);
@@ -263,9 +278,9 @@ class RequestMappingHandlerAdapterTests {
 	}
 
 	@Test // gh-15486
-	public void responseBodyAdvice() throws Exception {
+	void responseBodyAdvice() throws Exception {
 		List<HttpMessageConverter<?>> converters = new ArrayList<>();
-		converters.add(new MappingJackson2HttpMessageConverter());
+		converters.add(new JacksonJsonHttpMessageConverter());
 		this.handlerAdapter.setMessageConverters(converters);
 
 		this.webAppContext.registerSingleton("rba", ResponseCodeSuppressingAdvice.class);
@@ -283,7 +298,7 @@ class RequestMappingHandlerAdapterTests {
 	}
 
 	@Test // gh-30522
-	public void responseBodyAdviceWithEmptyBody() throws Exception {
+	void responseBodyAdviceWithEmptyBody() throws Exception {
 		this.webAppContext.registerBean("rba", EmptyBodyAdvice.class);
 		this.webAppContext.refresh();
 
@@ -377,6 +392,22 @@ class RequestMappingHandlerAdapterTests {
 	}
 
 
+	static class SseController {
+
+		public ResponseEntity<?> handle(@RequestParam String q) throws IOException {
+			if (q.equals("sse")) {
+				SseEmitter emitter = new SseEmitter();
+				emitter.send("event 1");
+				emitter.send("event 2");
+				emitter.complete();
+				return ResponseEntity.ok().body(emitter);
+			}
+			return ResponseEntity.ok("text");
+		}
+
+	}
+
+
 	@ControllerAdvice
 	private static class ModelAttributeAdvice {
 
@@ -421,19 +452,25 @@ class RequestMappingHandlerAdapterTests {
 	 */
 	@ControllerAdvice
 	private static class ResponseCodeSuppressingAdvice
-			extends AbstractMappingJacksonResponseBodyAdvice implements RequestBodyAdvice {
+			implements ResponseBodyAdvice<Object>, RequestBodyAdvice {
 
 		@Override
-		protected void beforeBodyWriteInternal(MappingJacksonValue bodyContainer, MediaType contentType,
-				MethodParameter returnType, ServerHttpRequest request, ServerHttpResponse response) {
+		public boolean supports(MethodParameter returnType, Class<? extends HttpMessageConverter<?>> converterType) {
+			return JacksonJsonHttpMessageConverter.class.equals(converterType);
+		}
+
+		@Override
+		public Object beforeBodyWrite(Object body, MethodParameter returnType,
+				MediaType contentType, Class<? extends HttpMessageConverter<?>> converterType,
+				ServerHttpRequest request, ServerHttpResponse response) {
 
 			int status = ((ServletServerHttpResponse) response).getServletResponse().getStatus();
 			response.setStatusCode(HttpStatus.OK);
 
 			Map<String, Object> map = new LinkedHashMap<>();
 			map.put("status", status);
-			map.put("message", bodyContainer.getValue());
-			bodyContainer.setValue(map);
+			map.put("message", body);
+			return map;
 		}
 
 		@Override

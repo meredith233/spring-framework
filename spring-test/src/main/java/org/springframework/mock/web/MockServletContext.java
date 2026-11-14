@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -43,13 +43,13 @@ import jakarta.servlet.SessionTrackingMode;
 import jakarta.servlet.descriptor.JspConfigDescriptor;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.jspecify.annotations.Nullable;
 
 import org.springframework.core.io.DefaultResourceLoader;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.ResourceLoader;
 import org.springframework.http.MediaType;
 import org.springframework.http.MediaTypeFactory;
-import org.springframework.lang.Nullable;
 import org.springframework.util.Assert;
 import org.springframework.util.ClassUtils;
 import org.springframework.util.CollectionUtils;
@@ -61,11 +61,11 @@ import org.springframework.web.util.WebUtils;
 /**
  * Mock implementation of the {@link jakarta.servlet.ServletContext} interface.
  *
- * <p>As of Spring 6.0, this set of mocks is designed on a Servlet 6.0 baseline.
+ * <p>As of Spring 7.0, this set of mocks is designed on a Servlet 6.1 baseline.
  *
- * <p>Compatible with Servlet 3.1 but can be configured to expose a specific version
- * through {@link #setMajorVersion}/{@link #setMinorVersion}; default is 3.1.
- * Note that Servlet 3.1 support is limited: servlet, filter and listener
+ * <p>Compatible with Servlet 6.1 but can be configured to expose a specific version
+ * through {@link #setMajorVersion}/{@link #setMinorVersion}; default is 6.1.
+ * Note that some Servlet SPI support is limited: servlet, filter and listener
  * registration methods are not supported; neither is JSP configuration.
  * We generally do not recommend to unit test your ServletContainerInitializers and
  * WebApplicationInitializers which is where those registration methods would be used.
@@ -114,11 +114,11 @@ public class MockServletContext implements ServletContext {
 
 	private int majorVersion = 6;
 
-	private int minorVersion = 0;
+	private int minorVersion = 1;
 
 	private int effectiveMajorVersion = 6;
 
-	private int effectiveMinorVersion = 0;
+	private int effectiveMinorVersion = 1;
 
 	private final Map<String, RequestDispatcher> namedRequestDispatchers = new HashMap<>();
 
@@ -132,18 +132,17 @@ public class MockServletContext implements ServletContext {
 
 	private final Set<String> declaredRoles = new LinkedHashSet<>();
 
-	@Nullable
-	private Set<SessionTrackingMode> sessionTrackingModes;
+	private @Nullable Set<SessionTrackingMode> sessionTrackingModes;
 
 	private final SessionCookieConfig sessionCookieConfig = new MockSessionCookieConfig();
 
 	private int sessionTimeout;
 
-	@Nullable
-	private String requestCharacterEncoding;
+	private @Nullable String requestCharacterEncoding;
 
-	@Nullable
-	private String responseCharacterEncoding;
+	private @Nullable String responseCharacterEncoding;
+
+	private final Map<String, FilterRegistration> filterRegistrations = new LinkedHashMap<>();
 
 	private final Map<String, MediaType> mimeTypes = new LinkedHashMap<>();
 
@@ -224,8 +223,7 @@ public class MockServletContext implements ServletContext {
 	}
 
 	@Override
-	@Nullable
-	public ServletContext getContext(String contextPath) {
+	public @Nullable ServletContext getContext(String contextPath) {
 		if (this.contextPath.equals(contextPath)) {
 			return this;
 		}
@@ -269,8 +267,7 @@ public class MockServletContext implements ServletContext {
 	}
 
 	@Override
-	@Nullable
-	public String getMimeType(String filePath) {
+	public @Nullable String getMimeType(String filePath) {
 		String extension = StringUtils.getFilenameExtension(filePath);
 		if (this.mimeTypes.containsKey(extension)) {
 			return this.mimeTypes.get(extension).toString();
@@ -293,8 +290,7 @@ public class MockServletContext implements ServletContext {
 	}
 
 	@Override
-	@Nullable
-	public Set<String> getResourcePaths(String path) {
+	public @Nullable Set<String> getResourcePaths(String path) {
 		String actualPath = (path.endsWith("/") ? path : path + "/");
 		String resourceLocation = getResourceLocation(actualPath);
 		Resource resource = null;
@@ -325,8 +321,7 @@ public class MockServletContext implements ServletContext {
 	}
 
 	@Override
-	@Nullable
-	public URL getResource(String path) throws MalformedURLException {
+	public @Nullable URL getResource(String path) throws MalformedURLException {
 		String resourceLocation = getResourceLocation(path);
 		Resource resource = null;
 		try {
@@ -349,8 +344,7 @@ public class MockServletContext implements ServletContext {
 	}
 
 	@Override
-	@Nullable
-	public InputStream getResourceAsStream(String path) {
+	public @Nullable InputStream getResourceAsStream(String path) {
 		String resourceLocation = getResourceLocation(path);
 		Resource resource = null;
 		try {
@@ -377,8 +371,7 @@ public class MockServletContext implements ServletContext {
 	}
 
 	@Override
-	@Nullable
-	public RequestDispatcher getNamedDispatcher(String path) {
+	public @Nullable RequestDispatcher getNamedDispatcher(String path) {
 		return this.namedRequestDispatchers.get(path);
 	}
 
@@ -444,8 +437,7 @@ public class MockServletContext implements ServletContext {
 	}
 
 	@Override
-	@Nullable
-	public String getRealPath(String path) {
+	public @Nullable String getRealPath(String path) {
 		String resourceLocation = getResourceLocation(path);
 		Resource resource = null;
 		try {
@@ -467,8 +459,7 @@ public class MockServletContext implements ServletContext {
 	}
 
 	@Override
-	@Nullable
-	public String getInitParameter(String name) {
+	public @Nullable String getInitParameter(String name) {
 		Assert.notNull(name, "Parameter name must not be null");
 		return this.initParameters.get(name);
 	}
@@ -494,8 +485,7 @@ public class MockServletContext implements ServletContext {
 	}
 
 	@Override
-	@Nullable
-	public Object getAttribute(String name) {
+	public @Nullable Object getAttribute(String name) {
 		Assert.notNull(name, "Attribute name must not be null");
 		return this.attributes.get(name);
 	}
@@ -532,8 +522,7 @@ public class MockServletContext implements ServletContext {
 	}
 
 	@Override
-	@Nullable
-	public ClassLoader getClassLoader() {
+	public @Nullable ClassLoader getClassLoader() {
 		return ClassUtils.getDefaultClassLoader();
 	}
 
@@ -588,8 +577,7 @@ public class MockServletContext implements ServletContext {
 	}
 
 	@Override  // on Servlet 4.0
-	@Nullable
-	public String getRequestCharacterEncoding() {
+	public @Nullable String getRequestCharacterEncoding() {
 		return this.requestCharacterEncoding;
 	}
 
@@ -599,9 +587,26 @@ public class MockServletContext implements ServletContext {
 	}
 
 	@Override  // on Servlet 4.0
-	@Nullable
-	public String getResponseCharacterEncoding() {
+	public @Nullable String getResponseCharacterEncoding() {
 		return this.responseCharacterEncoding;
+	}
+
+	/**
+	 * Add a {@link FilterRegistration}.
+	 * @since 6.2
+	 */
+	public void addFilterRegistration(FilterRegistration registration) {
+		this.filterRegistrations.put(registration.getName(), registration);
+	}
+
+	@Override
+	public @Nullable FilterRegistration getFilterRegistration(String filterName) {
+		return this.filterRegistrations.get(filterName);
+	}
+
+	@Override
+	public Map<String, ? extends FilterRegistration> getFilterRegistrations() {
+		return Collections.unmodifiableMap(this.filterRegistrations);
 	}
 
 
@@ -644,8 +649,7 @@ public class MockServletContext implements ServletContext {
 	 * @see jakarta.servlet.ServletContext#getServletRegistration(java.lang.String)
 	 */
 	@Override
-	@Nullable
-	public ServletRegistration getServletRegistration(String servletName) {
+	public @Nullable ServletRegistration getServletRegistration(String servletName) {
 		return null;
 	}
 
@@ -676,25 +680,6 @@ public class MockServletContext implements ServletContext {
 	@Override
 	public <T extends Filter> T createFilter(Class<T> c) throws ServletException {
 		throw new UnsupportedOperationException();
-	}
-
-	/**
-	 * This method always returns {@code null}.
-	 * @see jakarta.servlet.ServletContext#getFilterRegistration(java.lang.String)
-	 */
-	@Override
-	@Nullable
-	public FilterRegistration getFilterRegistration(String filterName) {
-		return null;
-	}
-
-	/**
-	 * This method always returns an {@linkplain Collections#emptyMap empty map}.
-	 * @see jakarta.servlet.ServletContext#getFilterRegistrations()
-	 */
-	@Override
-	public Map<String, ? extends FilterRegistration> getFilterRegistrations() {
-		return Collections.emptyMap();
 	}
 
 	@Override

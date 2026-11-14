@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2023 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,14 +22,14 @@ import java.beans.Introspector;
 
 import org.springframework.core.Ordered;
 import org.springframework.core.SpringProperties;
-import org.springframework.lang.NonNull;
 
 /**
  * {@link BeanInfoFactory} implementation that performs standard
  * {@link java.beans.Introspector} inspection.
  *
  * <p>To be configured via a {@code META-INF/spring.factories} file with the following content:
- * {@code org.springframework.beans.BeanInfoFactory=org.springframework.beans.StandardBeanInfoFactory}
+ *
+ * <p>{@code org.springframework.beans.BeanInfoFactory=org.springframework.beans.StandardBeanInfoFactory}
  *
  * <p>Ordered at {@link Ordered#LOWEST_PRECEDENCE} to allow other user-defined
  * {@link BeanInfoFactory} types to take precedence.
@@ -66,7 +66,6 @@ public class StandardBeanInfoFactory implements BeanInfoFactory, Ordered {
 
 
 	@Override
-	@NonNull
 	public BeanInfo getBeanInfo(Class<?> beanClass) throws IntrospectionException {
 		BeanInfo beanInfo = (shouldIntrospectorIgnoreBeaninfoClasses ?
 				Introspector.getBeanInfo(beanClass, Introspector.IGNORE_ALL_BEANINFO) :

@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -37,7 +37,7 @@ import static org.assertj.core.api.Assertions.assertThatIllegalStateException;
  * @author Rob Winch
  * @since 4.2
  */
-public class MockMvcWebConnectionTests {
+class MockMvcWebConnectionTests {
 
 	private final WebClient webClient = new WebClient();
 
@@ -46,21 +46,21 @@ public class MockMvcWebConnectionTests {
 
 
 	@Test
-	public void contextPathNull() throws IOException {
+	void contextPathNull() throws IOException {
 		this.webClient.setWebConnection(new MockMvcWebConnection(this.mockMvc, this.webClient, null));
 		Page page = this.webClient.getPage("http://localhost/context/a");
 		assertThat(page.getWebResponse().getStatusCode()).isEqualTo(200);
 	}
 
 	@Test
-	public void contextPathExplicit() throws IOException {
+	void contextPathExplicit() throws IOException {
 		this.webClient.setWebConnection(new MockMvcWebConnection(this.mockMvc, this.webClient, "/context"));
 		Page page = this.webClient.getPage("http://localhost/context/a");
 		assertThat(page.getWebResponse().getStatusCode()).isEqualTo(200);
 	}
 
 	@Test
-	public void contextPathEmpty() {
+	void contextPathEmpty() {
 		this.webClient.setWebConnection(new MockMvcWebConnection(this.mockMvc, this.webClient, ""));
 		// Empty context path (root context) should not match to a URL with a context path
 		assertThatExceptionOfType(FailingHttpStatusCodeException.class)
@@ -75,14 +75,14 @@ public class MockMvcWebConnectionTests {
 	}
 
 	@Test
-	public void forward() throws IOException {
+	void forward() throws IOException {
 		this.webClient.setWebConnection(new MockMvcWebConnection(this.mockMvc, this.webClient, ""));
 		Page page = this.webClient.getPage("http://localhost/forward");
 		assertThat(page.getWebResponse().getContentAsString()).isEqualTo("hello");
 	}
 
 	@Test
-	public void infiniteForward() {
+	void infiniteForward() {
 		this.webClient.setWebConnection(new MockMvcWebConnection(this.mockMvc, this.webClient, ""));
 		assertThatIllegalStateException()
 				.isThrownBy(() -> this.webClient.getPage("http://localhost/infiniteForward"))
@@ -90,13 +90,13 @@ public class MockMvcWebConnectionTests {
 	}
 
 	@Test
-	public void contextPathDoesNotStartWithSlash() {
+	void contextPathDoesNotStartWithSlash() {
 		assertThatIllegalArgumentException().isThrownBy(() ->
 				new MockMvcWebConnection(this.mockMvc, this.webClient, "context"));
 	}
 
 	@Test
-	public void contextPathEndsWithSlash() {
+	void contextPathEndsWithSlash() {
 		assertThatIllegalArgumentException().isThrownBy(() ->
 				new MockMvcWebConnection(this.mockMvc, this.webClient, "/context/"));
 	}

@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -58,17 +58,6 @@ class ModelAndViewContainerTests {
 	}
 
 	@Test
-	@SuppressWarnings("deprecation")
-	public void redirectScenarioWithoutRedirectModel() {
-		this.mavContainer.setIgnoreDefaultModelOnRedirect(false);
-		this.mavContainer.addAttribute("name", "value");
-		this.mavContainer.setRedirectModelScenario(true);
-
-		assertThat(this.mavContainer.getModel()).hasSize(1);
-		assertThat(this.mavContainer.getModel().get("name")).isEqualTo("value");
-	}
-
-	@Test
 	void ignoreDefaultModel() {
 		this.mavContainer.addAttribute("name", "value");
 		this.mavContainer.setRedirectModelScenario(true);
@@ -77,7 +66,7 @@ class ModelAndViewContainerTests {
 	}
 
 	@Test  // SPR-14045
-	public void ignoreDefaultModelAndWithoutRedirectModel() {
+	void ignoreDefaultModelAndWithoutRedirectModel() {
 		this.mavContainer.setRedirectModelScenario(true);
 		this.mavContainer.addAttribute("name", "value");
 

@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,9 +21,10 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Deque;
 import java.util.List;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
+import java.util.Locale;
 import java.util.regex.Pattern;
+
+import org.jspecify.annotations.Nullable;
 
 import org.springframework.expression.ParseException;
 import org.springframework.expression.ParserContext;
@@ -77,7 +78,7 @@ import org.springframework.expression.spel.ast.Ternary;
 import org.springframework.expression.spel.ast.TypeReference;
 import org.springframework.expression.spel.ast.VariableReference;
 import org.springframework.lang.Contract;
-import org.springframework.lang.Nullable;
+import org.springframework.util.ConcurrentLruCache;
 import org.springframework.util.StringUtils;
 
 /**
@@ -99,10 +100,14 @@ class InternalSpelExpressionParser extends TemplateAwareExpressionParser {
 	private final Deque<SpelNodeImpl> constructedNodes = new ArrayDeque<>();
 
 	// Shared cache for compiled regex patterns
-	private final ConcurrentMap<String, Pattern> patternCache = new ConcurrentHashMap<>();
+	private final ConcurrentLruCache<String, Pattern> patternCache =
+			new ConcurrentLruCache<>(OperatorMatches.MAX_PATTERN_CACHE_SIZE, Pattern::compile);
+
 
 	// The expression being parsed
 	private String expressionString = "";
+
+	private int nestingDepth = 0;
 
 	// The token stream constructed from that expression string
 	private List<Token> tokenStream = Collections.emptyList();
@@ -164,48 +169,52 @@ class InternalSpelExpressionParser extends TemplateAwareExpressionParser {
 	//	    | (DEFAULT^ logicalOrExpression)
 	//	    | (QMARK^ expression COLON! expression)
 	//      | (ELVIS^ expression))?;
-	@Nullable
-	@SuppressWarnings("NullAway")
-	private SpelNodeImpl eatExpression() {
-		SpelNodeImpl expr = eatLogicalOrExpression();
-		Token t = peekToken();
-		if (t != null) {
-			if (t.kind == TokenKind.ASSIGN) {  // a=b
-				if (expr == null) {
-					expr = new NullLiteral(t.startPos - 1, t.endPos - 1);
+	@SuppressWarnings("NullAway") // Not null assertion performed in SpelNodeImpl constructor
+	private @Nullable SpelNodeImpl eatExpression() {
+		incrementNestingDepth();
+		try {
+			SpelNodeImpl expr = eatLogicalOrExpression();
+			Token t = peekToken();
+			if (t != null) {
+				if (t.kind == TokenKind.ASSIGN) {  // a=b
+					if (expr == null) {
+						expr = new NullLiteral(t.startPos - 1, t.endPos - 1);
+					}
+					nextToken();
+					SpelNodeImpl assignedValue = eatLogicalOrExpression();
+					return new Assign(t.startPos, t.endPos, expr, assignedValue);
 				}
-				nextToken();
-				SpelNodeImpl assignedValue = eatLogicalOrExpression();
-				return new Assign(t.startPos, t.endPos, expr, assignedValue);
+				if (t.kind == TokenKind.ELVIS) {  // a?:b (a if it isn't null, otherwise b)
+					if (expr == null) {
+						expr = new NullLiteral(t.startPos - 1, t.endPos - 2);
+					}
+					nextToken();  // elvis has left the building
+					SpelNodeImpl valueIfNull = eatExpression();
+					if (valueIfNull == null) {
+						valueIfNull = new NullLiteral(t.startPos + 1, t.endPos + 1);
+					}
+					return new Elvis(t.startPos, t.endPos, expr, valueIfNull);
+				}
+				if (t.kind == TokenKind.QMARK) {  // a?b:c
+					if (expr == null) {
+						expr = new NullLiteral(t.startPos - 1, t.endPos - 1);
+					}
+					nextToken();
+					SpelNodeImpl ifTrueExprValue = eatExpression();
+					eatToken(TokenKind.COLON);
+					SpelNodeImpl ifFalseExprValue = eatExpression();
+					return new Ternary(t.startPos, t.endPos, expr, ifTrueExprValue, ifFalseExprValue);
+				}
 			}
-			if (t.kind == TokenKind.ELVIS) {  // a?:b (a if it isn't null, otherwise b)
-				if (expr == null) {
-					expr = new NullLiteral(t.startPos - 1, t.endPos - 2);
-				}
-				nextToken();  // elvis has left the building
-				SpelNodeImpl valueIfNull = eatExpression();
-				if (valueIfNull == null) {
-					valueIfNull = new NullLiteral(t.startPos + 1, t.endPos + 1);
-				}
-				return new Elvis(t.startPos, t.endPos, expr, valueIfNull);
-			}
-			if (t.kind == TokenKind.QMARK) {  // a?b:c
-				if (expr == null) {
-					expr = new NullLiteral(t.startPos - 1, t.endPos - 1);
-				}
-				nextToken();
-				SpelNodeImpl ifTrueExprValue = eatExpression();
-				eatToken(TokenKind.COLON);
-				SpelNodeImpl ifFalseExprValue = eatExpression();
-				return new Ternary(t.startPos, t.endPos, expr, ifTrueExprValue, ifFalseExprValue);
-			}
+			return expr;
 		}
-		return expr;
+		finally {
+			decrementNestingDepth();
+		}
 	}
 
 	//logicalOrExpression : logicalAndExpression (OR^ logicalAndExpression)*;
-	@Nullable
-	private SpelNodeImpl eatLogicalOrExpression() {
+	private @Nullable SpelNodeImpl eatLogicalOrExpression() {
 		SpelNodeImpl expr = eatLogicalAndExpression();
 		while (peekIdentifierToken("or") || peekToken(TokenKind.SYMBOLIC_OR)) {
 			Token t = takeToken();  //consume OR
@@ -217,8 +226,7 @@ class InternalSpelExpressionParser extends TemplateAwareExpressionParser {
 	}
 
 	// logicalAndExpression : relationalExpression (AND^ relationalExpression)*;
-	@Nullable
-	private SpelNodeImpl eatLogicalAndExpression() {
+	private @Nullable SpelNodeImpl eatLogicalAndExpression() {
 		SpelNodeImpl expr = eatRelationalExpression();
 		while (peekIdentifierToken("and") || peekToken(TokenKind.SYMBOLIC_AND)) {
 			Token t = takeToken();  // consume 'AND'
@@ -230,8 +238,7 @@ class InternalSpelExpressionParser extends TemplateAwareExpressionParser {
 	}
 
 	// relationalExpression : sumExpression (relationalOperator^ sumExpression)?;
-	@Nullable
-	private SpelNodeImpl eatRelationalExpression() {
+	private @Nullable SpelNodeImpl eatRelationalExpression() {
 		SpelNodeImpl expr = eatSumExpression();
 		Token relationalOperatorToken = maybeEatRelationalOperator();
 		if (relationalOperatorToken != null) {
@@ -275,9 +282,8 @@ class InternalSpelExpressionParser extends TemplateAwareExpressionParser {
 	}
 
 	//sumExpression: productExpression ( (PLUS^ | MINUS^) productExpression)*;
-	@Nullable
-	@SuppressWarnings("NullAway")
-	private SpelNodeImpl eatSumExpression() {
+	@SuppressWarnings("NullAway") // Not null assertion performed in SpelNodeImpl constructor
+	private @Nullable SpelNodeImpl eatSumExpression() {
 		SpelNodeImpl expr = eatProductExpression();
 		while (peekToken(TokenKind.PLUS, TokenKind.MINUS, TokenKind.INC)) {
 			Token t = takeToken();  //consume PLUS or MINUS or INC
@@ -294,8 +300,7 @@ class InternalSpelExpressionParser extends TemplateAwareExpressionParser {
 	}
 
 	// productExpression: powerExpr ((STAR^ | DIV^| MOD^) powerExpr)* ;
-	@Nullable
-	private SpelNodeImpl eatProductExpression() {
+	private @Nullable SpelNodeImpl eatProductExpression() {
 		SpelNodeImpl expr = eatPowerIncDecExpression();
 		while (peekToken(TokenKind.STAR, TokenKind.DIV, TokenKind.MOD)) {
 			Token t = takeToken();  // consume STAR/DIV/MOD
@@ -315,9 +320,8 @@ class InternalSpelExpressionParser extends TemplateAwareExpressionParser {
 	}
 
 	// powerExpr  : unaryExpression (POWER^ unaryExpression)? (INC || DEC) ;
-	@Nullable
-	@SuppressWarnings("NullAway")
-	private SpelNodeImpl eatPowerIncDecExpression() {
+	@SuppressWarnings("NullAway") // Not null assertion performed in SpelNodeImpl constructor
+	private @Nullable SpelNodeImpl eatPowerIncDecExpression() {
 		SpelNodeImpl expr = eatUnaryExpression();
 		if (peekToken(TokenKind.POWER)) {
 			Token t = takeToken();  //consume POWER
@@ -336,12 +340,11 @@ class InternalSpelExpressionParser extends TemplateAwareExpressionParser {
 	}
 
 	// unaryExpression: (PLUS^ | MINUS^ | BANG^ | INC^ | DEC^) unaryExpression | primaryExpression ;
-	@Nullable
-	@SuppressWarnings("NullAway")
-	private SpelNodeImpl eatUnaryExpression() {
+	@SuppressWarnings("NullAway") // Not null assertion performed in SpelNodeImpl constructor
+	private @Nullable SpelNodeImpl eatUnaryExpression() {
 		if (peekToken(TokenKind.NOT, TokenKind.PLUS, TokenKind.MINUS)) {
 			Token t = takeToken();
-			SpelNodeImpl expr = eatUnaryExpression();
+			SpelNodeImpl expr = eatUnaryOperand();
 			if (expr == null) {
 				throw internalException(t.startPos, SpelMessage.OOD);
 			}
@@ -357,7 +360,7 @@ class InternalSpelExpressionParser extends TemplateAwareExpressionParser {
 		}
 		if (peekToken(TokenKind.INC, TokenKind.DEC)) {
 			Token t = takeToken();
-			SpelNodeImpl expr = eatUnaryExpression();
+			SpelNodeImpl expr = eatUnaryOperand();
 			if (t.getKind() == TokenKind.INC) {
 				return new OpInc(t.startPos, t.endPos, false, expr);
 			}
@@ -368,9 +371,26 @@ class InternalSpelExpressionParser extends TemplateAwareExpressionParser {
 		return eatPrimaryExpression();
 	}
 
+	/**
+	 * Eat the operand of a chained unary operator (for example, {@code !} or
+	 * {@code -}), tracking nesting depth so that a long chain of unary operators
+	 * cannot drive the recursive-descent parser into a {@link StackOverflowError}.
+	 * @since 7.1
+	 * @see #eatUnaryExpression()
+	 * @see SpelParserConfiguration#getMaximumNestingDepth()
+	 */
+	private @Nullable SpelNodeImpl eatUnaryOperand() {
+		incrementNestingDepth();
+		try {
+			return eatUnaryExpression();
+		}
+		finally {
+			decrementNestingDepth();
+		}
+	}
+
 	// primaryExpression : startNode (node)? -> ^(EXPRESSION startNode (node)?);
-	@Nullable
-	private SpelNodeImpl eatPrimaryExpression() {
+	private @Nullable SpelNodeImpl eatPrimaryExpression() {
 		SpelNodeImpl start = eatStartNode();  // always a start node
 		List<SpelNodeImpl> nodes = null;
 		SpelNodeImpl node = eatNode();
@@ -390,14 +410,12 @@ class InternalSpelExpressionParser extends TemplateAwareExpressionParser {
 	}
 
 	// node : ((DOT dottedNode) | (SAFE_NAVI dottedNode) | nonDottedNode)+;
-	@Nullable
-	private SpelNodeImpl eatNode() {
+	private @Nullable SpelNodeImpl eatNode() {
 		return (peekToken(TokenKind.DOT, TokenKind.SAFE_NAVI) ? eatDottedNode() : eatNonDottedNode());
 	}
 
 	// nonDottedNode: indexer;
-	@Nullable
-	private SpelNodeImpl eatNonDottedNode() {
+	private @Nullable SpelNodeImpl eatNonDottedNode() {
 		if (peekToken(TokenKind.LSQUARE)) {
 			if (maybeEatIndexer(false)) {
 				return pop();
@@ -456,8 +474,7 @@ class InternalSpelExpressionParser extends TemplateAwareExpressionParser {
 	}
 
 	// methodArgs : LPAREN! (argument (COMMA! argument)* (COMMA!)?)? RPAREN!;
-	@Nullable
-	private SpelNodeImpl[] maybeEatMethodArgs() {
+	private SpelNodeImpl @Nullable [] maybeEatMethodArgs() {
 		if (!peekToken(TokenKind.LPAREN)) {
 			return null;
 		}
@@ -523,8 +540,7 @@ class InternalSpelExpressionParser extends TemplateAwareExpressionParser {
 	//	    | lastSelection
 	//	    | indexer
 	//	    | constructor
-	@Nullable
-	private SpelNodeImpl eatStartNode() {
+	private @Nullable SpelNodeImpl eatStartNode() {
 		if (maybeEatLiteral()) {
 			return pop();
 		}
@@ -755,7 +771,7 @@ class InternalSpelExpressionParser extends TemplateAwareExpressionParser {
 				throw internalException( this.expressionString.length(), SpelMessage.OOD);
 			}
 			throw internalException(node.startPos, SpelMessage.NOT_EXPECTED_TOKEN,
-					"qualified ID", node.getKind().toString().toLowerCase());
+					"qualified ID", node.getKind().toString().toLowerCase(Locale.ROOT));
 		}
 		return new QualifiedIdentifier(qualifiedIdPieces.getFirst().getStartPosition(),
 				qualifiedIdPieces.getLast().getEndPosition(), qualifiedIdPieces.toArray(new SpelNodeImpl[0]));
@@ -916,8 +932,7 @@ class InternalSpelExpressionParser extends TemplateAwareExpressionParser {
 	// relationalOperator
 	// : EQUAL | NOT_EQUAL | LESS_THAN | LESS_THAN_OR_EQUAL | GREATER_THAN
 	// | GREATER_THAN_OR_EQUAL | INSTANCEOF | BETWEEN | MATCHES
-	@Nullable
-	private Token maybeEatRelationalOperator() {
+	private @Nullable Token maybeEatRelationalOperator() {
 		Token t = peekToken();
 		if (t == null) {
 			return null;
@@ -948,7 +963,7 @@ class InternalSpelExpressionParser extends TemplateAwareExpressionParser {
 		}
 		if (t.kind != expectedKind) {
 			throw internalException(t.startPos, SpelMessage.NOT_EXPECTED_TOKEN,
-					expectedKind.toString().toLowerCase(), t.getKind().toString().toLowerCase());
+					expectedKind.toString().toLowerCase(Locale.ROOT), t.getKind().toString().toLowerCase(Locale.ROOT));
 		}
 		return t;
 	}
@@ -970,7 +985,7 @@ class InternalSpelExpressionParser extends TemplateAwareExpressionParser {
 		}
 
 		if (desiredTokenKind == TokenKind.IDENTIFIER) {
-			// Might be one of the textual forms of the operators (e.g. NE for != ) -
+			// Might be one of the textual forms of the operators (for example, NE for != ) -
 			// in which case we can treat it as an identifier. The list is represented here:
 			// Tokenizer.ALTERNATIVE_OPERATOR_NAMES and those ones are in order in the TokenKind enum.
 			if (t.kind.ordinal() >= TokenKind.DIV.ordinal() && t.kind.ordinal() <= TokenKind.NOT.ordinal() &&
@@ -1021,16 +1036,14 @@ class InternalSpelExpressionParser extends TemplateAwareExpressionParser {
 		return this.tokenStream.get(this.tokenStreamPointer++);
 	}
 
-	@Nullable
-	private Token nextToken() {
+	private @Nullable Token nextToken() {
 		if (this.tokenStreamPointer >= this.tokenStreamLength) {
 			return null;
 		}
 		return this.tokenStream.get(this.tokenStreamPointer++);
 	}
 
-	@Nullable
-	private Token peekToken() {
+	private @Nullable Token peekToken() {
 		if (this.tokenStreamPointer >= this.tokenStreamLength) {
 			return null;
 		}
@@ -1044,7 +1057,7 @@ class InternalSpelExpressionParser extends TemplateAwareExpressionParser {
 		if (t.getKind().hasPayload()) {
 			return t.stringValue();
 		}
-		return t.kind.toString().toLowerCase();
+		return t.kind.toString().toLowerCase(Locale.ROOT);
 	}
 
 	@Contract("_, null, _ -> fail; _, _, null -> fail")
@@ -1065,6 +1078,28 @@ class InternalSpelExpressionParser extends TemplateAwareExpressionParser {
 		if (operandExpression == null) {
 			throw internalException(token.startPos, SpelMessage.RIGHT_OPERAND_PROBLEM);
 		}
+	}
+
+	/**
+	 * Increment the nesting depth.
+	 * @since 7.1
+	 * @see SpelParserConfiguration#getMaximumNestingDepth()
+	 */
+	private void incrementNestingDepth() {
+		int maxNestingDepth = this.configuration.getMaximumNestingDepth();
+		if (this.nestingDepth++ > maxNestingDepth) {
+			throw new InternalParseException(new SpelParseException(0,
+					SpelMessage.MAX_EXPRESSION_NESTING_DEPTH_EXCEEDED, maxNestingDepth));
+		}
+	}
+
+	/**
+	 * Decrement the nesting depth.
+	 * @since 7.1
+	 * @see SpelParserConfiguration#getMaximumNestingDepth()
+	 */
+	private void decrementNestingDepth() {
+		this.nestingDepth--;
 	}
 
 	private InternalParseException internalException(int startPos, SpelMessage message, Object... inserts) {

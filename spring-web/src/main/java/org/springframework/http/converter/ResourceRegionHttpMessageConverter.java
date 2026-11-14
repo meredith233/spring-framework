@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2023 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -24,6 +24,8 @@ import java.lang.reflect.Type;
 import java.nio.charset.StandardCharsets;
 import java.util.Collection;
 
+import org.jspecify.annotations.Nullable;
+
 import org.springframework.core.io.InputStreamResource;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.support.ResourceRegion;
@@ -32,7 +34,6 @@ import org.springframework.http.HttpInputMessage;
 import org.springframework.http.HttpOutputMessage;
 import org.springframework.http.MediaType;
 import org.springframework.http.MediaTypeFactory;
-import org.springframework.lang.Nullable;
 import org.springframework.util.Assert;
 import org.springframework.util.MimeTypeUtils;
 import org.springframework.util.StreamUtils;
@@ -52,22 +53,6 @@ public class ResourceRegionHttpMessageConverter extends AbstractGenericHttpMessa
 		super(MediaType.ALL);
 	}
 
-
-	@Override
-	@SuppressWarnings("unchecked")
-	protected MediaType getDefaultContentType(Object object) {
-		Resource resource = null;
-		if (object instanceof ResourceRegion resourceRegion) {
-			resource = resourceRegion.getResource();
-		}
-		else {
-			Collection<ResourceRegion> regions = (Collection<ResourceRegion>) object;
-			if (!regions.isEmpty()) {
-				resource = regions.iterator().next().getResource();
-			}
-		}
-		return MediaTypeFactory.getMediaType(resource).orElse(MediaType.APPLICATION_OCTET_STREAM);
-	}
 
 	@Override
 	public boolean canRead(Class<?> clazz, @Nullable MediaType mediaType) {
@@ -120,7 +105,33 @@ public class ResourceRegionHttpMessageConverter extends AbstractGenericHttpMessa
 	}
 
 	@Override
-	@SuppressWarnings("unchecked")
+	public boolean canWriteRepeatedly(Object object, @Nullable MediaType contentType) {
+		if (object instanceof ResourceRegion resourceRegion) {
+			return supportsRepeatableWrites(resourceRegion);
+		}
+		else {
+			@SuppressWarnings("unchecked")
+			Collection<ResourceRegion> regions = (Collection<ResourceRegion>) object;
+			for (ResourceRegion region : regions) {
+				if (!supportsRepeatableWrites(region)) {
+					return false;
+				}
+			}
+			return true;
+		}
+	}
+
+	@Override
+	@SuppressWarnings("removal")
+	protected boolean supportsRepeatableWrites(Object object) {
+		return canWriteRepeatedly(object, null);
+	}
+
+	private boolean supportsRepeatableWrites(ResourceRegion region) {
+		return !(region.getResource() instanceof InputStreamResource);
+	}
+
+	@Override
 	protected void writeInternal(Object object, @Nullable Type type, HttpOutputMessage outputMessage)
 			throws IOException, HttpMessageNotWritableException {
 
@@ -128,6 +139,7 @@ public class ResourceRegionHttpMessageConverter extends AbstractGenericHttpMessa
 			writeResourceRegion(resourceRegion, outputMessage);
 		}
 		else {
+			@SuppressWarnings("unchecked")
 			Collection<ResourceRegion> regions = (Collection<ResourceRegion>) object;
 			if (regions.size() == 1) {
 				writeResourceRegion(regions.iterator().next(), outputMessage);
@@ -136,6 +148,22 @@ public class ResourceRegionHttpMessageConverter extends AbstractGenericHttpMessa
 				writeResourceRegionCollection(regions, outputMessage);
 			}
 		}
+	}
+
+	@Override
+	protected MediaType getDefaultContentType(Object object) {
+		Resource resource = null;
+		if (object instanceof ResourceRegion resourceRegion) {
+			resource = resourceRegion.getResource();
+		}
+		else {
+			@SuppressWarnings("unchecked")
+			Collection<ResourceRegion> regions = (Collection<ResourceRegion>) object;
+			if (!regions.isEmpty()) {
+				resource = regions.iterator().next().getResource();
+			}
+		}
+		return MediaTypeFactory.getMediaType(resource).orElse(MediaType.APPLICATION_OCTET_STREAM);
 	}
 
 
@@ -161,13 +189,12 @@ public class ResourceRegionHttpMessageConverter extends AbstractGenericHttpMessa
 			try {
 				in.close();
 			}
-			catch (IOException ex) {
-				// ignore
+			catch (IOException ignored) {
 			}
 		}
 	}
 
-	@SuppressWarnings("NullAway")
+	@SuppressWarnings("NullAway") // Not null assertion performed in StreamUtils#copyRange
 	private void writeResourceRegionCollection(Collection<ResourceRegion> resourceRegions,
 			HttpOutputMessage outputMessage) throws IOException {
 
@@ -222,8 +249,7 @@ public class ResourceRegionHttpMessageConverter extends AbstractGenericHttpMessa
 					in.close();
 				}
 			}
-			catch (IOException ex) {
-				// ignore
+			catch (IOException ignored) {
 			}
 		}
 
@@ -240,24 +266,4 @@ public class ResourceRegionHttpMessageConverter extends AbstractGenericHttpMessa
 		os.write(buf.getBytes(StandardCharsets.US_ASCII));
 	}
 
-	@Override
-	@SuppressWarnings("unchecked")
-	protected boolean supportsRepeatableWrites(Object object) {
-		if (object instanceof ResourceRegion resourceRegion) {
-			return supportsRepeatableWrites(resourceRegion);
-		}
-		else {
-			Collection<ResourceRegion> regions = (Collection<ResourceRegion>) object;
-			for (ResourceRegion region : regions) {
-				if (!supportsRepeatableWrites(region)) {
-					return false;
-				}
-			}
-			return true;
-		}
-	}
-
-	private boolean supportsRepeatableWrites(ResourceRegion region) {
-		return !(region.getResource() instanceof InputStreamResource);
-	}
 }

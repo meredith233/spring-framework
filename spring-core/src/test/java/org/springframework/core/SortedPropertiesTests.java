@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -133,7 +133,7 @@ class SortedPropertiesTests {
 		String[] lines = lines(baos);
 
 		assertThat(lines).isNotEmpty();
-		// Leniently match first line due to differences between JDK 8 and JDK 9+.
+		// Leniently match first line due to potential differences between JDK versions.
 		String regex = "<\\?xml .*\\?>";
 		assertThat(lines[0]).matches(regex);
 		assertThat(lines).filteredOn(line -> !line.matches(regex)).containsExactly( //

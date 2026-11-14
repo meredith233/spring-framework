@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2023 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,13 +17,18 @@
 package org.springframework.web.servlet.mvc.method.annotation;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Set;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Consumer;
+
+import org.jspecify.annotations.Nullable;
 
 import org.springframework.http.MediaType;
 import org.springframework.http.server.ServerHttpResponse;
-import org.springframework.lang.Nullable;
 import org.springframework.util.Assert;
 import org.springframework.util.ObjectUtils;
 
@@ -59,15 +64,15 @@ import org.springframework.util.ObjectUtils;
  *
  * @author Rossen Stoyanchev
  * @author Juergen Hoeller
+ * @author Brian Clozel
+ * @author Taeik Lim
  * @since 4.2
  */
 public class ResponseBodyEmitter {
 
-	@Nullable
-	private final Long timeout;
+	private final @Nullable Long timeout;
 
-	@Nullable
-	private Handler handler;
+	private @Nullable Handler handler;
 
 	/** Store send data before handler is initialized. */
 	private final Set<DataWithMediaType> earlySendAttempts = new LinkedHashSet<>(8);
@@ -76,24 +81,16 @@ public class ResponseBodyEmitter {
 	private boolean complete;
 
 	/** Store an error before the handler is initialized. */
-	@Nullable
-	private Throwable failure;
-
-	/**
-	 * After an I/O error, we don't call {@link #completeWithError} directly but
-	 * wait for the Servlet container to call us via {@code AsyncListener#onError}
-	 * on a container thread at which point we call completeWithError.
-	 * This flag is used to ignore further calls to complete or completeWithError
-	 * that may come for example from an application try-catch block on the
-	 * thread of the I/O error.
-	 */
-	private boolean ioErrorOnSend;
+	private @Nullable Throwable failure;
 
 	private final DefaultCallback timeoutCallback = new DefaultCallback();
 
 	private final ErrorCallback errorCallback = new ErrorCallback();
 
 	private final DefaultCallback completionCallback = new DefaultCallback();
+
+	/** Guards access to write operations on the response. */
+	protected final Lock writeLock = new ReentrantLock();
 
 
 	/**
@@ -118,42 +115,53 @@ public class ResponseBodyEmitter {
 	/**
 	 * Return the configured timeout value, if any.
 	 */
-	@Nullable
-	public Long getTimeout() {
+	public @Nullable Long getTimeout() {
 		return this.timeout;
 	}
 
 
-	synchronized void initialize(Handler handler) throws IOException {
-		this.handler = handler;
-
+	void initialize(Handler handler) throws IOException {
+		this.writeLock.lock();
 		try {
-			sendInternal(this.earlySendAttempts);
-		}
-		finally {
-			this.earlySendAttempts.clear();
-		}
+			this.handler = handler;
 
-		if (this.complete) {
-			if (this.failure != null) {
-				this.handler.completeWithError(this.failure);
+			try {
+				sendInternal(this.earlySendAttempts);
+			}
+			finally {
+				this.earlySendAttempts.clear();
+			}
+
+			if (this.complete) {
+				if (this.failure != null) {
+					this.handler.completeWithError(this.failure);
+				}
+				else {
+					this.handler.complete();
+				}
 			}
 			else {
-				this.handler.complete();
+				this.handler.onTimeout(this.timeoutCallback);
+				this.handler.onError(this.errorCallback);
+				this.handler.onCompletion(this.completionCallback);
 			}
 		}
-		else {
-			this.handler.onTimeout(this.timeoutCallback);
-			this.handler.onError(this.errorCallback);
-			this.handler.onCompletion(this.completionCallback);
+		finally {
+			this.writeLock.unlock();
 		}
 	}
 
-	synchronized void initializeWithError(Throwable ex) {
-		this.complete = true;
-		this.failure = ex;
-		this.earlySendAttempts.clear();
-		this.errorCallback.accept(ex);
+	void initializeWithError(Throwable ex) {
+		this.writeLock.lock();
+		try {
+			this.complete = true;
+			this.failure = ex;
+			this.earlySendAttempts.clear();
+			this.errorCallback.accept(ex);
+		}
+		finally {
+			this.writeLock.unlock();
+		}
 	}
 
 	/**
@@ -190,23 +198,28 @@ public class ResponseBodyEmitter {
 	 * @throws IOException raised when an I/O error occurs
 	 * @throws java.lang.IllegalStateException wraps any other errors
 	 */
-	public synchronized void send(Object object, @Nullable MediaType mediaType) throws IOException {
-		Assert.state(!this.complete, () -> "ResponseBodyEmitter has already completed" +
-				(this.failure != null ? " with error: " + this.failure : ""));
-		if (this.handler != null) {
-			try {
-				this.handler.send(object, mediaType);
+	public void send(Object object, @Nullable MediaType mediaType) throws IOException {
+		this.writeLock.lock();
+		try {
+			Assert.state(!this.complete, () -> "ResponseBodyEmitter has already completed" +
+					(this.failure != null ? " with error: " + this.failure : ""));
+			if (this.handler != null) {
+				try {
+					this.handler.send(object, mediaType);
+				}
+				catch (IOException ex) {
+					throw ex;
+				}
+				catch (Throwable ex) {
+					throw new IllegalStateException("Failed to send " + object, ex);
+				}
 			}
-			catch (IOException ex) {
-				this.ioErrorOnSend = true;
-				throw ex;
-			}
-			catch (Throwable ex) {
-				throw new IllegalStateException("Failed to send " + object, ex);
+			else {
+				this.earlySendAttempts.add(new DataWithMediaType(object, mediaType));
 			}
 		}
-		else {
-			this.earlySendAttempts.add(new DataWithMediaType(object, mediaType));
+		finally {
+			this.writeLock.unlock();
 		}
 	}
 
@@ -219,10 +232,16 @@ public class ResponseBodyEmitter {
 	 * @throws java.lang.IllegalStateException wraps any other errors
 	 * @since 6.0.12
 	 */
-	public synchronized void send(Set<DataWithMediaType> items) throws IOException {
-		Assert.state(!this.complete, () -> "ResponseBodyEmitter has already completed" +
-				(this.failure != null ? " with error: " + this.failure : ""));
-		sendInternal(items);
+	public void send(Set<DataWithMediaType> items) throws IOException {
+		this.writeLock.lock();
+		try {
+			Assert.state(!this.complete, () -> "ResponseBodyEmitter has already completed" +
+					(this.failure != null ? " with error: " + this.failure : ""));
+			sendInternal(items);
+		}
+		finally {
+			this.writeLock.unlock();
+		}
 	}
 
 	private void sendInternal(Set<DataWithMediaType> items) throws IOException {
@@ -234,7 +253,6 @@ public class ResponseBodyEmitter {
 				this.handler.send(items);
 			}
 			catch (IOException ex) {
-				this.ioErrorOnSend = true;
 				throw ex;
 			}
 			catch (Throwable ex) {
@@ -254,14 +272,16 @@ public class ResponseBodyEmitter {
 	 * to complete request processing. It should not be used after container
 	 * related events such as an error while {@link #send(Object) sending}.
 	 */
-	public synchronized void complete() {
-		// Ignore complete after IO failure on send
-		if (this.ioErrorOnSend) {
-			return;
+	public void complete() {
+		this.writeLock.lock();
+		try {
+			this.complete = true;
+			if (this.handler != null) {
+				this.handler.complete();
+			}
 		}
-		this.complete = true;
-		if (this.handler != null) {
-			this.handler.complete();
+		finally {
+			this.writeLock.unlock();
 		}
 	}
 
@@ -276,34 +296,50 @@ public class ResponseBodyEmitter {
 	 * container related events such as an error while
 	 * {@link #send(Object) sending}.
 	 */
-	public synchronized void completeWithError(Throwable ex) {
-		// Ignore complete after IO failure on send
-		if (this.ioErrorOnSend) {
-			return;
+	public void completeWithError(Throwable ex) {
+		this.writeLock.lock();
+		try {
+			this.complete = true;
+			this.failure = ex;
+			if (this.handler != null) {
+				this.handler.completeWithError(ex);
+			}
 		}
-		this.complete = true;
-		this.failure = ex;
-		if (this.handler != null) {
-			this.handler.completeWithError(ex);
+		finally {
+			this.writeLock.unlock();
 		}
 	}
 
 	/**
 	 * Register code to invoke when the async request times out. This method is
 	 * called from a container thread when an async request times out.
+	 * <p>As of 6.2, one can register multiple callbacks for this event.
 	 */
-	public synchronized void onTimeout(Runnable callback) {
-		this.timeoutCallback.setDelegate(callback);
+	public void onTimeout(Runnable callback) {
+		this.writeLock.lock();
+		try {
+			this.timeoutCallback.addDelegate(callback);
+		}
+		finally {
+			this.writeLock.unlock();
+		}
 	}
 
 	/**
 	 * Register code to invoke for an error during async request processing.
 	 * This method is called from a container thread when an error occurred
 	 * while processing an async request.
+	 * <p>As of 6.2, one can register multiple callbacks for this event.
 	 * @since 5.0
 	 */
-	public synchronized void onError(Consumer<Throwable> callback) {
-		this.errorCallback.setDelegate(callback);
+	public void onError(Consumer<Throwable> callback) {
+		this.writeLock.lock();
+		try {
+			this.errorCallback.addDelegate(callback);
+		}
+		finally {
+			this.writeLock.unlock();
+		}
 	}
 
 	/**
@@ -311,9 +347,16 @@ public class ResponseBodyEmitter {
 	 * called from a container thread when an async request completed for any
 	 * reason including timeout and network error. This method is useful for
 	 * detecting that a {@code ResponseBodyEmitter} instance is no longer usable.
+	 * <p>As of 6.2, one can register multiple callbacks for this event.
 	 */
-	public synchronized void onCompletion(Runnable callback) {
-		this.completionCallback.setDelegate(callback);
+	public void onCompletion(Runnable callback) {
+		this.writeLock.lock();
+		try {
+			this.completionCallback.addDelegate(callback);
+		}
+		finally {
+			this.writeLock.unlock();
+		}
 	}
 
 
@@ -362,8 +405,7 @@ public class ResponseBodyEmitter {
 
 		private final Object data;
 
-		@Nullable
-		private final MediaType mediaType;
+		private final @Nullable MediaType mediaType;
 
 		public DataWithMediaType(Object data, @Nullable MediaType mediaType) {
 			this.data = data;
@@ -374,8 +416,7 @@ public class ResponseBodyEmitter {
 			return this.data;
 		}
 
-		@Nullable
-		public MediaType getMediaType() {
+		public @Nullable MediaType getMediaType() {
 			return this.mediaType;
 		}
 	}
@@ -383,18 +424,17 @@ public class ResponseBodyEmitter {
 
 	private class DefaultCallback implements Runnable {
 
-		@Nullable
-		private Runnable delegate;
+		private List<Runnable> delegates = new ArrayList<>(1);
 
-		public void setDelegate(Runnable delegate) {
-			this.delegate = delegate;
+		public void addDelegate(Runnable delegate) {
+			this.delegates.add(delegate);
 		}
 
 		@Override
 		public void run() {
 			ResponseBodyEmitter.this.complete = true;
-			if (this.delegate != null) {
-				this.delegate.run();
+			for (Runnable delegate : this.delegates) {
+				delegate.run();
 			}
 		}
 	}
@@ -402,18 +442,17 @@ public class ResponseBodyEmitter {
 
 	private class ErrorCallback implements Consumer<Throwable> {
 
-		@Nullable
-		private Consumer<Throwable> delegate;
+		private List<Consumer<Throwable>> delegates = new ArrayList<>(1);
 
-		public void setDelegate(Consumer<Throwable> callback) {
-			this.delegate = callback;
+		public void addDelegate(Consumer<Throwable> callback) {
+			this.delegates.add(callback);
 		}
 
 		@Override
 		public void accept(Throwable t) {
 			ResponseBodyEmitter.this.complete = true;
-			if (this.delegate != null) {
-				this.delegate.accept(t);
+			for(Consumer<Throwable> delegate : this.delegates) {
+				delegate.accept(t);
 			}
 		}
 	}

@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -29,14 +29,15 @@ import jakarta.jms.BytesMessage;
 import jakarta.jms.JMSException;
 import jakarta.jms.Session;
 import jakarta.jms.TextMessage;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.stubbing.Answer;
 
 import org.springframework.core.MethodParameter;
-import org.springframework.lang.Nullable;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.isA;
@@ -48,7 +49,9 @@ import static org.mockito.Mockito.verify;
  * @author Arjen Poutsma
  * @author Dave Syer
  * @author Stephane Nicoll
+ * @author Sebastien Deleuze
  */
+@SuppressWarnings("removal")
 class MappingJackson2MessageConverterTests {
 
 	private MappingJackson2MessageConverter converter = new MappingJackson2MessageConverter();
@@ -134,6 +137,86 @@ class MappingJackson2MessageConverterTests {
 	}
 
 	@Test
+	void fromTextMessageUntrusted() throws Exception {
+		converter = new MappingJackson2MessageConverter();
+		converter.setTrustedPackages("java.lang");
+		converter.setTypeIdPropertyName("__typeid__");
+		TextMessage textMessageMock = mock();
+
+		String text = "{\"foo\":\"bar\"}";
+		given(textMessageMock.getStringProperty("__typeid__")).willReturn(MyBean.class.getName());
+		given(textMessageMock.getText()).willReturn(text);
+
+		assertThatExceptionOfType(MessageConversionException.class)
+				.isThrownBy(() -> converter.fromMessage(textMessageMock))
+				.withMessageContaining("is not in the trusted packages");
+	}
+
+	@Test
+	void fromTextMessageTrusted() throws Exception {
+		converter = new MappingJackson2MessageConverter();
+		converter.setTrustedPackages("java.lang", "org.springframework.jms.support.converter");
+		converter.setTypeIdPropertyName("__typeid__");
+		TextMessage textMessageMock = mock();
+		MyBean unmarshalled = new MyBean("bar");
+
+		String text = "{\"foo\":\"bar\"}";
+		given(textMessageMock.getStringProperty("__typeid__")).willReturn(MyBean.class.getName());
+		given(textMessageMock.getText()).willReturn(text);
+
+		MyBean result = (MyBean) converter.fromMessage(textMessageMock);
+		assertThat(unmarshalled).as("Invalid result").isEqualTo(result);
+	}
+
+	@Test
+	void fromTextMessageTrustedEmpty() throws Exception {
+		converter = new MappingJackson2MessageConverter();
+		converter.setTrustedPackages();
+		converter.setTypeIdPropertyName("__typeid__");
+		TextMessage textMessageMock = mock();
+
+		String text = "{\"foo\":\"bar\"}";
+		given(textMessageMock.getStringProperty("__typeid__")).willReturn(MyBean.class.getName());
+		given(textMessageMock.getText()).willReturn(text);
+
+		assertThatExceptionOfType(MessageConversionException.class)
+				.isThrownBy(() -> converter.fromMessage(textMessageMock))
+				.withMessageContaining("is not in the trusted packages");
+	}
+
+	@Test
+	void fromTextMessageTrusted1DArray() throws Exception {
+		converter = new MappingJackson2MessageConverter();
+		converter.setTrustedPackages("org.springframework.jms.support.converter");
+		converter.setTypeIdPropertyName("__typeid__");
+		TextMessage textMessageMock = mock();
+		MyBean[] unmarshalled = new MyBean[] { new MyBean("bar") };
+
+		String text = "[{\"foo\":\"bar\"}]";
+		given(textMessageMock.getStringProperty("__typeid__")).willReturn("[L" + MyBean.class.getName() + ";");
+		given(textMessageMock.getText()).willReturn(text);
+
+		MyBean[] result = (MyBean[]) converter.fromMessage(textMessageMock);
+		assertThat(unmarshalled).as("Invalid result").isEqualTo(result);
+	}
+
+	@Test
+	void fromTextMessageTrusted2DArray() throws Exception {
+		converter = new MappingJackson2MessageConverter();
+		converter.setTrustedPackages("org.springframework.jms.support.converter");
+		converter.setTypeIdPropertyName("__typeid__");
+		TextMessage textMessageMock = mock();
+		MyBean[][] unmarshalled = new MyBean[][] { { new MyBean("bar") } };
+
+		String text = "[[{\"foo\":\"bar\"}]]";
+		given(textMessageMock.getStringProperty("__typeid__")).willReturn("[[L" + MyBean.class.getName() + ";");
+		given(textMessageMock.getText()).willReturn(text);
+
+		MyBean[][] result = (MyBean[][]) converter.fromMessage(textMessageMock);
+		assertThat(unmarshalled).as("Invalid result").isEqualTo(result);
+	}
+
+	@Test
 	void fromTextMessageWithUnknownProperty() throws Exception {
 		TextMessage textMessageMock = mock();
 		MyBean unmarshalled = new MyBean("bar");
@@ -174,7 +257,7 @@ class MappingJackson2MessageConverterTests {
 
 	@Test
 	void toTextMessageWithReturnType() throws JMSException, NoSuchMethodException {
-		Method method = this.getClass().getDeclaredMethod("summary");
+		Method method = getClass().getDeclaredMethod("summary");
 		MethodParameter returnType = new MethodParameter(method, -1);
 		testToTextMessageWithReturnType(returnType);
 		verify(sessionMock).createTextMessage("{\"name\":\"test\"}");
@@ -188,7 +271,7 @@ class MappingJackson2MessageConverterTests {
 
 	@Test
 	void toTextMessageWithReturnTypeAndNoJsonView() throws JMSException, NoSuchMethodException {
-		Method method = this.getClass().getDeclaredMethod("none");
+		Method method = getClass().getDeclaredMethod("none");
 		MethodParameter returnType = new MethodParameter(method, -1);
 
 		testToTextMessageWithReturnType(returnType);
@@ -197,7 +280,7 @@ class MappingJackson2MessageConverterTests {
 
 	@Test
 	void toTextMessageWithReturnTypeAndMultipleJsonViews() throws NoSuchMethodException {
-		Method method = this.getClass().getDeclaredMethod("invalid");
+		Method method = getClass().getDeclaredMethod("invalid");
 		MethodParameter returnType = new MethodParameter(method, -1);
 
 		assertThatIllegalArgumentException().isThrownBy(() ->

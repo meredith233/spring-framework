@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2018 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -25,7 +25,7 @@ package org.springframework.context;
  * <p>Can be implemented by both components (typically a Spring bean defined in a
  * Spring context) and containers  (typically a Spring {@link ApplicationContext}
  * itself). Containers will propagate start/stop signals to all components that
- * apply within each container, e.g. for a stop/restart scenario at runtime.
+ * apply within each container, for example, for a stop/restart scenario at runtime.
  *
  * <p>Can be used for direct invocations or for management operations via JMX.
  * In the latter case, the {@link org.springframework.jmx.export.MBeanExporter}
@@ -52,8 +52,8 @@ public interface Lifecycle {
 	/**
 	 * Start this component.
 	 * <p>Should not throw an exception if the component is already running.
-	 * <p>In the case of a container, this will propagate the start signal to all
-	 * components that apply.
+	 * <p>In the case of a container, this will propagate a hard start signal to all
+	 * components that apply, even to non-auto-startup components.
 	 * @see SmartLifecycle#isAutoStartup()
 	 */
 	void start();

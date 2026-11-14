@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -97,7 +97,7 @@ class TypePatternClassFilterTests {
 	}
 
 	@Test
-	void testEquals() {
+	void equals() {
 		TypePatternClassFilter filter1 = new TypePatternClassFilter("org.springframework.beans.testfixture.beans.*");
 		TypePatternClassFilter filter2 = new TypePatternClassFilter("org.springframework.beans.testfixture.beans.*");
 		TypePatternClassFilter filter3 = new TypePatternClassFilter("org.springframework.tests.*");
@@ -107,7 +107,7 @@ class TypePatternClassFilterTests {
 	}
 
 	@Test
-	void testHashCode() {
+	void hashCodeBehavior() {
 		TypePatternClassFilter filter1 = new TypePatternClassFilter("org.springframework.beans.testfixture.beans.*");
 		TypePatternClassFilter filter2 = new TypePatternClassFilter("org.springframework.beans.testfixture.beans.*");
 		TypePatternClassFilter filter3 = new TypePatternClassFilter("org.springframework.tests.*");
@@ -117,7 +117,7 @@ class TypePatternClassFilterTests {
 	}
 
 	@Test
-	void testToString() {
+	void toStringOutput() {
 		TypePatternClassFilter filter1 = new TypePatternClassFilter("org.springframework.beans.testfixture.beans.*");
 		TypePatternClassFilter filter2 = new TypePatternClassFilter("org.springframework.beans.testfixture.beans.*");
 

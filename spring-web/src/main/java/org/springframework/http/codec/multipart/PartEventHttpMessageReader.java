@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -24,6 +24,7 @@ import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
+import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Publisher;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
@@ -39,7 +40,6 @@ import org.springframework.http.ReactiveHttpInputMessage;
 import org.springframework.http.codec.HttpMessageReader;
 import org.springframework.http.codec.LoggingCodecSupport;
 import org.springframework.http.codec.multipart.MultipartParser.HeadersToken;
-import org.springframework.lang.Nullable;
 import org.springframework.util.Assert;
 
 /**
@@ -188,6 +188,9 @@ public class PartEventHttpMessageReader extends LoggingCodecSupport implements H
 			if (this.maxPartSize == -1) {
 				maxSize = this.maxInMemorySize;
 			}
+			else if (this.maxInMemorySize == -1) {
+				maxSize = (int) Math.min(Integer.MAX_VALUE, this.maxPartSize);
+			}
 			else {
 				// maxInMemorySize is an int, so we can safely cast the long result of Math.min
 				maxSize = (int) Math.min(this.maxInMemorySize, this.maxPartSize);
@@ -212,8 +215,8 @@ public class PartEventHttpMessageReader extends LoggingCodecSupport implements H
 									this.maxPartSize + " bytes"));
 						}
 						else {
-							return isFilePart ? Mono.just(DefaultPartEvents.file(headers, buffer, body.isLast()))
-									: Mono.just(DefaultPartEvents.create(headers, body.buffer(), body.isLast()));
+							return (isFilePart ? Mono.just(DefaultPartEvents.file(headers, buffer, body.isLast())) :
+									Mono.just(DefaultPartEvents.create(headers, body.buffer(), body.isLast())));
 						}
 					})
 					.switchIfEmpty(Mono.fromCallable(() ->

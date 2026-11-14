@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2023 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -44,7 +44,7 @@ class InMemoryGeneratedFilesTests {
 		this.generatedFiles.addResourceFile("META-INF/test", "test");
 		assertThatIllegalStateException().isThrownBy(
 				() -> this.generatedFiles.addResourceFile("META-INF/test", "test"))
-				.withMessage("Path 'META-INF/test' already in use");
+				.withMessage("META-INF/test already exists");
 	}
 
 	@Test

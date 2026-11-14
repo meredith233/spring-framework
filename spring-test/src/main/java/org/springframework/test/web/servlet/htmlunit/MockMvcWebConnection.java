@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,15 +21,14 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
 
-import org.apache.http.impl.cookie.BasicClientCookie;
 import org.htmlunit.CookieManager;
 import org.htmlunit.WebClient;
 import org.htmlunit.WebConnection;
 import org.htmlunit.WebRequest;
 import org.htmlunit.WebResponse;
-import org.htmlunit.util.Cookie;
+import org.htmlunit.http.Cookie;
+import org.jspecify.annotations.Nullable;
 
-import org.springframework.lang.Nullable;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.mock.web.MockHttpSession;
 import org.springframework.test.web.servlet.MockMvc;
@@ -63,8 +62,7 @@ public final class MockMvcWebConnection implements WebConnection {
 
 	private final MockMvc mockMvc;
 
-	@Nullable
-	private final String contextPath;
+	private final @Nullable String contextPath;
 
 	private WebClient webClient;
 
@@ -180,22 +178,13 @@ public final class MockMvcWebConnection implements WebConnection {
 		}
 	}
 
-	@SuppressWarnings("removal")
 	private static Cookie createCookie(jakarta.servlet.http.Cookie cookie) {
 		Date expires = null;
 		if (cookie.getMaxAge() > -1) {
-			expires = new Date(System.currentTimeMillis() + cookie.getMaxAge() * 1000);
+			expires = new Date(System.currentTimeMillis() + cookie.getMaxAge() * 1000L);
 		}
-		BasicClientCookie result = new BasicClientCookie(cookie.getName(), cookie.getValue());
-		result.setDomain(cookie.getDomain());
-		result.setComment(cookie.getComment());
-		result.setExpiryDate(expires);
-		result.setPath(cookie.getPath());
-		result.setSecure(cookie.getSecure());
-		if (cookie.isHttpOnly()) {
-			result.setAttribute("httponly", "true");
-		}
-		return new Cookie(result);
+		return new Cookie(cookie.getDomain(), cookie.getName(), cookie.getValue(), cookie.getPath(),
+				expires, cookie.getSecure(), cookie.isHttpOnly());
 	}
 
 	@Override

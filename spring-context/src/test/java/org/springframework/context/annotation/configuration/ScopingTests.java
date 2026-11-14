@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -86,12 +86,12 @@ class ScopingTests {
 
 
 	@Test
-	void testScopeOnClasses() {
+	void scopeOnClasses() {
 		genericTestScope("scopedClass");
 	}
 
 	@Test
-	void testScopeOnInterfaces() {
+	void scopeOnInterfaces() {
 		genericTestScope("scopedInterface");
 	}
 
@@ -130,7 +130,7 @@ class ScopingTests {
 	}
 
 	@Test
-	void testSameScopeOnDifferentBeans() {
+	void sameScopeOnDifferentBeans() {
 		Object beanAInScope = ctx.getBean("scopedClass");
 		Object beanBInScope = ctx.getBean("scopedInterface");
 
@@ -147,22 +147,20 @@ class ScopingTests {
 	}
 
 	@Test
-	void testRawScopes() {
+	void rawScopes() {
 		String beanName = "scopedProxyInterface";
 
 		// get hidden bean
 		Object bean = ctx.getBean("scopedTarget." + beanName);
 
-		boolean condition = bean instanceof ScopedObject;
-		assertThat(condition).isFalse();
+		assertThat(bean).isNotInstanceOf(ScopedObject.class);
 	}
 
 	@Test
-	void testScopedProxyConfiguration() {
+	void scopedProxyConfiguration() {
 		TestBean singleton = (TestBean) ctx.getBean("singletonWithScopedInterfaceDep");
 		ITestBean spouse = singleton.getSpouse();
-		boolean condition = spouse instanceof ScopedObject;
-		assertThat(condition).as("scoped bean is not wrapped by the scoped-proxy").isTrue();
+		assertThat(spouse).as("scoped bean is not wrapped by the scoped-proxy").isInstanceOf(ScopedObject.class);
 
 		String beanName = "scopedProxyInterface";
 
@@ -191,11 +189,10 @@ class ScopingTests {
 	}
 
 	@Test
-	void testScopedProxyConfigurationWithClasses() {
+	void scopedProxyConfigurationWithClasses() {
 		TestBean singleton = (TestBean) ctx.getBean("singletonWithScopedClassDep");
 		ITestBean spouse = singleton.getSpouse();
-		boolean condition = spouse instanceof ScopedObject;
-		assertThat(condition).as("scoped bean is not wrapped by the scoped-proxy").isTrue();
+		assertThat(spouse).as("scoped bean is not wrapped by the scoped-proxy").isInstanceOf(ScopedObject.class);
 
 		String beanName = "scopedProxyClass";
 
@@ -354,11 +351,6 @@ class ScopingTests {
 		}
 
 		@Override
-		public String getConversationId() {
-			return null;
-		}
-
-		@Override
 		public void registerDestructionCallback(String name, Runnable callback) {
 			throw new IllegalStateException("Not supposed to be called");
 		}
@@ -368,10 +360,6 @@ class ScopingTests {
 			return beans.remove(name);
 		}
 
-		@Override
-		public Object resolveContextualObject(String key) {
-			return null;
-		}
 	}
 
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -298,6 +298,20 @@ class ReactiveAdapterRegistryTests {
 			Object target = getAdapter(Uni.class).toPublisher(source);
 			assertThat(target).isInstanceOf(Mono.class);
 			assertThat(((Mono<Integer>) target).block(FIVE_SECONDS)).isEqualTo(Integer.valueOf(1));
+		}
+
+		@Test
+		void fromNullValue() {
+			Object target = getAdapter(Uni.class).toPublisher(null);
+			assertThat(target).isInstanceOf(Mono.class);
+			assertThat(((Mono<Integer>) target).block(FIVE_SECONDS)).isNull();
+		}
+
+		@Test
+		void toUniFromEmptyPublisher() {
+			Object target = getAdapter(Uni.class).fromPublisher(Mono.empty());
+			assertThat(target).isInstanceOf(Uni.class);
+			assertThat(((Uni<Integer>) target).await().atMost(FIVE_SECONDS)).isNull();
 		}
 
 		@Test

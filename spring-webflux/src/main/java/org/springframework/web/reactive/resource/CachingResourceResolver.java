@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2019 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,17 +17,16 @@
 package org.springframework.web.reactive.resource;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
 
+import org.jspecify.annotations.Nullable;
 import reactor.core.publisher.Mono;
 
 import org.springframework.cache.Cache;
 import org.springframework.cache.CacheManager;
 import org.springframework.core.io.Resource;
-import org.springframework.lang.Nullable;
 import org.springframework.util.Assert;
 import org.springframework.util.StringUtils;
 import org.springframework.web.server.ServerWebExchange;
@@ -108,7 +107,7 @@ public class CachingResourceResolver extends AbstractResourceResolver {
 	protected Mono<Resource> resolveResourceInternal(@Nullable ServerWebExchange exchange,
 			String requestPath, List<? extends Resource> locations, ResourceResolverChain chain) {
 
-		String key = computeKey(exchange, requestPath);
+		String key = computeKey(exchange, requestPath, locations);
 		Resource cachedResource = this.cache.get(key, Resource.class);
 
 		if (cachedResource != null) {
@@ -121,27 +120,40 @@ public class CachingResourceResolver extends AbstractResourceResolver {
 				.doOnNext(resource -> this.cache.put(key, resource));
 	}
 
+	/**
+	 * Compute the caching key for the given exchange and resource request path.
+	 * @deprecated since 6.2.19 in favor of {@link #computeKey(ServerWebExchange, String, List)}.
+	 */
+	@Deprecated(since = "6.2.19", forRemoval = true)
 	protected String computeKey(@Nullable ServerWebExchange exchange, String requestPath) {
+		return computeKey(exchange, requestPath, Collections.emptyList());
+	}
+
+	/**
+	 * Compute the caching key for the given exchange and resource request path in the configured locations.
+	 */
+	protected String computeKey(@Nullable ServerWebExchange exchange, String requestPath, List<? extends Resource> locations) {
+		StringBuilder builder = new StringBuilder(RESOLVED_RESOURCE_CACHE_KEY_PREFIX);
+		if (!locations.isEmpty()) {
+			builder.append(Integer.toHexString(locations.hashCode())).append(":");
+		}
+		builder.append(requestPath);
 		if (exchange != null) {
 			String codingKey = getContentCodingKey(exchange);
 			if (StringUtils.hasText(codingKey)) {
-				return RESOLVED_RESOURCE_CACHE_KEY_PREFIX + requestPath + "+encoding=" + codingKey;
+				builder.append("+encoding=").append(codingKey);
 			}
 		}
-		return RESOLVED_RESOURCE_CACHE_KEY_PREFIX + requestPath;
+		return builder.toString();
 	}
 
-	@Nullable
-	private String getContentCodingKey(ServerWebExchange exchange) {
-		String header = exchange.getRequest().getHeaders().getFirst("Accept-Encoding");
-		if (!StringUtils.hasText(header)) {
+	private @Nullable String getContentCodingKey(ServerWebExchange exchange) {
+		List<String> acceptedCodings = EncodedResourceResolver.parseAcceptEncoding(exchange);
+		if (acceptedCodings.isEmpty()) {
 			return null;
 		}
-		return Arrays.stream(StringUtils.tokenizeToStringArray(header, ","))
-				.map(token -> {
-					int index = token.indexOf(';');
-					return (index >= 0 ? token.substring(0, index) : token).trim().toLowerCase();
-				})
+		return acceptedCodings
+				.stream()
 				.filter(this.contentCodings::contains)
 				.sorted()
 				.collect(Collectors.joining(","));

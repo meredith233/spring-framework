@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -58,14 +58,14 @@ class FormContentFilterTests {
 
 
 	@Test
-	void wrapPutPatchAndDeleteOnly() throws Exception {
+	void wrapPutPatchQueryAndDeleteOnly() throws Exception {
 		for (HttpMethod method : HttpMethod.values()) {
 			MockHttpServletRequest request = new MockHttpServletRequest(method.name(), "/");
 			request.setContent("foo=bar".getBytes(StandardCharsets.ISO_8859_1));
 			request.setContentType("application/x-www-form-urlencoded; charset=ISO-8859-1");
 			this.filterChain = new MockFilterChain();
 			this.filter.doFilter(request, this.response, this.filterChain);
-			if (method == HttpMethod.PUT || method == HttpMethod.PATCH || method == HttpMethod.DELETE) {
+			if (method == HttpMethod.PUT || method == HttpMethod.PATCH || method == HttpMethod.DELETE || method == HttpMethod.QUERY) {
 				assertThat(this.filterChain.getRequest()).isNotSameAs(request);
 			}
 			else {
@@ -207,7 +207,7 @@ class FormContentFilterTests {
 	}
 
 	@Test  // SPR-15835
-	public void hiddenHttpMethodFilterFollowedByHttpPutFormContentFilter() throws Exception {
+	void hiddenHttpMethodFilterFollowedByHttpPutFormContentFilter() throws Exception {
 		this.request.addParameter("_method", "PUT");
 		this.request.addParameter("hiddenField", "testHidden");
 		this.filter.doFilter(this.request, this.response, this.filterChain);

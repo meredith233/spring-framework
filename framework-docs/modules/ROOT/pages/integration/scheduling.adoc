@@ -50,6 +50,9 @@ The variants that Spring provides are as follows:
   for each invocation. However, it does support a concurrency limit that blocks
   any invocations that are over the limit until a slot has been freed up. If you
   are looking for true pooling, see `ThreadPoolTaskExecutor`, later in this list.
+  This will use JDK 21's Virtual Threads, when the "virtualThreads"
+  option is enabled. This implementation also supports graceful shutdown through
+  Spring's lifecycle management.
 * `ConcurrentTaskExecutor`:
   This implementation is an adapter for a `java.util.concurrent.Executor` instance.
   There is an alternative (`ThreadPoolTaskExecutor`) that exposes the `Executor`
@@ -61,15 +64,13 @@ The variants that Spring provides are as follows:
   a `java.util.concurrent.ThreadPoolExecutor` and wraps it in a `TaskExecutor`.
   If you need to adapt to a different kind of `java.util.concurrent.Executor`,
   we recommend that you use a `ConcurrentTaskExecutor` instead.
+  It also provides a pause/resume capability and graceful shutdown through
+  Spring's lifecycle management.
 * `DefaultManagedTaskExecutor`:
   This implementation uses a JNDI-obtained `ManagedExecutorService` in a JSR-236
   compatible runtime environment (such as a Jakarta EE application server),
   replacing a CommonJ WorkManager for that purpose.
 
-As of 6.1, `ThreadPoolTaskExecutor` provides a pause/resume capability and graceful
-shutdown through Spring's lifecycle management. There is also a new "virtualThreads"
-option on `SimpleAsyncTaskExecutor` which is aligned with JDK 21's Virtual Threads,
-as well as a graceful shutdown capability for `SimpleAsyncTaskExecutor` as well.
 
 
 [[scheduling-task-executor-usage]]
@@ -79,38 +80,7 @@ Spring's `TaskExecutor` implementations are commonly used with dependency inject
 In the following example, we define a bean that uses the `ThreadPoolTaskExecutor`
 to asynchronously print out a set of messages:
 
-[source,java,indent=0,subs="verbatim,quotes"]
-----
-	import org.springframework.core.task.TaskExecutor;
-
-	public class TaskExecutorExample {
-
-		private class MessagePrinterTask implements Runnable {
-
-			private String message;
-
-			public MessagePrinterTask(String message) {
-				this.message = message;
-			}
-
-			public void run() {
-				System.out.println(message);
-			}
-		}
-
-		private TaskExecutor taskExecutor;
-
-		public TaskExecutorExample(TaskExecutor taskExecutor) {
-			this.taskExecutor = taskExecutor;
-		}
-
-		public void printMessages() {
-			for(int i = 0; i < 25; i++) {
-				taskExecutor.execute(new MessagePrinterTask("Message" + i));
-			}
-		}
-	}
-----
+include-code::./TaskExecutorExample[tag=snippet,indent=0]
 
 As you can see, rather than retrieving a thread from the pool and executing it yourself,
 you add your `Runnable` to the queue. Then the `TaskExecutor` uses its internal rules to
@@ -118,19 +88,23 @@ decide when the task gets run.
 
 To configure the rules that the `TaskExecutor` uses, we expose simple bean properties:
 
-[source,xml,indent=0,subs="verbatim,quotes"]
-----
-	<bean id="taskExecutor" class="org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor">
-		<property name="corePoolSize" value="5"/>
-		<property name="maxPoolSize" value="10"/>
-		<property name="queueCapacity" value="25"/>
-	</bean>
+include-code::./TaskExecutorConfiguration[tag=snippet,indent=0]
 
-	<bean id="taskExecutorExample" class="TaskExecutorExample">
-		<constructor-arg ref="taskExecutor"/>
-	</bean>
-----
+Most `TaskExecutor` implementations provide a way to automatically wrap tasks submitted
+with a `TaskDecorator`. Decorators should delegate to the task it is wrapping, possibly
+implementing custom behavior before/after the execution of the task.
 
+Let's consider a simple implementation that will log messages before and after the execution
+or our tasks:
+
+include-code::./LoggingTaskDecorator[indent=0]
+
+We can then configure our decorator on a `TaskExecutor` instance:
+
+include-code::./TaskExecutorConfiguration[tag=decorator,indent=0]
+
+In case multiple decorators are needed, the `org.springframework.core.task.support.CompositeTaskDecorator`
+can be used to execute sequentially multiple decorators.
 
 
 [[scheduling-task-scheduler]]
@@ -157,7 +131,7 @@ listing shows the `TaskScheduler` interface definition:
 		ScheduledFuture scheduleWithFixedDelay(Runnable task, Instant startTime, Duration delay);
 
 		ScheduledFuture scheduleWithFixedDelay(Runnable task, Duration delay);
-
+	}
 ----
 
 The simplest method is the one named `schedule` that takes only a `Runnable` and an `Instant`.
@@ -209,7 +183,7 @@ default). The following listing shows the available methods for `Trigger` implem
 
 Spring provides two implementations of the `Trigger` interface. The most interesting one
 is the `CronTrigger`. It enables the scheduling of tasks based on
-xref:integration/scheduling.adoc#scheduling-cron-expression[cron expressions].
+<<scheduling-cron-expression,cron expressions>>.
 For example, the following task is scheduled to run 15 minutes past each hour but only
 during the 9-to-5 "business hours" on weekdays:
 
@@ -269,16 +243,10 @@ execution.
 === Enable Scheduling Annotations
 
 To enable support for `@Scheduled` and `@Async` annotations, you can add `@EnableScheduling`
-and `@EnableAsync` to one of your `@Configuration` classes, as the following example shows:
+and `@EnableAsync` to one of your `@Configuration` classes, or `<task:annotation-driven>` element,
+as the following example shows:
 
-[source,java,indent=0,subs="verbatim,quotes"]
-----
-	@Configuration
-	@EnableAsync
-	@EnableScheduling
-	public class AppConfig {
-	}
-----
+include-code::./SchedulingConfiguration[tag=snippet,indent=0]
 
 You can pick and choose the relevant annotations for your application. For example,
 if you need only support for `@Scheduled`, you can omit `@EnableAsync`. For more
@@ -287,16 +255,6 @@ interface, the `AsyncConfigurer` interface, or both. See the
 {spring-framework-api}/scheduling/annotation/SchedulingConfigurer.html[`SchedulingConfigurer`]
 and {spring-framework-api}/scheduling/annotation/AsyncConfigurer.html[`AsyncConfigurer`]
 javadoc for full details.
-
-If you prefer XML configuration, you can use the `<task:annotation-driven>` element,
-as the following example shows:
-
-[source,xml,indent=0,subs="verbatim,quotes"]
-----
-	<task:annotation-driven executor="myExecutor" scheduler="myScheduler"/>
-	<task:executor id="myExecutor" pool-size="5"/>
-	<task:scheduler id="myScheduler" pool-size="10"/>
-----
 
 Note that, with the preceding XML, an executor reference is provided for handling those
 tasks that correspond to methods with the `@Async` annotation, and the scheduler
@@ -377,7 +335,7 @@ of time to wait before the intended execution of the method:
 ----
 
 If simple periodic scheduling is not expressive enough, you can provide a
-xref:integration/scheduling.adoc#scheduling-cron-expression[cron expression].
+<<scheduling-cron-expression,cron expression>>.
 The following example runs only on weekdays:
 
 [source,java,indent=0]
@@ -510,14 +468,14 @@ seconds:
 ----
 	@Scheduled(initialDelay = 0, fixedRate = 5000)
 	public Mono<Void> reactiveSomething() {
-		AtomicInteger countdown = new AtomicInteger(2);
+		AtomicInteger countDown = new AtomicInteger(2);
 
 		return Mono.defer(() -> {
 			if (countDown.get() == 0 || countDown.decrementAndGet() == 0) {
 				return Mono.fromRunnable(() -> System.out.println("Message"));
 			}
 			return Mono.error(new IllegalStateException("Cannot deliver message"));
-		})
+		});
 	}
 ----
 
@@ -525,7 +483,7 @@ seconds:
 ====
 When destroying the annotated bean or closing the application context, Spring Framework cancels
 scheduled tasks, which includes the next scheduled subscription to the `Publisher` as well
-as any past subscription that is still currently active (e.g. for long-running publishers
+as any past subscription that is still currently active (for example, for long-running publishers
 or even infinite publishers).
 ====
 
@@ -575,8 +533,7 @@ that returns a value:
 ----
 
 TIP: `@Async` methods may not only declare a regular `java.util.concurrent.Future` return
-type but also Spring's `org.springframework.util.concurrent.ListenableFuture` or, as of
-Spring 4.2, JDK 8's `java.util.concurrent.CompletableFuture`, for richer interaction with
+type but also `java.util.concurrent.CompletableFuture`, for richer interaction with
 the asynchronous task and for immediate composition with further processing steps.
 
 You can not use `@Async` in conjunction with lifecycle callbacks such as `@PostConstruct`.
@@ -616,12 +573,17 @@ for asynchronous execution in the first place, not externally re-declared to be 
 However, you can manually set up Spring's `AsyncExecutionInterceptor` with Spring AOP,
 in combination with a custom pointcut.
 
+TIP: When `@Async` is combined with `@Retryable`, the async advice is applied outermost, so
+all retry attempts run on the async executor thread. See
+xref:core/resilience.adoc#resilience-annotations-retryable-combining-async[Combining `@Retryable` with `@Async`]
+for details.
+
 
 [[scheduling-annotation-support-qualification]]
 === Executor Qualification with `@Async`
 
 By default, when specifying `@Async` on a method, the executor that is used is the
-one xref:integration/scheduling.adoc#scheduling-enable-annotation-support[configured when enabling async support],
+one <<scheduling-enable-annotation-support,configured when enabling async support>>,
 i.e. the "`annotation-driven`" element if you are using XML or your `AsyncConfigurer`
 implementation, if any. However, you can use the `value` attribute of the `@Async`
 annotation when you need to indicate that an executor other than the default should be
@@ -675,7 +637,7 @@ scheduled with a trigger.
 
 
 [[scheduling-task-namespace-scheduler]]
-=== The 'scheduler' Element
+=== The `scheduler` Element
 
 The following element creates a `ThreadPoolTaskScheduler` instance with the
 specified thread pool size:
@@ -701,7 +663,7 @@ The following creates a `ThreadPoolTaskExecutor` instance:
 	<task:executor id="executor" pool-size="10"/>
 ----
 
-As with the scheduler shown in the xref:integration/scheduling.adoc#scheduling-task-namespace-scheduler[previous section],
+As with the scheduler shown in the <<scheduling-task-namespace-scheduler,previous section>>,
 the value provided for the `id` attribute is used as the prefix for thread names within
 the pool. As far as the pool size is concerned, the `executor` element supports more
 configuration options than the `scheduler` element. For one thing, the thread pool for
@@ -733,7 +695,7 @@ reached, does the executor create a new thread beyond the core size. If the max 
 has also been reached, then the executor rejects the task.
 
 By default, the queue is unbounded, but this is rarely the desired configuration,
-because it can lead to `OutOfMemoryErrors` if enough tasks are added to that queue while
+because it can lead to `OutOfMemoryError` if enough tasks are added to that queue while
 all pool threads are busy. Furthermore, if the queue is unbounded, the max size has
 no effect at all. Since the executor always tries the queue before creating a new
 thread beyond the core size, a queue must have a finite capacity for the thread pool to
@@ -786,7 +748,7 @@ The following example sets the `keep-alive` value to two minutes:
 
 
 [[scheduling-task-namespace-scheduled-tasks]]
-=== The 'scheduled-tasks' Element
+=== The `scheduled-tasks` Element
 
 The most powerful feature of Spring's task namespace is the support for configuring
 tasks to be scheduled within a Spring Application Context. This follows an approach
@@ -813,7 +775,7 @@ any previous execution takes. Additionally, for both `fixed-delay` and `fixed-ra
 tasks, you can specify an 'initial-delay' parameter, indicating the number of
 milliseconds to wait before the first execution of the method. For more control,
 you can instead provide a `cron` attribute to provide a
-xref:integration/scheduling.adoc#scheduling-cron-expression[cron expression].
+<<scheduling-cron-expression,cron expression>>.
 The following example shows these other options:
 
 [source,xml,indent=0]
@@ -834,8 +796,8 @@ The following example shows these other options:
 == Cron Expressions
 
 All Spring cron expressions have to conform to the same format, whether you are using them in
-xref:integration/scheduling.adoc#scheduling-annotation-support-scheduled[`@Scheduled` annotations],
-xref:integration/scheduling.adoc#scheduling-task-namespace-scheduled-tasks[`task:scheduled-tasks` elements],
+<<scheduling-annotation-support-scheduled,`@Scheduled` annotations>>,
+<<scheduling-task-namespace-scheduled-tasks,`task:scheduled-tasks` elements>>,
 or someplace else. A well-formed cron expression, such as `* * * * * *`, consists of six
 space-separated time and date fields, each with its own range of valid values:
 
@@ -1105,4 +1067,3 @@ it is therefore not recommended to specify values at both levels. For example, d
 an "org.quartz.jobStore.class" property if you mean to rely on a Spring-provided DataSource,
 or specify an `org.springframework.scheduling.quartz.LocalDataSourceJobStore` variant which
 is a full-fledged replacement for the standard `org.quartz.impl.jdbcjobstore.JobStoreTX`.
-

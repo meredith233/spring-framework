@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2023 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,6 +18,8 @@ package org.springframework.aop.aspectj.annotation;
 
 import java.util.List;
 
+import org.jspecify.annotations.Nullable;
+
 import org.springframework.aop.Advisor;
 import org.springframework.aop.aspectj.AbstractAspectJAdvice;
 import org.springframework.aot.generate.GenerationContext;
@@ -27,7 +29,6 @@ import org.springframework.beans.factory.aot.BeanFactoryInitializationAotContrib
 import org.springframework.beans.factory.aot.BeanFactoryInitializationAotProcessor;
 import org.springframework.beans.factory.aot.BeanFactoryInitializationCode;
 import org.springframework.beans.factory.config.ConfigurableListableBeanFactory;
-import org.springframework.lang.Nullable;
 import org.springframework.util.ClassUtils;
 
 /**
@@ -40,14 +41,13 @@ import org.springframework.util.ClassUtils;
  */
 class AspectJBeanFactoryInitializationAotProcessor implements BeanFactoryInitializationAotProcessor {
 
-	private static final boolean aspectJPresent = ClassUtils.isPresent("org.aspectj.lang.annotation.Pointcut",
+	private static final boolean ASPECTJ_PRESENT = ClassUtils.isPresent("org.aspectj.lang.annotation.Pointcut",
 			AspectJBeanFactoryInitializationAotProcessor.class.getClassLoader());
 
 
 	@Override
-	@Nullable
-	public BeanFactoryInitializationAotContribution processAheadOfTime(ConfigurableListableBeanFactory beanFactory) {
-		if (aspectJPresent) {
+	public @Nullable BeanFactoryInitializationAotContribution processAheadOfTime(ConfigurableListableBeanFactory beanFactory) {
+		if (ASPECTJ_PRESENT) {
 			return AspectDelegate.processAheadOfTime(beanFactory);
 		}
 		return null;
@@ -59,8 +59,7 @@ class AspectJBeanFactoryInitializationAotProcessor implements BeanFactoryInitial
 	 */
 	private static class AspectDelegate {
 
-		@Nullable
-		private static AspectContribution processAheadOfTime(ConfigurableListableBeanFactory beanFactory) {
+		private static @Nullable AspectContribution processAheadOfTime(ConfigurableListableBeanFactory beanFactory) {
 			BeanFactoryAspectJAdvisorsBuilder builder = new BeanFactoryAspectJAdvisorsBuilder(beanFactory);
 			List<Advisor> advisors = builder.buildAspectJAdvisors();
 			return (advisors.isEmpty() ? null : new AspectContribution(advisors));

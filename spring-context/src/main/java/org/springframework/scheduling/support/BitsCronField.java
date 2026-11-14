@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,7 +20,8 @@ import java.time.DateTimeException;
 import java.time.temporal.Temporal;
 import java.time.temporal.ValueRange;
 
-import org.springframework.lang.Nullable;
+import org.jspecify.annotations.Nullable;
+
 import org.springframework.util.Assert;
 import org.springframework.util.StringUtils;
 
@@ -160,8 +161,9 @@ final class BitsCronField extends CronField {
 				int max = Integer.parseInt(value, hyphenPos + 1, value.length(), 10);
 				min = type.checkValidValue(min);
 				max = type.checkValidValue(max);
-				if (type == Type.DAY_OF_WEEK && min == 7) {
-					// If used as a minimum in a range, Sunday means 0 (not 7)
+				if (type == Type.DAY_OF_WEEK && min == 7 && max != 7) {
+					// If used as a minimum in a range, Sunday means 0 (not 7),
+					// unless the range also ends with Sunday, as in "SUN-SUN"
 					min = 0;
 				}
 				return ValueRange.of(min, max);
@@ -170,14 +172,17 @@ final class BitsCronField extends CronField {
 	}
 
 
-	@Nullable
 	@Override
-	public <T extends Temporal & Comparable<? super T>> T nextOrSame(T temporal) {
+	public <T extends Temporal & Comparable<? super T>> @Nullable T nextOrSame(T temporal) {
 		int current = type().get(temporal);
 		int next = nextSetBit(current);
 		if (next == -1) {
 			temporal = type().rollForward(temporal);
-			next = nextSetBit(0);
+			next = nextSetBit(type().get(temporal));
+			if (next == -1) {
+				temporal = type().rollForward(temporal);
+				next = nextSetBit(0);
+			}
 		}
 		if (next == current) {
 			return temporal;
@@ -191,7 +196,12 @@ final class BitsCronField extends CronField {
 				next = nextSetBit(current);
 				if (next == -1) {
 					temporal = type().rollForward(temporal);
-					next = nextSetBit(0);
+					next = nextSetBit(type().get(temporal));
+					if (next == -1) {
+						temporal = type().rollForward(temporal);
+						next = nextSetBit(0);
+					}
+					current = type().get(temporal);
 				}
 			}
 			if (count >= CronExpression.MAX_ATTEMPTS) {
@@ -247,7 +257,7 @@ final class BitsCronField extends CronField {
 
 
 	@Override
-	public boolean equals(Object other) {
+	public boolean equals(@Nullable Object other) {
 		return (this == other || (other instanceof BitsCronField that &&
 				type() == that.type() && this.bits == that.bits));
 	}

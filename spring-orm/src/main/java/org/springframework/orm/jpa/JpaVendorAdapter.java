@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2020 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,8 +23,7 @@ import jakarta.persistence.EntityManager;
 import jakarta.persistence.EntityManagerFactory;
 import jakarta.persistence.spi.PersistenceProvider;
 import jakarta.persistence.spi.PersistenceUnitInfo;
-
-import org.springframework.lang.Nullable;
+import org.jspecify.annotations.Nullable;
 
 /**
  * SPI interface that allows to plug in vendor-specific behavior
@@ -45,12 +44,11 @@ public interface JpaVendorAdapter {
 
 	/**
 	 * Return the name of the persistence provider's root package
-	 * (e.g. "oracle.toplink.essentials"). Will be used for
+	 * (for example, "oracle.toplink.essentials"). Will be used for
 	 * excluding provider classes from temporary class overriding.
 	 * @since 2.5.2
 	 */
-	@Nullable
-	default String getPersistenceProviderRootPackage() {
+	default @Nullable String getPersistenceProviderRootPackage() {
 		return null;
 	}
 
@@ -99,8 +97,7 @@ public interface JpaVendorAdapter {
 	 * Return the vendor-specific JpaDialect implementation for this
 	 * provider, or {@code null} if there is none.
 	 */
-	@Nullable
-	default JpaDialect getJpaDialect() {
+	default @Nullable JpaDialect getJpaDialect() {
 		return null;
 	}
 
@@ -128,6 +125,20 @@ public interface JpaVendorAdapter {
 	}
 
 	/**
+	 * Return the vendor-specific JPA 4.0 EntityAgent interface
+	 * that this provider's EntityAgents will implement.
+	 * <p>If the provider does not offer any EntityAgent extensions,
+	 * the adapter should simply return the standard
+	 * {@code jakarta.persistence.EntityAgent} class here.
+	 * @return the EntityAgent class, or {@code null} if not supported
+	 * (on JPA 3.2)
+	 * @since 7.0.4
+	 */
+	default @Nullable Class<?> getEntityAgentInterface() {
+		return EntityManagerFactoryUtils.getEntityAgentClass();
+	}
+
+	/**
 	 * Optional callback for post-processing the native EntityManagerFactory
 	 * before active use.
 	 * <p>This can be used for triggering vendor-specific initialization processes.
@@ -140,7 +151,7 @@ public interface JpaVendorAdapter {
 	/**
 	 * Optional callback for post-processing the native EntityManager
 	 * before active use.
-	 * <p>This can be used for setting vendor-specific parameters, e.g.
+	 * <p>This can be used for setting vendor-specific parameters, for example,
 	 * Hibernate filters, on every new EntityManager.
 	 * @since 5.3
 	 */

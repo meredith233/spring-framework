@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2015 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -30,7 +30,7 @@ import org.springframework.web.context.WebApplicationContext;
  * <p>In contrast to
  * {@link org.springframework.validation.beanvalidation.SpringConstraintValidatorFactory},
  * this variant is meant for declarative use in a standard {@code validation.xml} file,
- * e.g. in combination with JAX-RS or JAX-WS.
+ * for example, in combination with JAX-RS or JAX-WS.
  *
  * @author Juergen Hoeller
  * @since 4.2.1
@@ -44,7 +44,6 @@ public class SpringWebConstraintValidatorFactory implements ConstraintValidatorF
 		return getWebApplicationContext().getAutowireCapableBeanFactory().createBean(key);
 	}
 
-	// Bean Validation 1.1 releaseInstance method
 	@Override
 	public void releaseInstance(ConstraintValidator<?, ?> instance) {
 		getWebApplicationContext().getAutowireCapableBeanFactory().destroyBean(instance);

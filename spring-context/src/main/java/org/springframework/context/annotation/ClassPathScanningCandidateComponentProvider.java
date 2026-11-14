@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2023 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -27,6 +27,7 @@ import java.util.Set;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.jspecify.annotations.Nullable;
 
 import org.springframework.beans.factory.BeanDefinitionStoreException;
 import org.springframework.beans.factory.annotation.AnnotatedBeanDefinition;
@@ -54,7 +55,6 @@ import org.springframework.core.type.classreading.MetadataReaderFactory;
 import org.springframework.core.type.filter.AnnotationTypeFilter;
 import org.springframework.core.type.filter.AssignableTypeFilter;
 import org.springframework.core.type.filter.TypeFilter;
-import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Component;
 import org.springframework.stereotype.Controller;
 import org.springframework.stereotype.Indexed;
@@ -90,7 +90,6 @@ import org.springframework.util.ClassUtils;
  * @see ScannedGenericBeanDefinition
  * @see CandidateComponentsIndex
  */
-@SuppressWarnings("removal") // components index
 public class ClassPathScanningCandidateComponentProvider implements EnvironmentCapable, ResourceLoaderAware {
 
 	static final String DEFAULT_RESOURCE_PATTERN = "**/*.class";
@@ -116,20 +115,15 @@ public class ClassPathScanningCandidateComponentProvider implements EnvironmentC
 
 	private final List<TypeFilter> excludeFilters = new ArrayList<>();
 
-	@Nullable
-	private Environment environment;
+	private @Nullable Environment environment;
 
-	@Nullable
-	private ConditionEvaluator conditionEvaluator;
+	private @Nullable ConditionEvaluator conditionEvaluator;
 
-	@Nullable
-	private ResourcePatternResolver resourcePatternResolver;
+	private @Nullable ResourcePatternResolver resourcePatternResolver;
 
-	@Nullable
-	private MetadataReaderFactory metadataReaderFactory;
+	private @Nullable MetadataReaderFactory metadataReaderFactory;
 
-	@Nullable
-	private CandidateComponentsIndex componentsIndex;
+	private @Nullable CandidateComponentsIndex componentsIndex;
 
 
 	/**
@@ -216,10 +210,7 @@ public class ClassPathScanningCandidateComponentProvider implements EnvironmentC
 	 * {@link Component @Component} meta-annotation including the
 	 * {@link Repository @Repository}, {@link Service @Service}, and
 	 * {@link Controller @Controller} stereotype annotations.
-	 * <p>Also supports Jakarta EE's {@link jakarta.annotation.ManagedBean} and
-	 * JSR-330's {@link jakarta.inject.Named} annotations (as well as their
-	 * pre-Jakarta {@code javax.annotation.ManagedBean} and {@code javax.inject.Named}
-	 * equivalents), if available.
+	 * <p>Also supports JSR-330's {@link jakarta.inject.Named} annotation if available.
 	 */
 	@SuppressWarnings("unchecked")
 	protected void registerDefaultFilters() {
@@ -227,35 +218,11 @@ public class ClassPathScanningCandidateComponentProvider implements EnvironmentC
 		ClassLoader cl = ClassPathScanningCandidateComponentProvider.class.getClassLoader();
 		try {
 			this.includeFilters.add(new AnnotationTypeFilter(
-					((Class<? extends Annotation>) ClassUtils.forName("jakarta.annotation.ManagedBean", cl)), false));
-			logger.trace("JSR-250 'jakarta.annotation.ManagedBean' found and supported for component scanning");
-		}
-		catch (ClassNotFoundException ex) {
-			// JSR-250 1.1 API (as included in Jakarta EE) not available - simply skip.
-		}
-		try {
-			this.includeFilters.add(new AnnotationTypeFilter(
-					((Class<? extends Annotation>) ClassUtils.forName("javax.annotation.ManagedBean", cl)), false));
-			logger.trace("JSR-250 'javax.annotation.ManagedBean' found and supported for component scanning");
-		}
-		catch (ClassNotFoundException ex) {
-			// JSR-250 1.1 API not available - simply skip.
-		}
-		try {
-			this.includeFilters.add(new AnnotationTypeFilter(
 					((Class<? extends Annotation>) ClassUtils.forName("jakarta.inject.Named", cl)), false));
 			logger.trace("JSR-330 'jakarta.inject.Named' annotation found and supported for component scanning");
 		}
 		catch (ClassNotFoundException ex) {
 			// JSR-330 API (as included in Jakarta EE) not available - simply skip.
-		}
-		try {
-			this.includeFilters.add(new AnnotationTypeFilter(
-					((Class<? extends Annotation>) ClassUtils.forName("javax.inject.Named", cl)), false));
-			logger.trace("JSR-330 'javax.inject.Named' annotation found and supported for component scanning");
-		}
-		catch (ClassNotFoundException ex) {
-			// JSR-330 API not available - simply skip.
 		}
 	}
 
@@ -282,8 +249,7 @@ public class ClassPathScanningCandidateComponentProvider implements EnvironmentC
 	/**
 	 * Return the {@link BeanDefinitionRegistry} used by this scanner, if any.
 	 */
-	@Nullable
-	protected BeanDefinitionRegistry getRegistry() {
+	protected @Nullable BeanDefinitionRegistry getRegistry() {
 		return null;
 	}
 
@@ -345,11 +311,14 @@ public class ClassPathScanningCandidateComponentProvider implements EnvironmentC
 	 */
 	public Set<BeanDefinition> findCandidateComponents(String basePackage) {
 		if (this.componentsIndex != null && indexSupportsIncludeFilters()) {
-			return addCandidateComponentsFromIndex(this.componentsIndex, basePackage);
+			if (this.componentsIndex.hasScannedPackage(basePackage)) {
+				return addCandidateComponentsFromIndex(this.componentsIndex, basePackage);
+			}
+			else {
+				this.componentsIndex.registerScan(basePackage);
+			}
 		}
-		else {
-			return scanCandidateComponents(basePackage);
-		}
+		return scanCandidateComponents(basePackage);
 	}
 
 	/**
@@ -372,14 +341,13 @@ public class ClassPathScanningCandidateComponentProvider implements EnvironmentC
 	 * @param filter the filter to check
 	 * @return whether the index supports this include filter
 	 * @since 5.0
+	 * @see #registerCandidateTypeForIncludeFilter(String, TypeFilter)
 	 * @see #extractStereotype(TypeFilter)
 	 */
 	private boolean indexSupportsIncludeFilter(TypeFilter filter) {
 		if (filter instanceof AnnotationTypeFilter annotationTypeFilter) {
 			Class<? extends Annotation> annotationType = annotationTypeFilter.getAnnotationType();
-			return (AnnotationUtils.isAnnotationDeclaredLocally(Indexed.class, annotationType) ||
-					annotationType.getName().startsWith("jakarta.") ||
-					annotationType.getName().startsWith("javax."));
+			return isStereotypeAnnotationForIndex(annotationType);
 		}
 		if (filter instanceof AssignableTypeFilter assignableTypeFilter) {
 			Class<?> target = assignableTypeFilter.getTargetType();
@@ -389,14 +357,35 @@ public class ClassPathScanningCandidateComponentProvider implements EnvironmentC
 	}
 
 	/**
+	 * Register the given class as a candidate type with the runtime-populated index, if any.
+	 * @param className the fully-qualified class name of the candidate type
+	 * @param filter the include filter to introspect for the associated stereotype
+	 */
+	private void registerCandidateTypeForIncludeFilter(String className, TypeFilter filter) {
+		if (this.componentsIndex != null) {
+			if (filter instanceof AnnotationTypeFilter annotationTypeFilter) {
+				Class<? extends Annotation> annotationType = annotationTypeFilter.getAnnotationType();
+				if (isStereotypeAnnotationForIndex(annotationType)) {
+					this.componentsIndex.registerCandidateType(className, annotationType.getName());
+				}
+			}
+			else if (filter instanceof AssignableTypeFilter assignableTypeFilter) {
+				Class<?> target = assignableTypeFilter.getTargetType();
+				if (AnnotationUtils.isAnnotationDeclaredLocally(Indexed.class, target)) {
+					this.componentsIndex.registerCandidateType(className, target.getName());
+				}
+			}
+		}
+	}
+
+	/**
 	 * Extract the stereotype to use for the specified compatible filter.
 	 * @param filter the filter to handle
 	 * @return the stereotype in the index matching this filter
 	 * @since 5.0
 	 * @see #indexSupportsIncludeFilter(TypeFilter)
 	 */
-	@Nullable
-	private String extractStereotype(TypeFilter filter) {
+	private @Nullable String extractStereotype(TypeFilter filter) {
 		if (filter instanceof AnnotationTypeFilter annotationTypeFilter) {
 			return annotationTypeFilter.getAnnotationType().getName();
 		}
@@ -404,6 +393,11 @@ public class ClassPathScanningCandidateComponentProvider implements EnvironmentC
 			return assignableTypeFilter.getTargetType().getName();
 		}
 		return null;
+	}
+
+	private boolean isStereotypeAnnotationForIndex(Class<? extends Annotation> annotationType) {
+		return (AnnotationUtils.isAnnotationDeclaredLocally(Indexed.class, annotationType) ||
+				annotationType.getName().startsWith("jakarta."));
 	}
 
 	private Set<BeanDefinition> addCandidateComponentsFromIndex(CandidateComponentsIndex index, String basePackage) {
@@ -452,9 +446,9 @@ public class ClassPathScanningCandidateComponentProvider implements EnvironmentC
 	private Set<BeanDefinition> scanCandidateComponents(String basePackage) {
 		Set<BeanDefinition> candidates = new LinkedHashSet<>();
 		try {
-			String packageSearchPath = ResourcePatternResolver.CLASSPATH_ALL_URL_PREFIX +
+			String packageSearchPattern = ResourcePatternResolver.CLASSPATH_ALL_URL_PREFIX +
 					resolveBasePackage(basePackage) + '/' + this.resourcePattern;
-			Resource[] resources = getResourcePatternResolver().getResources(packageSearchPath);
+			Resource[] resources = getResourcePatternResolver().getResources(packageSearchPattern);
 			boolean traceEnabled = logger.isTraceEnabled();
 			boolean debugEnabled = logger.isDebugEnabled();
 			for (Resource resource : resources) {
@@ -537,13 +531,14 @@ public class ClassPathScanningCandidateComponentProvider implements EnvironmentC
 	 * @return whether the class qualifies as a candidate component
 	 */
 	protected boolean isCandidateComponent(MetadataReader metadataReader) throws IOException {
-		for (TypeFilter tf : this.excludeFilters) {
-			if (tf.match(metadataReader, getMetadataReaderFactory())) {
+		for (TypeFilter filter : this.excludeFilters) {
+			if (filter.match(metadataReader, getMetadataReaderFactory())) {
 				return false;
 			}
 		}
-		for (TypeFilter tf : this.includeFilters) {
-			if (tf.match(metadataReader, getMetadataReaderFactory())) {
+		for (TypeFilter filter : this.includeFilters) {
+			if (filter.match(metadataReader, getMetadataReaderFactory())) {
+				registerCandidateTypeForIncludeFilter(metadataReader.getClassMetadata().getClassName(), filter);
 				return isConditionMatch(metadataReader);
 			}
 		}
@@ -565,9 +560,10 @@ public class ClassPathScanningCandidateComponentProvider implements EnvironmentC
 	}
 
 	/**
-	 * Determine whether the given bean definition qualifies as candidate.
-	 * <p>The default implementation checks whether the class is not an interface
-	 * and not dependent on an enclosing class.
+	 * Determine whether the given bean definition qualifies as a candidate component.
+	 * <p>The default implementation checks whether the class is not dependent on an
+	 * enclosing class as well as whether the class is either concrete (and therefore
+	 * not an interface) or has {@link Lookup @Lookup} methods.
 	 * <p>Can be overridden in subclasses.
 	 * @param beanDefinition the bean definition to check
 	 * @return whether the bean definition qualifies as a candidate component

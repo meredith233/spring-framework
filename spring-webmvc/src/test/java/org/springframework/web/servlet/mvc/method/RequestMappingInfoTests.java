@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,6 +22,7 @@ import java.util.List;
 import java.util.stream.Stream;
 
 import jakarta.servlet.http.HttpServletRequest;
+import org.junit.jupiter.api.Named;
 import org.junit.jupiter.api.Test;
 
 import org.springframework.http.HttpHeaders;
@@ -35,6 +36,7 @@ import org.springframework.web.util.pattern.PathPatternParser;
 
 import static java.util.Arrays.asList;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Named.named;
 import static org.springframework.web.bind.annotation.RequestMethod.GET;
 import static org.springframework.web.bind.annotation.RequestMethod.HEAD;
 
@@ -46,14 +48,18 @@ import static org.springframework.web.bind.annotation.RequestMethod.HEAD;
  */
 class RequestMappingInfoTests {
 
-	@SuppressWarnings("unused")
-	static Stream<RequestMappingInfo.Builder> pathPatternsArguments() {
+	@SuppressWarnings({"unused", "removal"})
+	static Stream<Named<RequestMappingInfo.Builder>> pathPatternsArguments() {
 		RequestMappingInfo.BuilderConfiguration config = new RequestMappingInfo.BuilderConfiguration();
 		config.setPathMatcher(new AntPathMatcher());
-		return Stream.of(RequestMappingInfo.paths(), RequestMappingInfo.paths().options(config));
+		return Stream.of(
+				named("PathPatternParser", RequestMappingInfo.paths()),
+				named("AntPathMatcher", RequestMappingInfo.paths().options(config))
+			);
 	}
 
 
+	@SuppressWarnings({"removal", "DataFlowIssue"})
 	@PathPatternsParameterizedTest
 	void createEmpty(RequestMappingInfo.Builder infoBuilder) {
 
@@ -87,6 +93,7 @@ class RequestMappingInfoTests {
 		assertThat(info.getCustomCondition()).isSameAs(result.getCustomCondition());
 	}
 
+	@SuppressWarnings("removal")
 	@Test // gh-31662
 	void pathPatternByDefault() {
 		RequestMappingInfo info = RequestMappingInfo.paths().build();
@@ -314,6 +321,7 @@ class RequestMappingInfoTests {
 		assertThat(match).as("Pre-flight should match the ACCESS_CONTROL_REQUEST_METHOD").isNull();
 	}
 
+	@SuppressWarnings("removal")
 	@Test
 	void mutate() {
 		RequestMappingInfo.BuilderConfiguration options = new RequestMappingInfo.BuilderConfiguration();

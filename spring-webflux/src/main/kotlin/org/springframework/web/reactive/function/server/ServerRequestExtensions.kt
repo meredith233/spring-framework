@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2023 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -24,6 +24,7 @@ import org.springframework.core.ParameterizedTypeReference
 import org.springframework.http.MediaType
 import org.springframework.http.codec.multipart.Part
 import org.springframework.util.MultiValueMap
+import org.springframework.web.bind.WebDataBinder
 import org.springframework.web.server.WebSession
 import reactor.core.publisher.Flux
 import reactor.core.publisher.Mono
@@ -35,7 +36,7 @@ import kotlin.reflect.KClass
  * Extension for [ServerRequest.bodyToMono] providing a `bodyToMono<Foo>()` variant
  * leveraging Kotlin reified type parameters. This extension is not subject to type
  * erasure and retains actual generic type arguments.
- * 
+ *
  * @author Sebastien Deleuze
  * @since 5.0
  */
@@ -172,7 +173,7 @@ fun ServerRequest.attributeOrNull(name: String): Any? = attributes()[name]
  */
 fun ServerRequest.queryParamOrNull(name: String): String? {
 	val queryParamValues = queryParams()[name]
-	return if (queryParamValues.isNullOrEmpty()) null else queryParamValues[0] ?: ""
+	return if (queryParamValues.isNullOrEmpty()) null else queryParamValues[0]
 }
 
 /**
@@ -192,3 +193,33 @@ fun ServerRequest.Headers.contentLengthOrNull(): Long? =
  */
 fun ServerRequest.Headers.contentTypeOrNull(): MediaType? =
 		contentType().orElse(null)
+
+/**
+ * Nullable variant of [ServerRequest.pathVariable].
+ *
+ * @author George Papadopoulos
+ * @since 6.2
+ */
+fun ServerRequest.pathVariableOrNull(name: String): String? {
+	return pathVariables()[name]
+}
+
+/**
+ * Extension for [ServerRequest.bind] providing a `bindAndAwait<Foo>()` Coroutines
+ * variant leveraging Kotlin reified type parameters.
+ *
+ * @author Sebastien Deleuze
+ * @since 7.0.3
+ */
+suspend inline fun <reified T : Any> ServerRequest.bindAndAwait(): T? =
+	bind(T::class.java).awaitSingleOrNull()
+
+/**
+ * Extension for [ServerRequest.bind] providing a `bindAndAwait<Foo> { ... }` Coroutines
+ * variant leveraging Kotlin reified type parameters.
+ *
+ * @author Sebastien Deleuze
+ * @since 7.0.3
+ */
+suspend inline fun <reified T : Any> ServerRequest.bindAndAwait(noinline dataBinderCustomizer: (WebDataBinder) -> Unit): T? =
+	bind(T::class.java, dataBinderCustomizer).awaitSingleOrNull()

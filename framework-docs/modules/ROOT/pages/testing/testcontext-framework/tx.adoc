@@ -9,6 +9,7 @@ transactions, however, you must configure a `PlatformTransactionManager` bean in
 details are provided later). In addition, you must declare Spring's `@Transactional`
 annotation either at the class or the method level for your tests.
 
+
 [[testcontext-tx-test-managed-transactions]]
 == Test-managed Transactions
 
@@ -45,6 +46,7 @@ Situations in which this can occur include but are not limited to the following.
   `org.junit.jupiter.api.Assertions` class
 * TestNG's `@Test(timeOut = ...)` support
 ====
+
 
 [[testcontext-tx-enabling-transactions]]
 == Enabling and Disabling Transactions
@@ -106,7 +108,7 @@ a Hibernate-based `UserRepository`:
 ======
 Java::
 +
-[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+[source,java,indent=0,subs="verbatim,quotes"]
 ----
 	@SpringJUnitConfig(TestConfig.class)
 	@Transactional
@@ -150,7 +152,7 @@ Java::
 
 Kotlin::
 +
-[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+[source,kotlin,indent=0,subs="verbatim,quotes"]
 ----
 	@SpringJUnitConfig(TestConfig::class)
 	@Transactional
@@ -193,9 +195,11 @@ Kotlin::
 ----
 ======
 
-As explained in xref:testing/testcontext-framework/tx.adoc#testcontext-tx-rollback-and-commit-behavior[Transaction Rollback and Commit Behavior], there is no need to
-clean up the database after the `createUser()` method runs, since any changes made to the
-database are automatically rolled back by the `TransactionalTestExecutionListener`.
+As explained in <<testcontext-tx-rollback-and-commit-behavior,Transaction Rollback and Commit Behavior>>,
+there is no need to clean up the database after the `createUser()` method runs,
+since any changes made to the database are automatically rolled back by the
+`TransactionalTestExecutionListener`.
+
 
 [[testcontext-tx-rollback-and-commit-behavior]]
 == Transaction Rollback and Commit Behavior
@@ -204,6 +208,7 @@ By default, test transactions will be automatically rolled back after completion
 test; however, transactional commit and rollback behavior can be configured declaratively
 via the `@Commit` and `@Rollback` annotations. See the corresponding entries in the
 xref:testing/annotations.adoc[annotation support] section for further details.
+
 
 [[testcontext-tx-programmatic-tx-mgt]]
 == Programmatic Transaction Management
@@ -223,7 +228,7 @@ for further details.
 ======
 Java::
 +
-[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+[source,java,indent=0,subs="verbatim,quotes"]
 ----
 	@ContextConfiguration(classes = TestConfig.class)
 	public class ProgrammaticTransactionManagementTests extends
@@ -255,7 +260,7 @@ Java::
 
 Kotlin::
 +
-[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+[source,kotlin,indent=0,subs="verbatim,quotes"]
 ----
 	@ContextConfiguration(classes = [TestConfig::class])
 	class ProgrammaticTransactionManagementTests : AbstractTransactionalJUnit4SpringContextTests() {
@@ -285,6 +290,7 @@ Kotlin::
 ----
 ======
 
+
 [[testcontext-tx-before-and-after-tx]]
 == Running Code Outside of a Transaction
 
@@ -303,7 +309,7 @@ before-transaction method or after-transaction method runs at the appropriate ti
 Generally speaking, `@BeforeTransaction` and `@AfterTransaction` methods must not accept
 any arguments.
 
-However, as of Spring Framework 6.1, for tests using the 
+However, for tests using the
 xref:testing/testcontext-framework/support-classes.adoc#testcontext-junit-jupiter-extension[`SpringExtension`]
 with JUnit Jupiter, `@BeforeTransaction` and `@AfterTransaction` methods may optionally
 accept arguments which will be resolved by any registered JUnit `ParameterResolver`
@@ -316,7 +322,7 @@ example.
 ======
 Java::
 +
-[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+[source,java,indent=0,subs="verbatim,quotes"]
 ----
 @BeforeTransaction
 void verifyInitialDatabaseState(@Autowired DataSource dataSource) {
@@ -326,7 +332,7 @@ void verifyInitialDatabaseState(@Autowired DataSource dataSource) {
 
 Kotlin::
 +
-[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+[source,kotlin,indent=0,subs="verbatim,quotes"]
 ----
 @BeforeTransaction
 fun verifyInitialDatabaseState(@Autowired dataSource: DataSource) {
@@ -346,6 +352,7 @@ Similarly, methods annotated with `@BeforeTransaction` or `@AfterTransaction` ar
 run for transactional test methods.
 ====
 
+
 [[testcontext-tx-mgr-config]]
 == Configuring a Transaction Manager
 
@@ -355,9 +362,10 @@ of `PlatformTransactionManager` within the test's `ApplicationContext`, you can 
 qualifier by using `@Transactional("myTxMgr")` or `@Transactional(transactionManager =
 "myTxMgr")`, or `TransactionManagementConfigurer` can be implemented by an
 `@Configuration` class. Consult the
-{spring-framework-api}/test/context/transaction/TestContextTransactionUtils.html#retrieveTransactionManager-org.springframework.test.context.TestContext-java.lang.String-[javadoc
+{spring-framework-api}/test/context/transaction/TestContextTransactionUtils.html#retrieveTransactionManager(org.springframework.test.context.TestContext,java.lang.String)[javadoc
 for `TestContextTransactionUtils.retrieveTransactionManager()`] for details on the
 algorithm used to look up a transaction manager in the test's `ApplicationContext`.
+
 
 [[testcontext-tx-annotation-demo]]
 == Demonstration of All Transaction-related Annotations
@@ -375,7 +383,7 @@ following example shows the relevant annotations:
 ======
 Java::
 +
-[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+[source,java,indent=0,subs="verbatim,quotes"]
 ----
 	@SpringJUnitConfig
 	@Transactional(transactionManager = "txMgr")
@@ -414,7 +422,7 @@ Java::
 
 Kotlin::
 +
-[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+[source,kotlin,indent=0,subs="verbatim,quotes"]
 ----
 	@SpringJUnitConfig
 	@Transactional(transactionManager = "txMgr")
@@ -469,7 +477,7 @@ session:
 ======
 Java::
 +
-[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+[source,java,indent=0,subs="verbatim,quotes"]
 ----
 	// ...
 
@@ -497,7 +505,7 @@ Java::
 
 Kotlin::
 +
-[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+[source,kotlin,indent=0,subs="verbatim,quotes"]
 ----
 	// ...
 
@@ -530,7 +538,7 @@ The following example shows matching methods for JPA:
 ======
 Java::
 +
-[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+[source,java,indent=0,subs="verbatim,quotes"]
 ----
 	// ...
 
@@ -558,7 +566,7 @@ Java::
 
 Kotlin::
 +
-[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+[source,kotlin,indent=0,subs="verbatim,quotes"]
 ----
 	// ...
 
@@ -575,7 +583,7 @@ Kotlin::
 
 	@Transactional
 	@Test(expected = ...)
-	void updateWithEntityManagerFlush() {
+	fun updateWithEntityManagerFlush() {
 		updateEntityInJpaPersistenceContext()
 		// Manual flush is required to avoid false positive in test
 		entityManager.flush()
@@ -590,7 +598,7 @@ Kotlin::
 .Testing ORM entity lifecycle callbacks
 [NOTE]
 =====
-Similar to the note about avoiding xref:testing/testcontext-framework/tx.adoc#testcontext-tx-false-positives[false positives]
+Similar to the note about avoiding <<testcontext-tx-false-positives,false positives>>
 when testing ORM code, if your application makes use of entity lifecycle callbacks (also
 known as entity listeners), make sure to flush the underlying unit of work within test
 methods that run that code. Failing to _flush_ or _clear_ the underlying unit of work can
@@ -612,7 +620,7 @@ example.
 ======
 Java::
 +
-[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+[source,java,indent=0,subs="verbatim,quotes"]
 ----
 	// ...
 
@@ -640,7 +648,7 @@ Java::
 
 Kotlin::
 +
-[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+[source,kotlin,indent=0,subs="verbatim,quotes"]
 ----
 	// ...
 
@@ -671,5 +679,3 @@ See
 {spring-framework-code}/spring-test/src/test/java/org/springframework/test/context/junit/jupiter/orm/JpaEntityListenerTests.java[JpaEntityListenerTests]
 in the Spring Framework test suite for working examples using all JPA lifecycle callbacks.
 =====
-
-

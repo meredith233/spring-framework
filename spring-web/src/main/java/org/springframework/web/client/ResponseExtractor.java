@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2018 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,8 +19,9 @@ package org.springframework.web.client;
 import java.io.IOException;
 import java.lang.reflect.Type;
 
+import org.jspecify.annotations.Nullable;
+
 import org.springframework.http.client.ClientHttpResponse;
-import org.springframework.lang.Nullable;
 
 /**
  * Generic callback interface used by {@link RestTemplate}'s retrieval methods.
@@ -36,8 +37,11 @@ import org.springframework.lang.Nullable;
  * @since 3.0
  * @param <T> the data type
  * @see RestTemplate#execute
+ * @deprecated as of 7.1 in favor of {@link RestClient.RequestBodySpec#exchange(RestClient.RequestHeadersSpec.ExchangeFunction)}.
  */
 @FunctionalInterface
+@Deprecated(since = "7.1", forRemoval = true)
+@SuppressWarnings("removal")
 public interface ResponseExtractor<T> {
 
 	/**
@@ -46,7 +50,6 @@ public interface ResponseExtractor<T> {
 	 * @return the extracted data
 	 * @throws IOException in case of I/O errors
 	 */
-	@Nullable
-	T extractData(ClientHttpResponse response) throws IOException;
+	@Nullable T extractData(ClientHttpResponse response) throws IOException;
 
 }

@@ -3,9 +3,8 @@
 
 The `org.springframework.jdbc.datasource.embedded` package provides support for embedded
 Java database engines. Support for https://www.hsqldb.org[HSQL],
-https://www.h2database.com[H2], and https://db.apache.org/derby[Derby] is provided
-natively. You can also use an extensible API to plug in new embedded database types and
-`DataSource` implementations.
+and https://www.h2database.com[H2] is provided natively.
+You can also use an extensible API to plug in new embedded database types and `DataSource` implementations.
 
 
 [[jdbc-why-embedded-database]]
@@ -39,9 +38,8 @@ for further details on all supported options.
 This section covers how to select one of the three embedded databases that Spring
 supports. It includes the following topics:
 
-* xref:data-access/jdbc/embedded-database-support.adoc#jdbc-embedded-database-using-HSQL[Using HSQL]
-* xref:data-access/jdbc/embedded-database-support.adoc#jdbc-embedded-database-using-H2[Using H2]
-* xref:data-access/jdbc/embedded-database-support.adoc#jdbc-embedded-database-using-Derby[Using Derby]
+* <<jdbc-embedded-database-using-HSQL,Using HSQL>>
+* <<jdbc-embedded-database-using-H2,Using H2>>
 
 [[jdbc-embedded-database-using-HSQL]]
 === Using HSQL
@@ -58,13 +56,6 @@ Spring supports the H2 database. To enable H2, set the `type` attribute of the
 `embedded-database` tag to `H2`. If you use the builder API, call the
 `setType(EmbeddedDatabaseType)` method with `EmbeddedDatabaseType.H2`.
 
-[[jdbc-embedded-database-using-Derby]]
-=== Using Derby
-
-Spring supports Apache Derby 10.5 and above. To enable Derby, set the `type`
-attribute of the `embedded-database` tag to `DERBY`. If you use the builder API,
-call the `setType(EmbeddedDatabaseType)` method with `EmbeddedDatabaseType.DERBY`.
-
 
 [[jdbc-embedded-database-types-custom]]
 == Customizing the Embedded Database Type
@@ -76,35 +67,35 @@ to customize them if necessary. The following example uses H2 with a custom driv
 ======
 Java::
 +
-[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+[source,java,indent=0,subs="verbatim,quotes"]
 ----
-    @Configuration
-    public class DataSourceConfig {
+	@Configuration
+	public class DataSourceConfig {
 
-        @Bean
-        public DataSource dataSource() {
-            return new EmbeddedDatabaseBuilder()
-                    .setDatabaseConfigurer(EmbeddedDatabaseConfigurers
-                            .customizeConfigurer(H2, this::customize))
-                    .addScript("schema.sql")
-                    .build();
-        }
+		@Bean
+		public DataSource dataSource() {
+			return new EmbeddedDatabaseBuilder()
+					.setDatabaseConfigurer(EmbeddedDatabaseConfigurers
+							.customizeConfigurer(H2, this::customize))
+					.addScript("schema.sql")
+					.build();
+		}
 
-        private EmbeddedDatabaseConfigurer customize(EmbeddedDatabaseConfigurer defaultConfigurer) {
-            return new EmbeddedDatabaseConfigurerDelegate(defaultConfigurer) {
-                @Override
-                public void configureConnectionProperties(ConnectionProperties properties, String databaseName) {
-                    super.configureConnectionProperties(properties, databaseName);
-                    properties.setDriverClass(CustomDriver.class);
-                }
-            };
-        }
+		private EmbeddedDatabaseConfigurer customize(EmbeddedDatabaseConfigurer defaultConfigurer) {
+			return new EmbeddedDatabaseConfigurerDelegate(defaultConfigurer) {
+				@Override
+				public void configureConnectionProperties(ConnectionProperties properties, String databaseName) {
+					super.configureConnectionProperties(properties, databaseName);
+					properties.setDriverClass(CustomDriver.class);
+				}
+			};
+		}
 	}
 ----
 
 Kotlin::
 +
-[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+[source,kotlin,indent=0,subs="verbatim,quotes"]
 ----
 	@Configuration
 	class DataSourceConfig {
@@ -143,14 +134,14 @@ can be useful for one-offs when the embedded database does not need to be reused
 classes. However, if you wish to create an embedded database that is shared within a test suite,
 consider using the xref:testing/testcontext-framework.adoc[Spring TestContext Framework] and
 configuring the embedded database as a bean in the Spring `ApplicationContext` as described
-in xref:data-access/jdbc/embedded-database-support.adoc#jdbc-embedded-database[Creating an Embedded Database].
+in <<jdbc-embedded-database,Creating an Embedded Database>>.
 The following listing shows the test template:
 
 [tabs]
 ======
 Java::
 +
-[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+[source,java,indent=0,subs="verbatim,quotes"]
 ----
 	public class DataAccessIntegrationTestTemplate {
 
@@ -182,7 +173,7 @@ Java::
 
 Kotlin::
 +
-[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+[source,kotlin,indent=0,subs="verbatim,quotes"]
 ----
 	class DataAccessIntegrationTestTemplate {
 
@@ -255,6 +246,3 @@ You can extend Spring JDBC embedded database support in two ways:
 
 We encourage you to contribute extensions to the Spring community at
 {spring-framework-issues}[GitHub Issues].
-
-
-

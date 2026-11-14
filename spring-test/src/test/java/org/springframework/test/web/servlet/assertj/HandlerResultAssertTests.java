@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,7 +19,6 @@ package org.springframework.test.web.servlet.assertj;
 import java.lang.reflect.Method;
 
 import org.assertj.core.api.AssertProvider;
-import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 import org.springframework.http.ResponseEntity;
@@ -120,7 +119,7 @@ class HandlerResultAssertTests {
 
 	private static Method method(Class<?> target, String name, Class<?>... parameterTypes) {
 		Method method = ReflectionUtils.findMethod(target, name, parameterTypes);
-		Assertions.assertThat(method).isNotNull();
+		assertThat(method).isNotNull();
 		return method;
 	}
 

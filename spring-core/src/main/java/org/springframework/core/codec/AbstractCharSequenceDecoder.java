@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2023 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -24,18 +24,18 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
 
+import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Publisher;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import org.springframework.core.ResolvableType;
 import org.springframework.core.io.buffer.DataBuffer;
+import org.springframework.core.io.buffer.DataBufferMatcher;
 import org.springframework.core.io.buffer.DataBufferUtils;
 import org.springframework.core.io.buffer.LimitedDataBufferList;
 import org.springframework.core.log.LogFormatUtils;
-import org.springframework.lang.Nullable;
 import org.springframework.util.Assert;
 import org.springframework.util.MimeType;
 
@@ -62,7 +62,7 @@ public abstract class AbstractCharSequenceDecoder<T extends CharSequence> extend
 
 	private Charset defaultCharset = DEFAULT_CHARSET;
 
-	private final ConcurrentMap<Charset, byte[][]> delimitersCache = new ConcurrentHashMap<>();
+	private final Map<Charset, byte[][]> delimitersCache = new ConcurrentHashMap<>();
 
 
 	/**
@@ -100,7 +100,7 @@ public abstract class AbstractCharSequenceDecoder<T extends CharSequence> extend
 		byte[][] delimiterBytes = getDelimiterBytes(mimeType);
 
 		LimitedDataBufferList chunks = new LimitedDataBufferList(getMaxInMemorySize());
-		DataBufferUtils.Matcher matcher = DataBufferUtils.matcher(delimiterBytes);
+		DataBufferMatcher matcher = DataBufferUtils.matcher(delimiterBytes);
 
 		return Flux.from(input)
 				.concatMapIterable(buffer -> processDataBuffer(buffer, matcher, chunks))
@@ -127,7 +127,7 @@ public abstract class AbstractCharSequenceDecoder<T extends CharSequence> extend
 		});
 	}
 
-	private Collection<DataBuffer> processDataBuffer(DataBuffer buffer, DataBufferUtils.Matcher matcher,
+	private Collection<DataBuffer> processDataBuffer(DataBuffer buffer, DataBufferMatcher matcher,
 			LimitedDataBufferList chunks) {
 
 		boolean release = true;
@@ -175,14 +175,18 @@ public abstract class AbstractCharSequenceDecoder<T extends CharSequence> extend
 	public final T decode(DataBuffer dataBuffer, ResolvableType elementType,
 			@Nullable MimeType mimeType, @Nullable Map<String, Object> hints) {
 
-		Charset charset = getCharset(mimeType);
-		T value = decodeInternal(dataBuffer, charset);
-		DataBufferUtils.release(dataBuffer);
-		LogFormatUtils.traceDebug(logger, traceOn -> {
-			String formatted = LogFormatUtils.formatValue(value, !traceOn);
-			return Hints.getLogPrefix(hints) + "Decoded " + formatted;
-		});
-		return value;
+		try {
+			Charset charset = getCharset(mimeType);
+			T value = decodeInternal(dataBuffer, charset);
+			LogFormatUtils.traceDebug(logger, traceOn -> {
+				String formatted = LogFormatUtils.formatValue(value, !traceOn);
+				return Hints.getLogPrefix(hints) + "Decoded " + formatted;
+			});
+			return value;
+		}
+		finally {
+			DataBufferUtils.release(dataBuffer);
+		}
 	}
 
 	private Charset getCharset(@Nullable MimeType mimeType) {

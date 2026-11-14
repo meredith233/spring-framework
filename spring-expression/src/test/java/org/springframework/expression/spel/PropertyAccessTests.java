@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,14 +16,25 @@
 
 package org.springframework.expression.spel;
 
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
+import java.lang.reflect.Method;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
+import org.assertj.core.api.ThrowableTypeAssert;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 
 import org.springframework.core.convert.TypeDescriptor;
+import org.springframework.core.convert.converter.ConditionalGenericConverter;
+import org.springframework.core.convert.support.GenericConversionService;
 import org.springframework.expression.AccessException;
 import org.springframework.expression.EvaluationContext;
 import org.springframework.expression.EvaluationException;
@@ -32,11 +43,14 @@ import org.springframework.expression.PropertyAccessor;
 import org.springframework.expression.TypedValue;
 import org.springframework.expression.spel.standard.SpelExpression;
 import org.springframework.expression.spel.standard.SpelExpressionParser;
+import org.springframework.expression.spel.support.ReflectivePropertyAccessor;
 import org.springframework.expression.spel.support.SimpleEvaluationContext;
 import org.springframework.expression.spel.support.StandardEvaluationContext;
+import org.springframework.expression.spel.support.StandardTypeConverter;
 import org.springframework.expression.spel.testresources.Inventor;
 import org.springframework.expression.spel.testresources.Person;
 import org.springframework.expression.spel.testresources.RecordPerson;
+import org.springframework.util.ClassUtils;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
@@ -83,11 +97,11 @@ class PropertyAccessTests extends AbstractExpressionTests {
 	void accessingOnNullObject() {
 		SpelExpression expr = (SpelExpression) parser.parseExpression("madeup");
 		EvaluationContext context = new StandardEvaluationContext(null);
-		assertThatExceptionOfType(SpelEvaluationException.class)
+		assertThatSpelEvaluationException()
 			.isThrownBy(() -> expr.getValue(context))
 			.extracting(SpelEvaluationException::getMessageCode).isEqualTo(SpelMessage.PROPERTY_OR_FIELD_NOT_READABLE_ON_NULL);
 		assertThat(expr.isWritable(context)).isFalse();
-		assertThatExceptionOfType(SpelEvaluationException.class)
+		assertThatSpelEvaluationException()
 			.isThrownBy(() -> expr.setValue(context, "abc"))
 			.extracting(SpelEvaluationException::getMessageCode).isEqualTo(SpelMessage.PROPERTY_OR_FIELD_NOT_WRITABLE_ON_NULL);
 	}
@@ -117,8 +131,7 @@ class PropertyAccessTests extends AbstractExpressionTests {
 		assertThat((int) i).isEqualTo(99);
 
 		// Cannot set it to a string value
-		assertThatExceptionOfType(EvaluationException.class).isThrownBy(() ->
-				flibbleexpr.setValue(ctx, "not allowed"));
+		assertThatSpelEvaluationException().isThrownBy(() -> flibbleexpr.setValue(ctx, "not allowed"));
 		// message will be: EL1063E:(pos 20): A problem occurred whilst attempting to set the property
 		// 'flibbles': 'Cannot set flibbles to an object of type 'class java.lang.String''
 		// System.out.println(e.getMessage());
@@ -145,10 +158,25 @@ class PropertyAccessTests extends AbstractExpressionTests {
 	}
 
 	@Test
-	void accessingPropertyOfClass() {
+	void accessingPropertyOfJavaLangClass() {
 		Expression expression = parser.parseExpression("name");
 		Object value = expression.getValue(new StandardEvaluationContext(String.class));
 		assertThat(value).isEqualTo("java.lang.String");
+	}
+
+	@Test  // gh-33216
+	void accessingPropertyOfJavaTimeZoneIdDeclaredInNonPublicSubclass() throws Exception {
+		String ID = "CET";
+		ZoneId zoneId = ZoneId.of(ID);
+
+		// Prerequisites for this use case:
+		assertThat(zoneId.getClass()).isPackagePrivate();
+		assertThat(zoneId.getId()).isEqualTo(ID);
+
+		Expression expression = parser.parseExpression("id");
+
+		String result = expression.getValue(new StandardEvaluationContext(zoneId), String.class);
+		assertThat(result).isEqualTo(ID);
 	}
 
 	@Test
@@ -173,8 +201,7 @@ class PropertyAccessTests extends AbstractExpressionTests {
 	@Test
 	void noGetClassAccess() {
 		EvaluationContext context = SimpleEvaluationContext.forReadOnlyDataBinding().build();
-		assertThatExceptionOfType(SpelEvaluationException.class).isThrownBy(() ->
-				parser.parseExpression("'a'.class.name").getValue(context));
+		assertThatSpelEvaluationException().isThrownBy(() -> parser.parseExpression("'a'.class.name").getValue(context));
 	}
 
 	@Test
@@ -187,8 +214,23 @@ class PropertyAccessTests extends AbstractExpressionTests {
 		target.setName("p2");
 		assertThat(expr.getValue(context, target)).isEqualTo("p2");
 
-		assertThatExceptionOfType(SpelEvaluationException.class).isThrownBy(() ->
-				parser.parseExpression("name='p3'").getValue(context, target));
+		assertThatSpelEvaluationException()
+				.isThrownBy(() -> parser.parseExpression("nonexistent").getValue(context, target))
+				.extracting(SpelEvaluationException::getMessageCode).isEqualTo(SpelMessage.PROPERTY_OR_FIELD_NOT_READABLE);
+
+		Method getInvalid = ClassUtils.getMethod(Person.class, "getInvalid");
+		assertThat(getInvalid.getReturnType()).isEqualTo(void.class);
+		assertThatSpelEvaluationException()
+				.isThrownBy(() -> parser.parseExpression("invalid").getValue(context, target))
+				.extracting(SpelEvaluationException::getMessageCode).isEqualTo(SpelMessage.PROPERTY_OR_FIELD_NOT_READABLE);
+
+		assertThatSpelEvaluationException()
+				.isThrownBy(() -> parser.parseExpression("name='p3'").getValue(context, target))
+				.extracting(SpelEvaluationException::getMessageCode).isEqualTo(SpelMessage.NOT_ASSIGNABLE);
+
+		assertThatSpelEvaluationException()
+				.isThrownBy(() -> parser.parseExpression("['name']='p4'").getValue(context, target))
+				.extracting(SpelEvaluationException::getMessageCode).isEqualTo(SpelMessage.NOT_ASSIGNABLE);
 	}
 
 	@Test
@@ -201,8 +243,112 @@ class PropertyAccessTests extends AbstractExpressionTests {
 		RecordPerson target2 = new RecordPerson("p2");
 		assertThat(expr.getValue(context, target2)).isEqualTo("p2");
 
-		assertThatExceptionOfType(SpelEvaluationException.class).isThrownBy(() ->
-				parser.parseExpression("name='p3'").getValue(context, target2));
+		assertThatSpelEvaluationException()
+				.isThrownBy(() -> parser.parseExpression("name='p3'").getValue(context, target2))
+				.extracting(SpelEvaluationException::getMessageCode).isEqualTo(SpelMessage.NOT_ASSIGNABLE);
+	}
+
+	@Test  // gh-37123
+	void propertyReadOnlyWithGenuineRecordAccessorEmbeddingPrefix() {
+		EvaluationContext context = SimpleEvaluationContext.forReadOnlyDataBinding().build();
+		Deal deal = new Deal("100", "urgent");
+
+		Expression budgetExpr = parser.parseExpression("budget");
+		Expression issueExpr = parser.parseExpression("issue");
+
+		assertThat(budgetExpr.getValue(context, deal)).isEqualTo("100");
+		assertThat(issueExpr.getValue(context, deal)).isEqualTo("urgent");
+
+		// The property name used to look up the record component's backing field (and thus
+		// its field-only annotations) must exactly match the component name: "budget", not ""
+		// from Property#resolveName() stripping a "get" that merely appears embedded in the
+		// name; "issue", not "sue" from stripping an "is" that merely happens to start it.
+		assertThat(budgetExpr.getValueTypeDescriptor(context, deal).getAnnotation(Marker.class).value())
+				.isEqualTo("budget");
+		assertThat(issueExpr.getValueTypeDescriptor(context, deal).getAnnotation(Marker.class).value())
+				.isEqualTo("issue");
+	}
+
+	@Test  // gh-37123
+	void propertyReadOnlyWithNonRecordDataClassAccessorEmbeddingPrefix() {
+		EvaluationContext context = SimpleEvaluationContext.forReadOnlyDataBinding().build();
+		IslandDataClass target = new IslandDataClass("Bali", "gizmo");
+
+		Expression islandExpr = parser.parseExpression("island");
+		Expression widgetExpr = parser.parseExpression("widget");
+
+		assertThat(islandExpr.getValue(context, target)).isEqualTo("Bali");
+		assertThat(widgetExpr.getValue(context, target)).isEqualTo("gizmo");
+
+		// Same guarantee as for a genuine java.lang.Record (see above): "island", not "land"
+		// from stripping an "is" that merely happens to start it; "widget", not "" from
+		// stripping a "get" that merely appears embedded in the name. But here on a plain,
+		// hand-written "data class" that is not a record and thus cannot be special-cased
+		// by type in Property#resolveName().
+		assertThat(islandExpr.getValueTypeDescriptor(context, target).getAnnotation(Marker.class).value())
+				.isEqualTo("island");
+		assertThat(widgetExpr.getValueTypeDescriptor(context, target).getAnnotation(Marker.class).value())
+				.isEqualTo("widget");
+	}
+
+	@Test  // gh-37123
+	void readCallSiteWithoutPriorCanReadResolvesCorrectAnnotation() throws AccessException {
+		// ReflectivePropertyAccessor#read() has its own Property construction call site,
+		// distinct from the one in canRead(). In the standard SpEL evaluation flow, that
+		// site is bypassed once canRead() has warmed the cache (and once an optimal
+		// accessor takes over), so we exercise it directly here with a fresh accessor/cache.
+		ReflectivePropertyAccessor accessor = new ReflectivePropertyAccessor();
+		EvaluationContext context = new StandardEvaluationContext();
+		IslandDataClass target = new IslandDataClass("Bali", "gizmo");
+
+		TypedValue result = accessor.read(context, target, "island");
+
+		assertThat(result.getValue()).isEqualTo("Bali");
+		assertThat(result.getTypeDescriptor().getAnnotation(Marker.class).value()).isEqualTo("island");
+	}
+
+	@Test  // gh-37123
+	void propertyReadWriteWithBooleanJavaBeanGetter() {
+		EvaluationContext context = SimpleEvaluationContext.forReadWriteDataBinding().build();
+		Flag target = new Flag();
+
+		Expression activeExpr = parser.parseExpression("active");
+		assertThat(activeExpr.getValue(context, target)).isEqualTo(false);
+
+		activeExpr.setValue(context, target, true);
+		assertThat(target.isActive()).isTrue();
+		assertThat(activeExpr.getValue(context, target)).isEqualTo(true);
+	}
+
+	@Test  // gh-37123
+	void propertyReadResolvesCorrectFieldForAcronymPropertyDespiteSimilarlyNamedField() {
+		EvaluationContext context = SimpleEvaluationContext.forReadOnlyDataBinding().build();
+		UrlHolder target = new UrlHolder();
+		target.setURL("https://spring.io");
+
+		Expression urlExpr = parser.parseExpression("URL");
+		assertThat(urlExpr.getValue(context, target)).isEqualTo("https://spring.io");
+
+		// Property#resolveName() would derive "uRL" (plain uncapitalize of "URL") for this
+		// getter, which happens to be the exact name of a decoy field on UrlHolder; passing
+		// the already-verified SpEL identifier "URL" through directly avoids that mismatch.
+		assertThat(urlExpr.getValueTypeDescriptor(context, target).getAnnotation(Marker.class).value())
+				.isEqualTo("right");
+	}
+
+	@Test  // gh-37123
+	void propertyWriteAppliesAnnotationDrivenConversionOnlyForCorrectlyResolvedAcronymField() {
+		GenericConversionService conversionService = new GenericConversionService();
+		conversionService.addConverter(new MarkerAwareStringConverter());
+		StandardEvaluationContext context = new StandardEvaluationContext();
+		context.setTypeConverter(new StandardTypeConverter(conversionService));
+		UrlHolder target = new UrlHolder();
+
+		parser.parseExpression("URL").setValue(context, target, "https://spring.io");
+
+		// Only observable if canWrite()'s Property resolves the "URL" field (not the "uRL"
+		// decoy field) and thus picks up the conversion-triggering @Marker("right") annotation.
+		assertThat(target.getURL()).isEqualTo("[https://spring.io]");
 	}
 
 	@Test
@@ -248,7 +394,7 @@ class PropertyAccessTests extends AbstractExpressionTests {
 	void propertyAccessWithoutMethodResolver() {
 		EvaluationContext context = SimpleEvaluationContext.forReadOnlyDataBinding().build();
 		Person target = new Person("p1");
-		assertThatExceptionOfType(SpelEvaluationException.class).isThrownBy(() ->
+		assertThatSpelEvaluationException().isThrownBy(() ->
 				parser.parseExpression("name.substring(1)").getValue(context, target));
 	}
 
@@ -274,9 +420,14 @@ class PropertyAccessTests extends AbstractExpressionTests {
 	void propertyAccessWithArrayIndexOutOfBounds() {
 		EvaluationContext context = SimpleEvaluationContext.forReadOnlyDataBinding().build();
 		Expression expression = parser.parseExpression("stringArrayOfThreeItems[3]");
-		assertThatExceptionOfType(SpelEvaluationException.class)
+		assertThatSpelEvaluationException()
 			.isThrownBy(() -> expression.getValue(context, new Inventor()))
 			.extracting(SpelEvaluationException::getMessageCode).isEqualTo(SpelMessage.ARRAY_INDEX_OUT_OF_BOUNDS);
+	}
+
+
+	private ThrowableTypeAssert<SpelEvaluationException> assertThatSpelEvaluationException() {
+		return assertThatExceptionOfType(SpelEvaluationException.class);
 	}
 
 
@@ -360,6 +511,99 @@ class PropertyAccessTests extends AbstractExpressionTests {
 
 		@Override
 		public void write(EvaluationContext context, Object target, String name, Object newValue) {
+		}
+	}
+
+
+	@Retention(RetentionPolicy.RUNTIME)
+	@Target(ElementType.FIELD)
+	private @interface Marker {
+
+		String value();
+	}
+
+
+	// Intentionally contains a "budget" property with a "get" prefix in its name
+	// and an "issue" property with an "is" prefix in its name.
+	private record Deal(@Marker("budget") String budget, @Marker("issue") String issue) {
+	}
+
+
+	// Intentionally contains a "widget" property with a "get" prefix in its name
+	// and an "island" property with an "is" prefix in its name.
+	static class IslandDataClass {
+
+		@Marker("island")
+		private final String island;
+
+		@Marker("widget")
+		private final String widget;
+
+		IslandDataClass(String island, String widget) {
+			this.island = island;
+			this.widget = widget;
+		}
+
+		// Intentionally begins with an "is" prefix, so to speak.
+		public String island() {
+			return this.island;
+		}
+
+		// Intentionally embeds a "get" prefix, so to speak.
+		public String widget() {
+			return this.widget;
+		}
+	}
+
+
+	static class Flag {
+
+		private boolean active;
+
+		public boolean isActive() {
+			return this.active;
+		}
+
+		public void setActive(boolean active) {
+			this.active = active;
+		}
+	}
+
+
+	private static class UrlHolder {
+
+		@Marker("wrong")
+		private String uRL = "decoy";
+
+		@Marker("right")
+		private String URL;
+
+		public String getURL() {
+			return this.URL;
+		}
+
+		public void setURL(String URL) {
+			this.URL = URL;
+		}
+	}
+
+
+	private static class MarkerAwareStringConverter implements ConditionalGenericConverter {
+
+		@Override
+		public Set<ConvertiblePair> getConvertibleTypes() {
+			return Set.of(new ConvertiblePair(String.class, String.class));
+		}
+
+		@Override
+		public boolean matches(TypeDescriptor sourceType, TypeDescriptor targetType) {
+			Marker marker = targetType.getAnnotation(Marker.class);
+			return (marker != null && marker.value().equals("right"));
+		}
+
+		@Override
+		public @Nullable Object convert(@Nullable Object source, TypeDescriptor sourceType, TypeDescriptor targetType) {
+			return "[" + source + "]";
 		}
 	}
 

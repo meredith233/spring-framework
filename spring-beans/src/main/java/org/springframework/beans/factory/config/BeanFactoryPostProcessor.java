@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2019 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -39,6 +39,13 @@ import org.springframework.beans.BeansException;
  * beans in its bean definitions and applies them before any other beans get created.
  * A {@code BeanFactoryPostProcessor} may also be registered programmatically
  * with a {@code ConfigurableApplicationContext}.
+ *
+ * <p>When registering a {@code BeanFactoryPostProcessor} via an {@code @Bean} method
+ * in a {@code @Configuration} class, use a {@code static} method to avoid eager
+ * initialization of other beans in the configuration class. See the
+ * "BeanFactoryPostProcessor-returning {@code @Bean} methods" section in
+ * {@link org.springframework.context.annotation.Bean @Bean}'s javadoc for details
+ * and an example.
  *
  * <h3>Ordering</h3>
  * <p>{@code BeanFactoryPostProcessor} beans that are autodetected in an

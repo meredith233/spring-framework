@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -25,17 +25,20 @@ import java.sql.Types;
 
 import javax.sql.DataSource;
 
+import org.assertj.core.api.InstanceOfAssertFactories;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import org.springframework.dao.InvalidDataAccessApiUsageException;
 import org.springframework.jdbc.BadSqlGrammarException;
+import org.springframework.jdbc.core.RowMapper;
 import org.springframework.jdbc.core.SqlOutParameter;
 import org.springframework.jdbc.core.SqlParameter;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
+import static org.assertj.core.api.Assertions.assertThatIllegalStateException;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.mock;
@@ -263,6 +266,61 @@ class SimpleJdbcCallTests {
 		verify(procedureColumnsResultSet).close();
 	}
 
+	@Test  // gh-37206
+	void functionWithAdditionalOutParameterDeclaredBeforeReturn() throws Exception {
+		initializeGetTotalFunctionWithMetaData();
+		SimpleJdbcCall function = new SimpleJdbcCall(dataSource).withFunctionName("get_total");
+		function.declareParameters(
+				new SqlOutParameter("out_status", Types.INTEGER),
+				new SqlOutParameter("RESULT", Types.INTEGER));
+		function.compile();
+		assertThat(function.getCallParameters()).extracting(SqlParameter::getName)
+				.containsExactly("RESULT", "AMOUNT", "out_status");
+		verifyStatement(function, "{? = call GET_TOTAL(?, ?)}");
+		Integer total = function.executeFunction(Integer.class, 5);
+		assertThat(total).isEqualTo(42);
+	}
+
+	@Test  // gh-37206
+	void functionWithAdditionalOutParameterDeclaredAfterReturn() throws Exception {
+		initializeGetTotalFunctionWithMetaData();
+		SimpleJdbcCall function = new SimpleJdbcCall(dataSource).withFunctionName("get_total");
+		function.declareParameters(
+				new SqlOutParameter("RESULT", Types.INTEGER),
+				new SqlOutParameter("out_status", Types.INTEGER));
+		function.compile();
+		assertThat(function.getCallParameters()).extracting(SqlParameter::getName)
+				.containsExactly("RESULT", "AMOUNT", "out_status");
+		Integer total = function.executeFunction(Integer.class, 5);
+		assertThat(total).isEqualTo(42);
+	}
+
+	@Test  // gh-37206
+	void sqlServerProcedureWithReturnValueDeclaredAfterOutParameter() throws Exception {
+		initializeSqlServerProcedureWithReturnValue();
+		SimpleJdbcCall procedure = new SimpleJdbcCall(dataSource).withProcedureName("my_proc").withReturnValue();
+		procedure.declareParameters(
+				new SqlOutParameter("@out_total", Types.INTEGER),
+				new SqlOutParameter("RETURN_VALUE", Types.INTEGER));
+		procedure.compile();
+		assertThat(procedure.getCallParameters()).extracting(SqlParameter::getName)
+				.containsExactly("RETURN_VALUE", "amount", "@out_total");
+		verifyStatement(procedure, "{? = call my_proc(?, ?)}");
+	}
+
+	@Test  // gh-37206
+	void sqlServerProcedureWithReturnValueDeclaredFirst() throws Exception {
+		initializeSqlServerProcedureWithReturnValue();
+		SimpleJdbcCall procedure = new SimpleJdbcCall(dataSource).withProcedureName("my_proc").withReturnValue();
+		procedure.declareParameters(
+				new SqlOutParameter("RETURN_VALUE", Types.INTEGER),
+				new SqlOutParameter("@out_total", Types.INTEGER));
+		procedure.compile();
+		assertThat(procedure.getCallParameters()).extracting(SqlParameter::getName)
+				.containsExactly("RETURN_VALUE", "amount", "@out_total");
+		verifyStatement(procedure, "{? = call my_proc(?, ?)}");
+	}
+
 
 	private void verifyStatement(SimpleJdbcCall adder, String expected) {
 		assertThat(adder.getCallString()).as("Incorrect call statement").isEqualTo(expected);
@@ -347,6 +405,41 @@ class SimpleJdbcCallTests {
 		verify(procedureColumnsResultSet).close();
 	}
 
+	private void initializeGetTotalFunctionWithMetaData() throws SQLException {
+		ResultSet proceduresResultSet = mock();
+		ResultSet procedureColumnsResultSet = mock();
+		given(databaseMetaData.getDatabaseProductName()).willReturn("Oracle");
+		given(databaseMetaData.getUserName()).willReturn("ME");
+		given(databaseMetaData.storesUpperCaseIdentifiers()).willReturn(true);
+		given(databaseMetaData.getProcedures("", "ME", "GET_TOTAL")).willReturn(proceduresResultSet);
+		given(databaseMetaData.getProcedureColumns("", "ME", "GET_TOTAL", null)).willReturn(procedureColumnsResultSet);
+		given(proceduresResultSet.next()).willReturn(true, false);
+		given(proceduresResultSet.getString("PROCEDURE_NAME")).willReturn("get_total");
+		given(procedureColumnsResultSet.next()).willReturn(true, true, true, false);
+		given(procedureColumnsResultSet.getInt("DATA_TYPE")).willReturn(4);
+		given(procedureColumnsResultSet.getString("COLUMN_NAME")).willReturn(null, "amount", "out_status");
+		given(procedureColumnsResultSet.getInt("COLUMN_TYPE")).willReturn(5, 1, 4);
+		given(connection.prepareCall("{? = call GET_TOTAL(?, ?)}")).willReturn(callableStatement);
+		given(callableStatement.execute()).willReturn(false);
+		given(callableStatement.getUpdateCount()).willReturn(-1);
+		given(callableStatement.getObject(1)).willReturn(42);
+		given(callableStatement.getObject(3)).willReturn(7);
+	}
+
+	private void initializeSqlServerProcedureWithReturnValue() throws SQLException {
+		ResultSet proceduresResultSet = mock();
+		ResultSet procedureColumnsResultSet = mock();
+		given(databaseMetaData.getDatabaseProductName()).willReturn("Microsoft SQL Server");
+		given(databaseMetaData.getProcedures(null, null, "my_proc")).willReturn(proceduresResultSet);
+		given(databaseMetaData.getProcedureColumns(null, null, "my_proc", null)).willReturn(procedureColumnsResultSet);
+		given(proceduresResultSet.next()).willReturn(true, false);
+		given(proceduresResultSet.getString("PROCEDURE_NAME")).willReturn("my_proc");
+		given(procedureColumnsResultSet.next()).willReturn(true, true, true, false);
+		given(procedureColumnsResultSet.getInt("DATA_TYPE")).willReturn(4);
+		given(procedureColumnsResultSet.getString("COLUMN_NAME")).willReturn("@RETURN_VALUE", "@amount", "@out_total");
+		given(procedureColumnsResultSet.getInt("COLUMN_TYPE")).willReturn(5, 1, 4);
+	}
+
 	@Test
 	void correctSybaseFunctionStatementNamed() throws Exception {
 		given(databaseMetaData.getDatabaseProductName()).willReturn("Sybase");
@@ -358,6 +451,39 @@ class SimpleJdbcCallTests {
 				.declareParameters(new SqlParameter("@CUSTID", Types.NUMERIC));
 		adder.compile();
 		verifyStatement(adder, "{call ADD_INVOICE(@AMOUNT = ?, @CUSTID = ?)}");
+	}
+
+	@Test
+	void declareParametersCannotBeInvokedWhenCompiled() {
+		SimpleJdbcCall call = new SimpleJdbcCall(dataSource)
+				.withProcedureName("procedure_name")
+				.declareParameters(new SqlParameter("PARAM", Types.VARCHAR));
+		call.compile();
+		assertThatIllegalStateException()
+				.isThrownBy(() -> call.declareParameters(new SqlParameter("Ignored Param", Types.VARCHAR)))
+				.withMessage("SqlCall for procedure is already compiled");
+	}
+
+	@Test
+	void addDeclaredRowMapperCanBeConfigured() {
+		SimpleJdbcCall call = new SimpleJdbcCall(dataSource)
+				.withProcedureName("procedure_name")
+				.returningResultSet("result_set", (rs, i) -> new Object());
+
+		assertThat(call).extracting("declaredRowMappers")
+				.asInstanceOf(InstanceOfAssertFactories.map(String.class, RowMapper.class))
+				.containsOnlyKeys("result_set");
+	}
+
+	@Test
+	void addDeclaredRowMapperWhenCompiled() {
+		SimpleJdbcCall call = new SimpleJdbcCall(dataSource)
+				.withProcedureName("procedure_name")
+				.returningResultSet("result_set", (rs, i) -> new Object());
+		call.compile();
+		assertThatIllegalStateException()
+				.isThrownBy(() -> call.returningResultSet("not added", (rs, i) -> new Object()))
+				.withMessage("SqlCall for procedure is already compiled");
 	}
 
 }

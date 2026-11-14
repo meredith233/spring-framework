@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2022 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,9 +23,9 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
-import org.springframework.aot.generate.ClassNameGenerator;
 import org.springframework.aot.generate.DefaultGenerationContext;
 import org.springframework.aot.generate.FileSystemGeneratedFiles;
+import org.springframework.aot.generate.NameGenerator;
 import org.springframework.aot.hint.ExecutableMode;
 import org.springframework.aot.hint.ReflectionHints;
 import org.springframework.aot.hint.TypeReference;
@@ -80,8 +80,9 @@ public abstract class ContextAotProcessor extends AbstractAotProcessor<ClassName
 	@Override
 	protected ClassName doProcess() {
 		deleteExistingOutput();
-		GenericApplicationContext applicationContext = prepareApplicationContext(getApplicationClass());
-		return performAotProcessing(applicationContext);
+		try (GenericApplicationContext applicationContext = prepareApplicationContext(getApplicationClass())) {
+			return performAotProcessing(applicationContext);
+		}
 	}
 
 	/**
@@ -101,7 +102,7 @@ public abstract class ContextAotProcessor extends AbstractAotProcessor<ClassName
 	protected ClassName performAotProcessing(GenericApplicationContext applicationContext) {
 		FileSystemGeneratedFiles generatedFiles = createFileSystemGeneratedFiles();
 		DefaultGenerationContext generationContext = new DefaultGenerationContext(
-				createClassNameGenerator(), generatedFiles);
+				createNameGenerator(), generatedFiles);
 		ApplicationContextAotGenerator generator = new ApplicationContextAotGenerator();
 		ClassName generatedInitializerClassName = generator.processAheadOfTime(applicationContext, generationContext);
 		registerEntryPointHint(generationContext, generatedInitializerClassName);
@@ -112,14 +113,15 @@ public abstract class ContextAotProcessor extends AbstractAotProcessor<ClassName
 	}
 
 	/**
-	 * Callback to customize the {@link ClassNameGenerator}.
-	 * <p>By default, a standard {@link ClassNameGenerator} using the configured
+	 * Callback to customize the {@link NameGenerator}.
+	 * <p>By default, a standard {@link NameGenerator} using the configured
 	 * {@linkplain #getApplicationClass() application entry point} as the default
 	 * target is used.
-	 * @return the class name generator
+	 * @return the name generator
+	 * @since 7.1
 	 */
-	protected ClassNameGenerator createClassNameGenerator() {
-		return new ClassNameGenerator(ClassName.get(getApplicationClass()));
+	protected NameGenerator createNameGenerator() {
+		return new NameGenerator(ClassName.get(getApplicationClass()));
 	}
 
 	/**
@@ -135,9 +137,7 @@ public abstract class ContextAotProcessor extends AbstractAotProcessor<ClassName
 	protected List<String> getDefaultNativeImageArguments(String applicationClassName) {
 		List<String> args = new ArrayList<>();
 		args.add("-H:Class=" + applicationClassName);
-		args.add("--report-unsupported-elements-at-runtime");
 		args.add("--no-fallback");
-		args.add("--install-exit-handlers");
 		return args;
 	}
 

@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2017 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -29,19 +29,19 @@ import org.springframework.web.bind.annotation.RestController;
  *
  * @author Rossen Stoyanchev
  */
-public class ControllerTests {
+class ControllerTests {
 
 	private WebTestClient client;
 
 
 	@BeforeEach
-	public void setUp() throws Exception {
+	void setUp() throws Exception {
 		this.client = WebTestClient.bindToController(new TestController()).build();
 	}
 
 
 	@Test
-	public void test() throws Exception {
+	void test() throws Exception {
 		this.client.get().uri("/test")
 				.exchange()
 				.expectStatus().isOk()

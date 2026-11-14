@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2022 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,14 +18,15 @@ package org.springframework.http.converter.json;
 
 import java.util.function.Consumer;
 
+import org.jspecify.annotations.Nullable;
+
 import org.springframework.aot.hint.MemberCategory;
 import org.springframework.aot.hint.RuntimeHints;
 import org.springframework.aot.hint.RuntimeHintsRegistrar;
 import org.springframework.aot.hint.TypeHint.Builder;
-import org.springframework.lang.Nullable;
 
 /**
- * {@link RuntimeHintsRegistrar} implementation that registers reflection entries
+ * {@link RuntimeHintsRegistrar} implementation that registers reflection hints
  * for {@link Jackson2ObjectMapperBuilder} well-known modules.
  *
  * @author Sebastien Deleuze
@@ -34,6 +35,7 @@ import org.springframework.lang.Nullable;
  */
 class JacksonModulesRuntimeHints implements RuntimeHintsRegistrar {
 
+	@SuppressWarnings("removal")
 	private static final Consumer<Builder> asJacksonModule = builder ->
 			builder.onReachableType(Jackson2ObjectMapperBuilder.class)
 					.withMembers(MemberCategory.INVOKE_DECLARED_CONSTRUCTORS);

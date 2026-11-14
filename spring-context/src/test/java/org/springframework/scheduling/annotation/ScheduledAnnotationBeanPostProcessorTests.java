@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2023 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,7 +21,6 @@ import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
-import java.lang.reflect.Method;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneId;
@@ -30,9 +29,11 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
-import org.junit.jupiter.api.AfterEach;
+import org.assertj.core.api.AbstractAssert;
+import org.junit.jupiter.api.AutoClose;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ParameterContext;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -83,13 +84,9 @@ import static org.assertj.core.api.SoftAssertions.assertSoftly;
  */
 class ScheduledAnnotationBeanPostProcessorTests {
 
+	@AutoClose
 	private final StaticApplicationContext context = new StaticApplicationContext();
 
-
-	@AfterEach
-	void closeContextAfterTest() {
-		context.close();
-	}
 
 	@ParameterizedTest
 	@CsvSource(textBlock = """
@@ -116,11 +113,7 @@ class ScheduledAnnotationBeanPostProcessorTests {
 				new DirectFieldAccessor(registrar).getPropertyValue("fixedDelayTasks");
 		assertThat(fixedDelayTasks).hasSize(1);
 		IntervalTask task = fixedDelayTasks.get(0);
-		ScheduledMethodRunnable runnable = (ScheduledMethodRunnable) task.getRunnable();
-		Object targetObject = runnable.getTarget();
-		Method targetMethod = runnable.getMethod();
-		assertThat(targetObject).isEqualTo(target);
-		assertThat(targetMethod.getName()).isEqualTo("fixedDelay");
+		assertThatScheduledRunnable(task.getRunnable()).hasTarget(target).hasMethodName("fixedDelay");
 		assertThat(task.getInitialDelayDuration()).isZero();
 		assertThat(task.getIntervalDuration()).isEqualTo(
 				Duration.ofMillis(expectedInterval < 0 ? Long.MAX_VALUE : expectedInterval));
@@ -150,11 +143,7 @@ class ScheduledAnnotationBeanPostProcessorTests {
 				new DirectFieldAccessor(registrar).getPropertyValue("fixedRateTasks");
 		assertThat(fixedRateTasks).hasSize(1);
 		IntervalTask task = fixedRateTasks.get(0);
-		ScheduledMethodRunnable runnable = (ScheduledMethodRunnable) task.getRunnable();
-		Object targetObject = runnable.getTarget();
-		Method targetMethod = runnable.getMethod();
-		assertThat(targetObject).isEqualTo(target);
-		assertThat(targetMethod.getName()).isEqualTo("fixedRate");
+		assertThatScheduledRunnable(task.getRunnable()).hasTarget(target).hasMethodName("fixedRate");
 		assertSoftly(softly -> {
 			softly.assertThat(task.getInitialDelayDuration()).as("initial delay").isZero();
 			softly.assertThat(task.getIntervalDuration()).as("interval").isEqualTo(Duration.ofMillis(expectedInterval));
@@ -185,11 +174,7 @@ class ScheduledAnnotationBeanPostProcessorTests {
 				new DirectFieldAccessor(registrar).getPropertyValue("fixedRateTasks");
 		assertThat(fixedRateTasks).hasSize(1);
 		IntervalTask task = fixedRateTasks.get(0);
-		ScheduledMethodRunnable runnable = (ScheduledMethodRunnable) task.getRunnable();
-		Object targetObject = runnable.getTarget();
-		Method targetMethod = runnable.getMethod();
-		assertThat(targetObject).isEqualTo(target);
-		assertThat(targetMethod.getName()).isEqualTo("fixedRate");
+		assertThatScheduledRunnable(task.getRunnable()).hasTarget(target).hasMethodName("fixedRate");
 		assertSoftly(softly -> {
 			softly.assertThat(task.getInitialDelayDuration()).as("initial delay").isEqualTo(Duration.ofMillis(expectedInitialDelay));
 			softly.assertThat(task.getIntervalDuration()).as("interval").isEqualTo(Duration.ofMillis(expectedInterval));
@@ -250,19 +235,11 @@ class ScheduledAnnotationBeanPostProcessorTests {
 				new DirectFieldAccessor(registrar).getPropertyValue("fixedRateTasks");
 		assertThat(fixedRateTasks).hasSize(2);
 		IntervalTask task1 = fixedRateTasks.get(0);
-		ScheduledMethodRunnable runnable1 = (ScheduledMethodRunnable) task1.getRunnable();
-		Object targetObject = runnable1.getTarget();
-		Method targetMethod = runnable1.getMethod();
-		assertThat(targetObject).isEqualTo(target);
-		assertThat(targetMethod.getName()).isEqualTo("fixedRate");
+		assertThatScheduledRunnable(task1.getRunnable()).hasTarget(target).hasMethodName("fixedRate");
 		assertThat(task1.getInitialDelayDuration()).isZero();
 		assertThat(task1.getIntervalDuration()).isEqualTo(Duration.ofMillis(4_000L));
 		IntervalTask task2 = fixedRateTasks.get(1);
-		ScheduledMethodRunnable runnable2 = (ScheduledMethodRunnable) task2.getRunnable();
-		targetObject = runnable2.getTarget();
-		targetMethod = runnable2.getMethod();
-		assertThat(targetObject).isEqualTo(target);
-		assertThat(targetMethod.getName()).isEqualTo("fixedRate");
+		assertThatScheduledRunnable(task2.getRunnable()).hasTarget(target).hasMethodName("fixedRate");
 		assertThat(task2.getInitialDelayDuration()).isEqualTo(Duration.ofMillis(2_000L));
 		assertThat(task2.getIntervalDuration()).isEqualTo(Duration.ofMillis(4_000L));
 	}
@@ -286,12 +263,26 @@ class ScheduledAnnotationBeanPostProcessorTests {
 				new DirectFieldAccessor(registrar).getPropertyValue("oneTimeTasks");
 		assertThat(oneTimeTasks).hasSize(1);
 		OneTimeTask task = oneTimeTasks.get(0);
-		ScheduledMethodRunnable runnable = (ScheduledMethodRunnable) task.getRunnable();
-		Object targetObject = runnable.getTarget();
-		Method targetMethod = runnable.getMethod();
-		assertThat(targetObject).isEqualTo(target);
-		assertThat(targetMethod.getName()).isEqualTo("oneTimeTask");
+		assertThatScheduledRunnable(task.getRunnable()).hasTarget(target).hasMethodName("oneTimeTask");
 		assertThat(task.getInitialDelayDuration()).isEqualTo(Duration.ofMillis(2_000L));
+	}
+
+	@Test
+	void oneTimeTaskOnNonRegisteredBean() {
+		BeanDefinition processorDefinition = new RootBeanDefinition(ScheduledAnnotationBeanPostProcessor.class);
+		context.registerBeanDefinition("postProcessor", processorDefinition);
+		context.refresh();
+
+		ScheduledTaskHolder postProcessor = context.getBean("postProcessor", ScheduledTaskHolder.class);
+		assertThat(postProcessor.getScheduledTasks()).hasSize(0);
+
+		Object target = context.getAutowireCapableBeanFactory().createBean(OneTimeTaskBean.class);
+		assertThat(postProcessor.getScheduledTasks()).hasSize(1);
+		@SuppressWarnings("unchecked")
+		Set<Object> manualTasks = (Set<Object>)
+				new DirectFieldAccessor(postProcessor).getPropertyValue("manualCancellationOnContextClose");
+		assertThat(manualTasks).hasSize(1);
+		assertThat(manualTasks).contains(target);
 	}
 
 	@Test
@@ -313,11 +304,7 @@ class ScheduledAnnotationBeanPostProcessorTests {
 				new DirectFieldAccessor(registrar).getPropertyValue("cronTasks");
 		assertThat(cronTasks).hasSize(1);
 		CronTask task = cronTasks.get(0);
-		ScheduledMethodRunnable runnable = (ScheduledMethodRunnable) task.getRunnable();
-		Object targetObject = runnable.getTarget();
-		Method targetMethod = runnable.getMethod();
-		assertThat(targetObject).isEqualTo(target);
-		assertThat(targetMethod.getName()).isEqualTo("cron");
+		assertThatScheduledRunnable(task.getRunnable()).hasTarget(target).hasMethodName("cron");
 		assertThat(task.getExpression()).isEqualTo("*/7 * * * * ?");
 	}
 
@@ -340,21 +327,13 @@ class ScheduledAnnotationBeanPostProcessorTests {
 				new DirectFieldAccessor(registrar).getPropertyValue("cronTasks");
 		assertThat(cronTasks).hasSize(1);
 		CronTask task = cronTasks.get(0);
-		ScheduledMethodRunnable runnable = (ScheduledMethodRunnable) task.getRunnable();
-		Object targetObject = runnable.getTarget();
-		Method targetMethod = runnable.getMethod();
-		assertThat(targetObject).isEqualTo(target);
-		assertThat(targetMethod.getName()).isEqualTo("cron");
+		assertThatScheduledRunnable(task.getRunnable()).hasTarget(target).hasMethodName("cron");
 		assertThat(task.getExpression()).isEqualTo("0 0 0-4,6-23 * * ?");
 		Trigger trigger = task.getTrigger();
 		assertThat(trigger).isNotNull();
-		boolean condition = trigger instanceof CronTrigger;
-		assertThat(condition).isTrue();
+		assertThat(trigger).isInstanceOf(CronTrigger.class);
 		CronTrigger cronTrigger = (CronTrigger) trigger;
 		ZonedDateTime dateTime = ZonedDateTime.of(2013, 4, 15, 4, 0, 0, 0, ZoneId.of("GMT+10"));
-//		Calendar cal = Calendar.getInstance(TimeZone.getTimeZone("GMT+10"));
-//		cal.clear();
-//		cal.set(2013, 3, 15, 4, 0);  // 15-04-2013 4:00 GMT+10;
 		Instant lastScheduledExecution = dateTime.toInstant();
 		Instant lastActualExecution = dateTime.toInstant();
 		dateTime = dateTime.plusMinutes(30);
@@ -404,11 +383,9 @@ class ScheduledAnnotationBeanPostProcessorTests {
 				new DirectFieldAccessor(registrar).getPropertyValue("cronTasks");
 		assertThat(cronTasks).hasSize(1);
 		CronTask task = cronTasks.get(0);
-		ScheduledMethodRunnable runnable = (ScheduledMethodRunnable) task.getRunnable();
-		Object targetObject = runnable.getTarget();
-		Method targetMethod = runnable.getMethod();
-		assertThat(targetObject).isEqualTo(context.getBean(ScopedProxyUtils.getTargetBeanName("target")));
-		assertThat(targetMethod.getName()).isEqualTo("cron");
+		assertThatScheduledRunnable(task.getRunnable())
+				.hasTarget(context.getBean(ScopedProxyUtils.getTargetBeanName("target")))
+				.hasMethodName("cron");
 		assertThat(task.getExpression()).isEqualTo("*/7 * * * * ?");
 	}
 
@@ -431,11 +408,7 @@ class ScheduledAnnotationBeanPostProcessorTests {
 				new DirectFieldAccessor(registrar).getPropertyValue("fixedRateTasks");
 		assertThat(fixedRateTasks).hasSize(1);
 		IntervalTask task = fixedRateTasks.get(0);
-		ScheduledMethodRunnable runnable = (ScheduledMethodRunnable) task.getRunnable();
-		Object targetObject = runnable.getTarget();
-		Method targetMethod = runnable.getMethod();
-		assertThat(targetObject).isEqualTo(target);
-		assertThat(targetMethod.getName()).isEqualTo("checkForUpdates");
+		assertThatScheduledRunnable(task.getRunnable()).hasTarget(target).hasMethodName("checkForUpdates");
 		assertThat(task.getIntervalDuration()).isEqualTo(Duration.ofMillis(5_000L));
 	}
 
@@ -458,11 +431,7 @@ class ScheduledAnnotationBeanPostProcessorTests {
 				new DirectFieldAccessor(registrar).getPropertyValue("fixedRateTasks");
 		assertThat(fixedRateTasks).hasSize(1);
 		IntervalTask task = fixedRateTasks.get(0);
-		ScheduledMethodRunnable runnable = (ScheduledMethodRunnable) task.getRunnable();
-		Object targetObject = runnable.getTarget();
-		Method targetMethod = runnable.getMethod();
-		assertThat(targetObject).isEqualTo(target);
-		assertThat(targetMethod.getName()).isEqualTo("checkForUpdates");
+		assertThatScheduledRunnable(task.getRunnable()).hasTarget(target).hasMethodName("checkForUpdates");
 		assertThat(task.getIntervalDuration()).isEqualTo(Duration.ofMillis(5_000L));
 		assertThat(task.getInitialDelayDuration()).isEqualTo(Duration.ofMillis(1_000L));
 	}
@@ -486,11 +455,7 @@ class ScheduledAnnotationBeanPostProcessorTests {
 				new DirectFieldAccessor(registrar).getPropertyValue("cronTasks");
 		assertThat(cronTasks).hasSize(1);
 		CronTask task = cronTasks.get(0);
-		ScheduledMethodRunnable runnable = (ScheduledMethodRunnable) task.getRunnable();
-		Object targetObject = runnable.getTarget();
-		Method targetMethod = runnable.getMethod();
-		assertThat(targetObject).isEqualTo(target);
-		assertThat(targetMethod.getName()).isEqualTo("generateReport");
+		assertThatScheduledRunnable(task.getRunnable()).hasTarget(target).hasMethodName("generateReport");
 		assertThat(task.getExpression()).isEqualTo("0 0 * * * ?");
 	}
 
@@ -519,11 +484,7 @@ class ScheduledAnnotationBeanPostProcessorTests {
 				new DirectFieldAccessor(registrar).getPropertyValue("cronTasks");
 		assertThat(cronTasks).hasSize(1);
 		CronTask task = cronTasks.get(0);
-		ScheduledMethodRunnable runnable = (ScheduledMethodRunnable) task.getRunnable();
-		Object targetObject = runnable.getTarget();
-		Method targetMethod = runnable.getMethod();
-		assertThat(targetObject).isEqualTo(target);
-		assertThat(targetMethod.getName()).isEqualTo("x");
+		assertThatScheduledRunnable(task.getRunnable()).hasTarget(target).hasMethodName("x");
 		assertThat(task.getExpression()).isEqualTo(businessHoursCronExpression);
 	}
 
@@ -549,8 +510,10 @@ class ScheduledAnnotationBeanPostProcessorTests {
 	@CsvSource(textBlock = """
 		PropertyPlaceholderWithFixedDelay, 5000, 1000, 5_000, 1_000
 		PropertyPlaceholderWithFixedDelay, PT5S, PT1S, 5_000, 1_000
+		PropertyPlaceholderWithFixedDelay, 5400ms, 1s, 5_400, 1_000
 		PropertyPlaceholderWithFixedDelayInSeconds, 5000, 1000, 5_000_000, 1_000_000
 		PropertyPlaceholderWithFixedDelayInSeconds, PT5S, PT1S, 5_000, 1_000
+		PropertyPlaceholderWithFixedDelayInSeconds, 5400ms, 500ms, 5_400, 500
 	""")
 	void propertyPlaceholderWithFixedDelay(@NameToClass Class<?> beanClass, String fixedDelay, String initialDelay,
 			long expectedInterval, long expectedInitialDelay) {
@@ -578,11 +541,7 @@ class ScheduledAnnotationBeanPostProcessorTests {
 				new DirectFieldAccessor(registrar).getPropertyValue("fixedDelayTasks");
 		assertThat(fixedDelayTasks).hasSize(1);
 		IntervalTask task = fixedDelayTasks.get(0);
-		ScheduledMethodRunnable runnable = (ScheduledMethodRunnable) task.getRunnable();
-		Object targetObject = runnable.getTarget();
-		Method targetMethod = runnable.getMethod();
-		assertThat(targetObject).isEqualTo(target);
-		assertThat(targetMethod.getName()).isEqualTo("fixedDelay");
+		assertThatScheduledRunnable(task.getRunnable()).hasTarget(target).hasMethodName("fixedDelay");
 		assertSoftly(softly -> {
 			softly.assertThat(task.getInitialDelayDuration()).as("initial delay").isEqualTo(Duration.ofMillis(expectedInitialDelay));
 			softly.assertThat(task.getIntervalDuration()).as("interval").isEqualTo(Duration.ofMillis(expectedInterval));
@@ -593,8 +552,10 @@ class ScheduledAnnotationBeanPostProcessorTests {
 	@CsvSource(textBlock = """
 		PropertyPlaceholderWithFixedRate, 3000, 1000, 3_000, 1_000
 		PropertyPlaceholderWithFixedRate, PT3S, PT1S, 3_000, 1_000
+		PropertyPlaceholderWithFixedRate, 3200ms, 1s, 3_200, 1_000
 		PropertyPlaceholderWithFixedRateInSeconds, 3000, 1000, 3_000_000, 1_000_000
 		PropertyPlaceholderWithFixedRateInSeconds, PT3S, PT1S, 3_000, 1_000
+		PropertyPlaceholderWithFixedRateInSeconds, 3200ms, 500ms, 3_200, 500
 	""")
 	void propertyPlaceholderWithFixedRate(@NameToClass Class<?> beanClass, String fixedRate, String initialDelay,
 			long expectedInterval, long expectedInitialDelay) {
@@ -622,11 +583,7 @@ class ScheduledAnnotationBeanPostProcessorTests {
 				new DirectFieldAccessor(registrar).getPropertyValue("fixedRateTasks");
 		assertThat(fixedRateTasks).hasSize(1);
 		IntervalTask task = fixedRateTasks.get(0);
-		ScheduledMethodRunnable runnable = (ScheduledMethodRunnable) task.getRunnable();
-		Object targetObject = runnable.getTarget();
-		Method targetMethod = runnable.getMethod();
-		assertThat(targetObject).isEqualTo(target);
-		assertThat(targetMethod.getName()).isEqualTo("fixedRate");
+		assertThatScheduledRunnable(task.getRunnable()).hasTarget(target).hasMethodName("fixedRate");
 		assertSoftly(softly -> {
 			softly.assertThat(task.getInitialDelayDuration()).as("initial delay").isEqualTo(Duration.ofMillis(expectedInitialDelay));
 			softly.assertThat(task.getIntervalDuration()).as("interval").isEqualTo(Duration.ofMillis(expectedInterval));
@@ -656,11 +613,7 @@ class ScheduledAnnotationBeanPostProcessorTests {
 				new DirectFieldAccessor(registrar).getPropertyValue("cronTasks");
 		assertThat(cronTasks).hasSize(1);
 		CronTask task = cronTasks.get(0);
-		ScheduledMethodRunnable runnable = (ScheduledMethodRunnable) task.getRunnable();
-		Object targetObject = runnable.getTarget();
-		Method targetMethod = runnable.getMethod();
-		assertThat(targetObject).isEqualTo(target);
-		assertThat(targetMethod.getName()).isEqualTo("x");
+		assertThatScheduledRunnable(task.getRunnable()).hasTarget(target).hasMethodName("x");
 		assertThat(task.getExpression()).isEqualTo(businessHoursCronExpression);
 	}
 
@@ -689,11 +642,7 @@ class ScheduledAnnotationBeanPostProcessorTests {
 				new DirectFieldAccessor(registrar).getPropertyValue("cronTasks");
 		assertThat(cronTasks).hasSize(1);
 		CronTask task = cronTasks.get(0);
-		ScheduledMethodRunnable runnable = (ScheduledMethodRunnable) task.getRunnable();
-		Object targetObject = runnable.getTarget();
-		Method targetMethod = runnable.getMethod();
-		assertThat(targetObject).isEqualTo(target);
-		assertThat(targetMethod.getName()).isEqualTo("y");
+		assertThatScheduledRunnable(task.getRunnable()).hasTarget(target).hasMethodName("y");
 		assertThat(task.getExpression()).isEqualTo(businessHoursCronExpression);
 	}
 
@@ -716,11 +665,7 @@ class ScheduledAnnotationBeanPostProcessorTests {
 				new DirectFieldAccessor(registrar).getPropertyValue("cronTasks");
 		assertThat(cronTasks).hasSize(1);
 		CronTask task = cronTasks.get(0);
-		ScheduledMethodRunnable runnable = (ScheduledMethodRunnable) task.getRunnable();
-		Object targetObject = runnable.getTarget();
-		Method targetMethod = runnable.getMethod();
-		assertThat(targetObject).isEqualTo(target);
-		assertThat(targetMethod.getName()).isEqualTo("cron");
+		assertThatScheduledRunnable(task.getRunnable()).hasTarget(target).hasMethodName("cron");
 		assertThat(task.getExpression()).isEqualTo("0 0 9-17 * * MON-FRI");
 	}
 
@@ -749,6 +694,32 @@ class ScheduledAnnotationBeanPostProcessorTests {
 		context.registerBeanDefinition("postProcessor", processorDefinition);
 		context.registerBeanDefinition("target", targetDefinition);
 		assertThatExceptionOfType(BeanCreationException.class).isThrownBy(context::refresh);
+	}
+
+
+	static ScheduledMethodRunnableAssert assertThatScheduledRunnable(Runnable runnable) {
+		return new ScheduledMethodRunnableAssert(runnable);
+	}
+
+
+	static class ScheduledMethodRunnableAssert extends AbstractAssert<ScheduledMethodRunnableAssert, Runnable> {
+
+		public ScheduledMethodRunnableAssert(Runnable actual) {
+			super(actual, ScheduledMethodRunnableAssert.class);
+			assertThat(actual).extracting("runnable").isInstanceOf(ScheduledMethodRunnable.class);
+		}
+
+		public ScheduledMethodRunnableAssert hasTarget(Object target) {
+			isNotNull();
+			assertThat(actual).extracting("runnable.target").isEqualTo(target);
+			return this;
+		}
+
+		public ScheduledMethodRunnableAssert hasMethodName(String name) {
+			isNotNull();
+			assertThat(actual).extracting("runnable.method.name").isEqualTo(name);
+			return this;
+		}
 	}
 
 
@@ -1026,6 +997,7 @@ class ScheduledAnnotationBeanPostProcessorTests {
 		}
 	}
 
+
 	static class PropertyPlaceholderWithFixedDelayInSeconds {
 
 		@Scheduled(fixedDelayString = "${fixedDelay}", initialDelayString = "${initialDelay}", timeUnit = TimeUnit.SECONDS)
@@ -1040,6 +1012,7 @@ class ScheduledAnnotationBeanPostProcessorTests {
 		void fixedRate() {
 		}
 	}
+
 
 	static class PropertyPlaceholderWithFixedRateInSeconds {
 
@@ -1071,9 +1044,11 @@ class ScheduledAnnotationBeanPostProcessorTests {
 		}
 	}
 
+
 	@Retention(RetentionPolicy.RUNTIME)
 	@ConvertWith(NameToClass.Converter.class)
 	private @interface NameToClass {
+
 		class Converter implements ArgumentConverter {
 			@Override
 			public Class<?> convert(Object beanClassName, ParameterContext context) throws ArgumentConversionException {

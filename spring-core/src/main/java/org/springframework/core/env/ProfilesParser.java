@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2023 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -26,8 +26,10 @@ import java.util.StringTokenizer;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
-import org.springframework.lang.Nullable;
+import org.jspecify.annotations.Nullable;
+
 import org.springframework.util.Assert;
+import org.springframework.util.StringUtils;
 
 /**
  * Internal parser used by {@link Profiles#of}.
@@ -64,6 +66,8 @@ final class ProfilesParser {
 	private static Profiles parseTokens(String expression, StringTokenizer tokens, Context context) {
 		List<Profiles> elements = new ArrayList<>();
 		Operator operator = null;
+		// Tracks whether an operand (rather than an operator) is expected next
+		boolean operandExpected = true;
 		while (tokens.hasMoreTokens()) {
 			String token = tokens.nextToken().trim();
 			if (token.isEmpty()) {
@@ -71,39 +75,55 @@ final class ProfilesParser {
 			}
 			switch (token) {
 				case "(" -> {
+					assertWellFormed(expression, operandExpected);
 					Profiles contents = parseTokens(expression, tokens, Context.PARENTHESIS);
 					if (context == Context.NEGATE) {
 						return contents;
 					}
 					elements.add(contents);
+					operandExpected = false;
 				}
 				case "&" -> {
-					assertWellFormed(expression, operator == null || operator == Operator.AND);
+					assertWellFormed(expression, operator == Operator.AND ||
+							(operator == null && !operandExpected));
 					operator = Operator.AND;
+					operandExpected = true;
 				}
 				case "|" -> {
-					assertWellFormed(expression, operator == null || operator == Operator.OR);
+					assertWellFormed(expression, operator == Operator.OR ||
+							(operator == null && !operandExpected));
 					operator = Operator.OR;
+					operandExpected = true;
 				}
-				case "!" -> elements.add(not(parseTokens(expression, tokens, Context.NEGATE)));
-				case ")" -> {
-					Profiles merged = merge(expression, elements, operator);
-					if (context == Context.PARENTHESIS) {
-						return merged;
+				case "!" -> {
+					assertWellFormed(expression, operandExpected);
+					Profiles negated = not(parseTokens(expression, tokens, Context.NEGATE));
+					if (context == Context.NEGATE) {
+						return negated;
 					}
-					elements.clear();
-					elements.add(merged);
-					operator = null;
+					elements.add(negated);
+					operandExpected = false;
+				}
+				case ")" -> {
+					if (context == Context.PARENTHESIS) {
+						assertWellFormed(expression, !operandExpected);
+						return merge(expression, elements, operator);
+					}
+					assertWellFormed(expression, false);
 				}
 				default -> {
+					assertWellFormed(expression, operandExpected);
+					assertWellFormed(expression, !StringUtils.containsWhitespace(token));
 					Profiles value = equals(token);
 					if (context == Context.NEGATE) {
 						return value;
 					}
 					elements.add(value);
+					operandExpected = false;
 				}
 			}
 		}
+		assertWellFormed(expression, context != Context.PARENTHESIS && !operandExpected);
 		return merge(expression, elements, operator);
 	}
 

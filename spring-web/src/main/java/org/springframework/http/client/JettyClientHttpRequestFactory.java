@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2023 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,6 +19,7 @@ package org.springframework.http.client;
 import java.io.IOException;
 import java.net.URI;
 import java.time.Duration;
+import java.util.concurrent.TimeUnit;
 
 import org.eclipse.jetty.client.HttpClient;
 import org.eclipse.jetty.client.Request;
@@ -36,6 +37,9 @@ import org.springframework.util.Assert;
  * @see <a href="https://www.eclipse.org/jetty/documentation/jetty-11/programming-guide/index.html#pg-client-http">Jetty HttpClient</a>
  */
 public class JettyClientHttpRequestFactory implements ClientHttpRequestFactory, InitializingBean, DisposableBean {
+
+	private static final Duration ONE_MILLISECOND = Duration.ofMillis(1);
+
 
 	private final HttpClient httpClient;
 
@@ -67,7 +71,7 @@ public class JettyClientHttpRequestFactory implements ClientHttpRequestFactory, 
 
 	/**
 	 * Set the underlying connect timeout in milliseconds.
-	 * A value of 0 specifies an infinite timeout.
+	 * <p>A value of 0 specifies an infinite timeout.
 	 * <p>Default is 5 seconds.
 	 */
 	public void setConnectTimeout(int connectTimeout) {
@@ -76,30 +80,40 @@ public class JettyClientHttpRequestFactory implements ClientHttpRequestFactory, 
 	}
 
 	/**
-	 * Set the underlying connect timeout in milliseconds.
-	 * A value of 0 specifies an infinite timeout.
+	 * Set the underlying connect timeout as a {@code Duration}.
+	 * <p>A value of 0 specifies an infinite timeout.
+	 * <p>Values less than one millisecond (other than 0) are not permitted.
 	 * <p>Default is 5 seconds.
 	 */
 	public void setConnectTimeout(Duration connectTimeout) {
 		Assert.notNull(connectTimeout, "ConnectTimeout must not be null");
+		Assert.isTrue(!connectTimeout.isNegative(), "Timeout must be a non-negative value");
+		Assert.isTrue(connectTimeout.isZero() || connectTimeout.compareTo(ONE_MILLISECOND) >= 0,
+				"Timeout must be zero or at least one millisecond");
 		this.httpClient.setConnectTimeout(connectTimeout.toMillis());
 	}
 
 	/**
 	 * Set the underlying read timeout in milliseconds.
+	 * <p>A value of 0 specifies an infinite timeout.
 	 * <p>Default is 10 seconds.
 	 */
 	public void setReadTimeout(long readTimeout) {
-		Assert.isTrue(readTimeout > 0, "Timeout must be a positive value");
+		Assert.isTrue(readTimeout >= 0, "Timeout must be a non-negative value");
 		this.readTimeout = readTimeout;
 	}
 
 	/**
-	 * Set the underlying read timeout as {@code Duration}.
+	 * Set the underlying read timeout as a {@code Duration}.
+	 * <p>A value of 0 specifies an infinite timeout.
+	 * <p>Values less than one millisecond (other than 0) are not permitted.
 	 * <p>Default is 10 seconds.
 	 */
 	public void setReadTimeout(Duration readTimeout) {
 		Assert.notNull(readTimeout, "ReadTimeout must not be null");
+		Assert.isTrue(!readTimeout.isNegative(), "Timeout must be a non-negative value");
+		Assert.isTrue(readTimeout.isZero() || readTimeout.compareTo(ONE_MILLISECOND) >= 0,
+				"Timeout must be zero or at least one millisecond");
 		this.readTimeout = readTimeout.toMillis();
 	}
 
@@ -133,6 +147,7 @@ public class JettyClientHttpRequestFactory implements ClientHttpRequestFactory, 
 		}
 
 		Request request = this.httpClient.newRequest(uri).method(httpMethod.name());
+		request.timeout(this.readTimeout, TimeUnit.MILLISECONDS);
 		return new JettyClientHttpRequest(request, this.readTimeout);
 	}
 }

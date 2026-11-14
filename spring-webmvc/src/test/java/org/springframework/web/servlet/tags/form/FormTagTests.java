@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -49,6 +49,7 @@ class FormTagTests extends AbstractHtmlElementTagTests {
 
 
 	@Override
+	@SuppressWarnings("serial")
 	protected void onSetUp() {
 		this.tag = new FormTag() {
 			@Override
@@ -126,6 +127,20 @@ class FormTagTests extends AbstractHtmlElementTagTests {
 		assertContainsAttribute(output, "name", name);
 		assertContainsAttribute(output, dynamicAttribute1, dynamicAttribute1);
 		assertContainsAttribute(output, dynamicAttribute2, dynamicAttribute2);
+	}
+
+	@Test
+	void writeFormWithHtmlEscaping() throws Exception {
+		this.tag.setCssClass("\"class\"");
+		this.tag.setCssStyle("\"style\"");
+
+		this.tag.doStartTag();
+		this.tag.doEndTag();
+		this.tag.doFinally();
+
+		String output = getOutput();
+		assertContainsAttribute(output, "class", "&quot;class&quot;");
+		assertContainsAttribute(output, "style", "&quot;style&quot;");
 	}
 
 	@Test

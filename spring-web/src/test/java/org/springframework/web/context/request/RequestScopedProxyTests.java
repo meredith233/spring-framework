@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -55,7 +55,7 @@ class RequestScopedProxyTests {
 
 
 	@Test
-	void testGetFromScope() {
+	void getFromScope() {
 		String name = "requestScopedObject";
 		TestBean bean = (TestBean) this.beanFactory.getBean(name);
 		assertThat(AopUtils.isCglibProxy(bean)).isTrue();
@@ -80,7 +80,7 @@ class RequestScopedProxyTests {
 	}
 
 	@Test
-	void testGetFromScopeThroughDynamicProxy() {
+	void getFromScopeThroughDynamicProxy() {
 		String name = "requestScopedProxy";
 		ITestBean bean = (ITestBean) this.beanFactory.getBean(name);
 		// assertTrue(AopUtils.isJdkDynamicProxy(bean));
@@ -105,7 +105,7 @@ class RequestScopedProxyTests {
 	}
 
 	@Test
-	void testDestructionAtRequestCompletion() {
+	void destructionAtRequestCompletion() {
 		String name = "requestScopedDisposableObject";
 		DerivedTestBean bean = (DerivedTestBean) this.beanFactory.getBean(name);
 		assertThat(AopUtils.isCglibProxy(bean)).isTrue();
@@ -131,7 +131,7 @@ class RequestScopedProxyTests {
 	}
 
 	@Test
-	void testGetFromFactoryBeanInScope() {
+	void getFromFactoryBeanInScope() {
 		String name = "requestScopedFactoryBean";
 		TestBean bean = (TestBean) this.beanFactory.getBean(name);
 		assertThat(AopUtils.isCglibProxy(bean)).isTrue();
@@ -153,7 +153,7 @@ class RequestScopedProxyTests {
 	}
 
 	@Test
-	void testGetInnerBeanFromScope() {
+	void getInnerBeanFromScope() {
 		TestBean bean = (TestBean) this.beanFactory.getBean("outerBean");
 		assertThat(AopUtils.isAopProxy(bean)).isFalse();
 		assertThat(AopUtils.isCglibProxy(bean.getSpouse())).isTrue();
@@ -177,7 +177,7 @@ class RequestScopedProxyTests {
 	}
 
 	@Test
-	void testGetAnonymousInnerBeanFromScope() {
+	void getAnonymousInnerBeanFromScope() {
 		TestBean bean = (TestBean) this.beanFactory.getBean("outerBean");
 		assertThat(AopUtils.isAopProxy(bean)).isFalse();
 		assertThat(AopUtils.isCglibProxy(bean.getSpouse())).isTrue();

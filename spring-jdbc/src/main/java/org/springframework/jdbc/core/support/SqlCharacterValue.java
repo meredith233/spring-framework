@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -24,20 +24,26 @@ import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.sql.Types;
 
+import org.jspecify.annotations.Nullable;
+
 import org.springframework.jdbc.core.SqlTypeValue;
-import org.springframework.lang.Nullable;
 
 /**
- * Object to represent a character-based parameter value for a SQL statement,
- * e.g. a character stream for a CLOB/NCLOB or a LONGVARCHAR column.
+ * Object to represent a character-based parameter value for an SQL statement,
+ * for example, a character stream for a CLOB/NCLOB or a LONGVARCHAR column.
  *
  * <p>Designed for use with {@link org.springframework.jdbc.core.JdbcTemplate}
  * as well as {@link org.springframework.jdbc.core.simple.JdbcClient}, to be
- * passed in as a parameter value wrapping the target content value. Can be
- * combined with {@link org.springframework.jdbc.core.SqlParameterValue} for
- * specifying a SQL type, e.g.
+ * passed in as a parameter value wrapping the target content value.
+ *
+ * <p>Can be combined with {@link org.springframework.jdbc.core.SqlParameterValue}
+ * for specifying an SQL type, for example,
  * {@code new SqlParameterValue(Types.CLOB, new SqlCharacterValue(myContent))}.
  * With most database drivers, the type hint is not actually necessary.
+ *
+ * <p>Note: Only specify {@code Types.CLOB} in case of an actual CLOB, preferring
+ * {@code Types.LONGVARCHAR} otherwise. This is in contrast to {@link SqlLobValue}
+ * where char sequence handling was lenient.
  *
  * @author Juergen Hoeller
  * @since 6.1.4
@@ -72,7 +78,7 @@ public class SqlCharacterValue implements SqlTypeValue {
 	/**
 	 * Create a new {@code SqlCharacterValue} for the given content.
 	 * @param reader the content reader
-	 * @param length the length of the content
+	 * @param length the length of the content (or -1 if undetermined)
 	 */
 	public SqlCharacterValue(Reader reader, long length) {
 		this.content = reader;
@@ -82,7 +88,7 @@ public class SqlCharacterValue implements SqlTypeValue {
 	/**
 	 * Create a new {@code SqlCharacterValue} for the given content.
 	 * @param asciiStream the content as ASCII stream
-	 * @param length the length of the content
+	 * @param length the length of the content (or -1 if undetermined)
 	 */
 	public SqlCharacterValue(InputStream asciiStream, long length) {
 		this.content = asciiStream;
@@ -103,8 +109,8 @@ public class SqlCharacterValue implements SqlTypeValue {
 		else if (this.content instanceof Reader reader) {
 			setReader(ps, paramIndex, sqlType, reader, this.length);
 		}
-		else if (this.content instanceof InputStream asciiStream) {
-			ps.setAsciiStream(paramIndex, asciiStream, this.length);
+		else if (this.content instanceof InputStream inputStream) {
+			setInputStream(ps, paramIndex, inputStream, this.length);
 		}
 		else {
 			throw new IllegalArgumentException("Illegal content type: " + this.content.getClass().getName());
@@ -129,13 +135,39 @@ public class SqlCharacterValue implements SqlTypeValue {
 			throws SQLException {
 
 		if (sqlType == Types.CLOB) {
-			ps.setClob(paramIndex, reader, length);
+			if (length >= 0) {
+				ps.setClob(paramIndex, reader, length);
+			}
+			else {
+				ps.setClob(paramIndex, reader);
+			}
 		}
 		else if (sqlType == Types.NCLOB) {
-			ps.setNClob(paramIndex, reader, length);
+			if (length >= 0) {
+				ps.setNClob(paramIndex, reader, length);
+			}
+			else {
+				ps.setNClob(paramIndex, reader);
+			}
 		}
 		else {
-			ps.setCharacterStream(paramIndex, reader, length);
+			if (length >= 0) {
+				ps.setCharacterStream(paramIndex, reader, length);
+			}
+			else {
+				ps.setCharacterStream(paramIndex, reader);
+			}
+		}
+	}
+
+	private void setInputStream(PreparedStatement ps, int paramIndex, InputStream is, long length)
+			throws SQLException {
+
+		if (length >= 0) {
+			ps.setAsciiStream(paramIndex, is, length);
+		}
+		else {
+			ps.setAsciiStream(paramIndex, is);
 		}
 	}
 

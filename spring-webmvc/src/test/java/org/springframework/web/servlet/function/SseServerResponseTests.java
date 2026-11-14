@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,11 +20,14 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.time.Duration;
 import java.util.Collections;
+import java.util.List;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import tools.jackson.databind.SerializationFeature;
+import tools.jackson.databind.json.JsonMapper;
 
-import org.springframework.http.converter.json.MappingJackson2HttpMessageConverter;
+import org.springframework.http.converter.json.JacksonJsonHttpMessageConverter;
 import org.springframework.web.servlet.ModelAndView;
 import org.springframework.web.testfixture.servlet.MockHttpServletRequest;
 import org.springframework.web.testfixture.servlet.MockHttpServletResponse;
@@ -33,22 +36,23 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * Tests for {@link ServerResponse.SseBuilder}.
+ *
  * @author Arjen Poutsma
  * @author Sebastien Deleuze
  * @author Brian Clozel
  */
 class SseServerResponseTests {
 
-	private MockHttpServletRequest mockRequest;
+	private final MockHttpServletRequest mockRequest = new MockHttpServletRequest("GET", "https://example.com");
 
-	private MockHttpServletResponse mockResponse;
+	private final MockHttpServletResponse mockResponse = new MockHttpServletResponse();
+
 
 	@BeforeEach
 	void setUp() {
-		this.mockRequest = new MockHttpServletRequest("GET", "https://example.com");
 		this.mockRequest.setAsyncSupported(true);
-		this.mockResponse = new MockHttpServletResponse();
 	}
+
 
 	@Test
 	void sendString() throws Exception {
@@ -67,8 +71,43 @@ class SseServerResponseTests {
 		ModelAndView mav = response.writeTo(this.mockRequest, this.mockResponse, context);
 		assertThat(mav).isNull();
 
-		String expected = "data:" + body + "\n\n";
+		String expected = "data: " + body + "\n\n";
 		assertThat(this.mockResponse.getContentAsString()).isEqualTo(expected);
+	}
+
+	@Test // gh-36537
+	void sendStringFlushesResponse() throws Exception {
+		ServerResponse response = ServerResponse.sse(sse -> {
+			try {
+				sse.send("foo bar");
+			}
+			catch (IOException ex) {
+				throw new UncheckedIOException(ex);
+			}
+		});
+
+		ServerResponse.Context context = Collections::emptyList;
+
+		response.writeTo(this.mockRequest, this.mockResponse, context);
+		assertThat(this.mockResponse.isCommitted()).isTrue();
+	}
+
+	@Test // gh-36537
+	void sendObjectFlushesResponse() throws Exception {
+		Person person = new Person("John Doe", 42);
+		ServerResponse response = ServerResponse.sse(sse -> {
+			try {
+				sse.send(person);
+			}
+			catch (IOException ex) {
+				throw new UncheckedIOException(ex);
+			}
+		});
+
+		ServerResponse.Context context = () -> List.of(new JacksonJsonHttpMessageConverter());
+
+		response.writeTo(this.mockRequest, this.mockResponse, context);
+		assertThat(this.mockResponse.isCommitted()).isTrue();
 	}
 
 	@Test
@@ -83,12 +122,12 @@ class SseServerResponseTests {
 			}
 		});
 
-		ServerResponse.Context context = () -> Collections.singletonList(new MappingJackson2HttpMessageConverter());
+		ServerResponse.Context context = () -> List.of(new JacksonJsonHttpMessageConverter());
 
 		ModelAndView mav = response.writeTo(this.mockRequest, this.mockResponse, context);
 		assertThat(mav).isNull();
 
-		String expected = "data:{\"name\":\"John Doe\",\"age\":42}\n\n";
+		String expected = "data: {\"name\":\"John Doe\",\"age\":42}\n\n";
 		assertThat(this.mockResponse.getContentAsString()).isEqualTo(expected);
 	}
 
@@ -104,18 +143,18 @@ class SseServerResponseTests {
 			}
 		});
 
-		MappingJackson2HttpMessageConverter converter = new MappingJackson2HttpMessageConverter();
-		converter.setPrettyPrint(true);
-		ServerResponse.Context context = () -> Collections.singletonList(converter);
+		JsonMapper jsonMapper = JsonMapper.builder().enable(SerializationFeature.INDENT_OUTPUT).build();
+		JacksonJsonHttpMessageConverter converter = new JacksonJsonHttpMessageConverter(jsonMapper);
+		ServerResponse.Context context = () -> List.of(converter);
 
 		ModelAndView mav = response.writeTo(this.mockRequest, this.mockResponse, context);
 		assertThat(mav).isNull();
 
 		String expected = """
-				data:{
-				data:  "name" : "John Doe",
-				data:  "age" : 42
-				data:}
+				data: {
+				data:   "name" : "John Doe",
+				data:   "age" : 42
+				data: }
 
 				""";
 		assertThat(this.mockResponse.getContentAsString()).isEqualTo(expected);
@@ -147,7 +186,7 @@ class SseServerResponseTests {
 				:comment line 1
 				:comment line 2
 				retry:1000
-				data:data
+				data: data
 
 				""";
 		assertThat(this.mockResponse.getContentAsString()).isEqualTo(expected);
@@ -170,6 +209,67 @@ class SseServerResponseTests {
 		assertThat(mav).isNull();
 
 		String expected = "event:custom\n\n";
+		assertThat(this.mockResponse.getContentAsString()).isEqualTo(expected);
+	}
+
+	@Test
+	void sendStringWithCarriageReturn() throws Exception {
+		String body = "line1\rline2\r\nline3";
+		ServerResponse response = ServerResponse.sse(sse -> {
+			try {
+				sse.send(body);
+			}
+			catch (IOException ex) {
+				throw new UncheckedIOException(ex);
+			}
+		});
+
+		ServerResponse.Context context = Collections::emptyList;
+
+		ModelAndView mav = response.writeTo(this.mockRequest, this.mockResponse, context);
+		assertThat(mav).isNull();
+
+		String expected = "data: line1\ndata: line2\ndata: line3\n\n";
+		assertThat(this.mockResponse.getContentAsString()).isEqualTo(expected);
+	}
+
+	@Test
+	void commentWithCarriageReturn() throws Exception {
+		ServerResponse response = ServerResponse.sse(sse -> {
+			try {
+				sse.comment("line1\rline2").send();
+			}
+			catch (IOException ex) {
+				throw new UncheckedIOException(ex);
+			}
+		});
+
+		ServerResponse.Context context = Collections::emptyList;
+
+		ModelAndView mav = response.writeTo(this.mockRequest, this.mockResponse, context);
+		assertThat(mav).isNull();
+
+		String expected = ":line1\n:line2\n\n";
+		assertThat(this.mockResponse.getContentAsString()).isEqualTo(expected);
+	}
+
+	@Test // gh-34608
+	void sendHeartbeat() throws Exception {
+		ServerResponse response = ServerResponse.sse(sse -> {
+			try {
+				sse.comment("").send();
+			}
+			catch (IOException ex) {
+				throw new UncheckedIOException(ex);
+			}
+		});
+
+		ServerResponse.Context context = Collections::emptyList;
+
+		ModelAndView mav = response.writeTo(this.mockRequest, this.mockResponse, context);
+		assertThat(mav).isNull();
+
+		String expected = ":\n\n";
 		assertThat(this.mockResponse.getContentAsString()).isEqualTo(expected);
 	}
 

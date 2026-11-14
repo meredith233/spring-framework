@@ -27,7 +27,7 @@ XML-free usage of the Spring container, as the following example shows:
 ======
 Java::
 +
-[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+[source,java,indent=0,subs="verbatim,quotes"]
 ----
 	public static void main(String[] args) {
 		ApplicationContext ctx = new AnnotationConfigApplicationContext(AppConfig.class);
@@ -38,7 +38,7 @@ Java::
 
 Kotlin::
 +
-[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+[source,kotlin,indent=0,subs="verbatim,quotes"]
 ----
 	import org.springframework.beans.factory.getBean
 
@@ -58,7 +58,7 @@ as input to the constructor, as the following example shows:
 ======
 Java::
 +
-[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+[source,java,indent=0,subs="verbatim,quotes"]
 ----
 	public static void main(String[] args) {
 		ApplicationContext ctx = new AnnotationConfigApplicationContext(MyServiceImpl.class, Dependency1.class, Dependency2.class);
@@ -69,7 +69,7 @@ Java::
 
 Kotlin::
 +
-[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+[source,kotlin,indent=0,subs="verbatim,quotes"]
 ----
 	import org.springframework.beans.factory.getBean
 
@@ -97,7 +97,7 @@ example shows how to do so:
 ======
 Java::
 +
-[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+[source,java,indent=0,subs="verbatim,quotes"]
 ----
 	public static void main(String[] args) {
 		AnnotationConfigApplicationContext ctx = new AnnotationConfigApplicationContext();
@@ -111,7 +111,7 @@ Java::
 
 Kotlin::
 +
-[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+[source,kotlin,indent=0,subs="verbatim,quotes"]
 ----
 	import org.springframework.beans.factory.getBean
 
@@ -136,7 +136,7 @@ To enable component scanning, you can annotate your `@Configuration` class as fo
 ======
 Java::
 +
-[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+[source,java,indent=0,subs="verbatim,quotes"]
 ----
 	@Configuration
 	@ComponentScan(basePackages = "com.acme") // <1>
@@ -148,7 +148,7 @@ Java::
 
 Kotlin::
 +
-[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+[source,kotlin,indent=0,subs="verbatim,quotes"]
 ----
 	@Configuration
 	@ComponentScan(basePackages = ["com.acme"]) // <1>
@@ -183,7 +183,7 @@ following example shows:
 ======
 Java::
 +
-[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+[source,java,indent=0,subs="verbatim,quotes"]
 ----
 	public static void main(String[] args) {
 		AnnotationConfigApplicationContext ctx = new AnnotationConfigApplicationContext();
@@ -195,7 +195,7 @@ Java::
 
 Kotlin::
 +
-[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+[source,kotlin,indent=0,subs="verbatim,quotes"]
 ----
 	fun main() {
 		val ctx = AnnotationConfigApplicationContext()
@@ -206,7 +206,8 @@ Kotlin::
 ----
 ======
 
-NOTE: Remember that `@Configuration` classes are xref:core/beans/classpath-scanning.adoc#beans-meta-annotations[meta-annotated]
+NOTE: Remember that `@Configuration` classes are
+xref:core/beans/classpath-scanning.adoc#beans-meta-annotations[meta-annotated]
 with `@Component`, so they are candidates for component-scanning. In the preceding example,
 assuming that `AppConfig` is declared within the `com.acme` package (or any package
 underneath), it is picked up during the call to `scan()`. Upon `refresh()`, all its `@Bean`
@@ -280,5 +281,3 @@ NOTE: For programmatic use cases, a `GenericWebApplicationContext` can be used a
 alternative to `AnnotationConfigWebApplicationContext`. See the
 {spring-framework-api}/web/context/support/GenericWebApplicationContext.html[`GenericWebApplicationContext`]
 javadoc for details.
-
-

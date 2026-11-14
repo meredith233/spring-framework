@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -60,6 +60,16 @@ class JavaScriptUtilsTests {
 	@Test
 	void escapeLessThanGreaterThanSigns() {
 		assertThat(JavaScriptUtils.javaScriptEscape("<>")).isEqualTo("\\u003C\\u003E");
+	}
+
+	@Test
+	void escapeBacktick() {
+		assertThat(JavaScriptUtils.javaScriptEscape("`")).isEqualTo("\\u0060");
+	}
+
+	@Test
+	void escapeDollar() {
+		assertThat(JavaScriptUtils.javaScriptEscape("$")).isEqualTo("\\u0024");
 	}
 
 }

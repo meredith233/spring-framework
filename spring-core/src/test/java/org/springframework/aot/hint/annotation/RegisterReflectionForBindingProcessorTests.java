@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2023 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -28,6 +28,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  * Tests for {@link RegisterReflectionForBindingProcessor}.
  *
  * @author Sebastien Deleuze
+ * @author Stephane Nicoll
  */
 class RegisterReflectionForBindingProcessorTests {
 
@@ -40,7 +41,7 @@ class RegisterReflectionForBindingProcessorTests {
 		processor.registerReflectionHints(hints.reflection(), ClassLevelAnnotatedBean.class);
 		assertThat(RuntimeHintsPredicates.reflection().onType(SampleClassWithGetter.class)).accepts(hints);
 		assertThat(RuntimeHintsPredicates.reflection().onType(String.class)).accepts(hints);
-		assertThat(RuntimeHintsPredicates.reflection().onMethod(SampleClassWithGetter.class, "getName")).accepts(hints);
+		assertThat(RuntimeHintsPredicates.reflection().onMethodInvocation(SampleClassWithGetter.class, "getName")).accepts(hints);
 	}
 
 	@Test
@@ -48,14 +49,15 @@ class RegisterReflectionForBindingProcessorTests {
 		processor.registerReflectionHints(hints.reflection(), MethodLevelAnnotatedBean.class.getMethod("method"));
 		assertThat(RuntimeHintsPredicates.reflection().onType(SampleClassWithGetter.class)).accepts(hints);
 		assertThat(RuntimeHintsPredicates.reflection().onType(String.class)).accepts(hints);
-		assertThat(RuntimeHintsPredicates.reflection().onMethod(SampleClassWithGetter.class, "getName")).accepts(hints);
+		assertThat(RuntimeHintsPredicates.reflection().onMethodInvocation(SampleClassWithGetter.class, "getName")).accepts(hints);
 	}
 
 	@Test
-	void throwExceptionWithoutAnnotationAttributeOnClass() {
-		assertThatThrownBy(() -> processor.registerReflectionHints(hints.reflection(),
-				SampleClassWithoutAnnotationAttribute.class))
-				.isInstanceOf(IllegalStateException.class);
+	void registerReflectionForBindingOnClassItself() {
+		processor.registerReflectionHints(hints.reflection(), SampleClassWithoutAnnotationAttribute.class);
+		assertThat(RuntimeHintsPredicates.reflection().onType(SampleClassWithoutAnnotationAttribute.class)).accepts(hints);
+		assertThat(RuntimeHintsPredicates.reflection().onType(String.class)).accepts(hints);
+		assertThat(RuntimeHintsPredicates.reflection().onMethodInvocation(SampleClassWithoutAnnotationAttribute.class, "getName")).accepts(hints);
 	}
 
 	@Test
@@ -80,12 +82,16 @@ class RegisterReflectionForBindingProcessorTests {
 	static class SampleClassWithGetter {
 
 		public String getName() {
-			return null;
+			return "test";
 		}
 	}
 
 	@RegisterReflectionForBinding
 	static class SampleClassWithoutAnnotationAttribute {
+
+		public String getName() {
+			return "test";
+		}
 	}
 
 	static class SampleClassWithoutMethodLevelAnnotationAttribute {

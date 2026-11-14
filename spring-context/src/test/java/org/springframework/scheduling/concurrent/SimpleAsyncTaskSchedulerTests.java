@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,6 +16,7 @@
 
 package org.springframework.scheduling.concurrent;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.util.Date;
 import java.util.concurrent.CountDownLatch;
@@ -27,6 +28,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.RepeatedTest;
 import org.junit.jupiter.api.Test;
 
+import org.springframework.core.task.AsyncTaskExecutor;
 import org.springframework.scheduling.Trigger;
 import org.springframework.scheduling.TriggerContext;
 import org.springframework.util.ErrorHandler;
@@ -44,9 +46,8 @@ class SimpleAsyncTaskSchedulerTests extends AbstractSchedulingTaskExecutorTests 
 	private final AtomicBoolean taskRun = new AtomicBoolean();
 
 
-	@SuppressWarnings("deprecation")
 	@Override
-	protected org.springframework.core.task.AsyncListenableTaskExecutor buildExecutor() {
+	protected AsyncTaskExecutor buildExecutor() {
 		scheduler.setTaskDecorator(runnable -> () -> {
 			taskRun.set(true);
 			runnable.run();
@@ -63,13 +64,6 @@ class SimpleAsyncTaskSchedulerTests extends AbstractSchedulingTaskExecutorTests 
 	}
 
 	@Test
-	@SuppressWarnings("deprecation")
-	@Override
-	void submitListenableRunnableWithGetAfterShutdown() {
-		// decorated Future cannot be cancelled on shutdown with SimpleAsyncTaskScheduler
-	}
-
-	@Test
 	@Override
 	void submitCompletableRunnableWithGetAfterShutdown() {
 		// decorated Future cannot be cancelled on shutdown with SimpleAsyncTaskScheduler
@@ -78,13 +72,6 @@ class SimpleAsyncTaskSchedulerTests extends AbstractSchedulingTaskExecutorTests 
 	@Test
 	@Override
 	void submitCallableWithGetAfterShutdown() {
-		// decorated Future cannot be cancelled on shutdown with SimpleAsyncTaskScheduler
-	}
-
-	@Test
-	@SuppressWarnings("deprecation")
-	@Override
-	void submitListenableCallableWithGetAfterShutdown() {
 		// decorated Future cannot be cancelled on shutdown with SimpleAsyncTaskScheduler
 	}
 
@@ -154,6 +141,54 @@ class SimpleAsyncTaskSchedulerTests extends AbstractSchedulingTaskExecutorTests 
 		Object result = future.get(1000, TimeUnit.MILLISECONDS);
 		await(errorHandler);
 		assertThat(result).isNull();
+		assertThat(errorHandler.lastError).isNotNull();
+		assertThat(taskRun.get()).isTrue();
+	}
+
+	@Test
+	void scheduleFixedRateTask() throws Exception {
+		TestTask task = new TestTask(this.testName, 1);
+		Future<?> future = scheduler.scheduleAtFixedRate(task, Duration.ofSeconds(1));
+		Thread.sleep(100);
+		future.cancel(true);
+		await(task);
+		assertThat(taskRun.get()).isTrue();
+		assertThreadNamePrefix(task);
+	}
+
+	@Test
+	void scheduleFixedRateTaskWithErrorHandler() throws Exception {
+		TestTask task = new TestTask(this.testName, 0);
+		TestErrorHandler errorHandler = new TestErrorHandler(1);
+		scheduler.setErrorHandler(errorHandler);
+		Future<?> future = scheduler.scheduleAtFixedRate(task, Duration.ofSeconds(1));
+		Thread.sleep(100);
+		future.cancel(true);
+		await(errorHandler);
+		assertThat(errorHandler.lastError).isNotNull();
+		assertThat(taskRun.get()).isTrue();
+	}
+
+	@Test
+	void scheduleFixedDelayTask() throws Exception {
+		TestTask task = new TestTask(this.testName, 1);
+		Future<?> future = scheduler.scheduleWithFixedDelay(task, Duration.ofSeconds(1));
+		Thread.sleep(100);
+		future.cancel(true);
+		await(task);
+		assertThat(taskRun.get()).isTrue();
+		assertThreadNamePrefix(task);
+	}
+
+	@Test
+	void scheduleFixedDelayTaskWithErrorHandler() throws Exception {
+		TestTask task = new TestTask(this.testName, 0);
+		TestErrorHandler errorHandler = new TestErrorHandler(1);
+		scheduler.setErrorHandler(errorHandler);
+		Future<?> future = scheduler.scheduleWithFixedDelay(task, Duration.ofSeconds(1));
+		Thread.sleep(100);
+		future.cancel(true);
+		await(errorHandler);
 		assertThat(errorHandler.lastError).isNotNull();
 		assertThat(taskRun.get()).isTrue();
 	}

@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,12 +16,14 @@
 
 package org.springframework.web.servlet.mvc.support;
 
+import java.io.IOException;
 import java.lang.reflect.Method;
 import java.util.Arrays;
 import java.util.Collections;
 
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -30,12 +32,13 @@ import org.springframework.beans.TypeMismatchException;
 import org.springframework.beans.testfixture.beans.TestBean;
 import org.springframework.core.MethodParameter;
 import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.http.converter.HttpMessageNotWritableException;
 import org.springframework.http.server.ServletServerHttpRequest;
-import org.springframework.lang.Nullable;
 import org.springframework.validation.BeanPropertyBindingResult;
+import org.springframework.web.ErrorResponseException;
 import org.springframework.web.HttpMediaTypeNotSupportedException;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -48,7 +51,9 @@ import org.springframework.web.multipart.support.MissingServletRequestPartExcept
 import org.springframework.web.servlet.HandlerExceptionResolver;
 import org.springframework.web.servlet.ModelAndView;
 import org.springframework.web.servlet.NoHandlerFoundException;
+import org.springframework.web.servlet.mvc.ObservedExchange;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
+import org.springframework.web.testfixture.http.MockHttpInputMessage;
 import org.springframework.web.testfixture.servlet.MockHttpServletRequest;
 import org.springframework.web.testfixture.servlet.MockHttpServletResponse;
 
@@ -153,9 +158,8 @@ class DefaultHandlerExceptionResolverTests {
 	}
 
 	@Test
-	@SuppressWarnings("deprecation")
-	public void handleHttpMessageNotReadable() {
-		HttpMessageNotReadableException ex = new HttpMessageNotReadableException("foo");
+	void handleHttpMessageNotReadable() {
+		HttpMessageNotReadableException ex = new HttpMessageNotReadableException("foo", new MockHttpInputMessage(new byte[0]));
 		ModelAndView mav = exceptionResolver.resolveException(request, response, null, ex);
 		assertThat(mav).as("No ModelAndView returned").isNotNull();
 		assertThat(mav.isEmpty()).as("No Empty ModelAndView returned").isTrue();
@@ -175,7 +179,7 @@ class DefaultHandlerExceptionResolverTests {
 	void handleMethodArgumentNotValid() throws Exception {
 		BeanPropertyBindingResult errors = new BeanPropertyBindingResult(new TestBean(), "testBean");
 		errors.rejectValue("name", "invalid");
-		MethodParameter parameter = new MethodParameter(this.getClass().getMethod("handle", String.class), 0);
+		MethodParameter parameter = new MethodParameter(getClass().getMethod("handle", String.class), 0);
 		MethodArgumentNotValidException ex = new MethodArgumentNotValidException(parameter, errors);
 		ModelAndView mav = exceptionResolver.resolveException(request, response, null, ex);
 		assertThat(mav).as("No ModelAndView returned").isNotNull();
@@ -209,7 +213,7 @@ class DefaultHandlerExceptionResolverTests {
 
 	@Test
 	void handleNoResourceFoundException() {
-		NoResourceFoundException ex = new NoResourceFoundException(HttpMethod.GET, "/resource");
+		NoResourceFoundException ex = new NoResourceFoundException(HttpMethod.GET, "/context/resource", "/resource");
 		ModelAndView mav = exceptionResolver.resolveException(request, response, null, ex);
 		assertThat(mav).as("No ModelAndView returned").isNotNull();
 		assertThat(mav.isEmpty()).as("No Empty ModelAndView returned").isTrue();
@@ -230,7 +234,7 @@ class DefaultHandlerExceptionResolverTests {
 	}
 
 	@Test  // SPR-14669
-	public void handleAsyncRequestTimeoutException() {
+	void handleAsyncRequestTimeoutException() {
 		Exception ex = new AsyncRequestTimeoutException();
 		ModelAndView mav = exceptionResolver.resolveException(request, response, null, ex);
 		assertThat(mav).as("No ModelAndView returned").isNotNull();
@@ -269,6 +273,53 @@ class DefaultHandlerExceptionResolverTests {
 		assertThat(actual).isSameAs(expected);
 	}
 
+	@Test // gh-34481
+	void handleDisconnectedClientException() {
+		Exception ex = new IOException("Broken pipe");
+		ModelAndView mav = exceptionResolver.resolveException(request, response, null, ex);
+		assertThat(mav).as("No ModelAndView returned").isNotNull();
+		assertThat(mav.isEmpty()).as("No Empty ModelAndView returned").isTrue();
+		assertThat(response.getStatus()).as("Should attempt to send server error").isEqualTo(500);
+	}
+
+	@Test
+	void serverErrorResponseIsRecordedOnObservation() throws Exception {
+		Method method = getClass().getMethod("handle", String.class);
+		MissingPathVariableException ex = new MissingPathVariableException("foo", new MethodParameter(method, 0));
+
+		assertThat(observe(ex).error()).isSameAs(ex);
+		assertThat(response.getStatus()).isEqualTo(500);
+	}
+
+	@Test
+	void serviceUnavailableErrorResponseIsRecordedOnObservation() throws Exception {
+		ErrorResponseException ex = new ErrorResponseException(HttpStatus.SERVICE_UNAVAILABLE);
+
+		assertThat(observe(ex).error()).isSameAs(ex);
+		assertThat(response.getStatus()).isEqualTo(503);
+	}
+
+	@Test
+	void clientErrorResponseIsNotRecordedOnObservation() throws Exception {
+		MissingServletRequestParameterException ex = new MissingServletRequestParameterException("foo", "bar");
+
+		assertThat(observe(ex).error()).isNull();
+		assertThat(response.getStatus()).isEqualTo(400);
+	}
+
+	@Test
+	void serverErrorResponseWithoutObservation() {
+		ErrorResponseException ex = new ErrorResponseException(HttpStatus.SERVICE_UNAVAILABLE);
+
+		ModelAndView mav = exceptionResolver.resolveException(request, response, null, ex);
+		assertThat(mav).isNotNull();
+		assertThat(response.getStatus()).isEqualTo(503);
+	}
+
+	private ObservedExchange<ModelAndView> observe(Exception ex) throws Exception {
+		return ObservedExchange.observe(this.request, this.response,
+				() -> this.exceptionResolver.resolveException(this.request, this.response, null, ex));
+	}
 
 	@SuppressWarnings("unused")
 	public void handle(String arg) {

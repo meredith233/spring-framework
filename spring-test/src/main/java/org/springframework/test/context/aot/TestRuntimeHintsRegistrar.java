@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2022 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -37,7 +37,7 @@ import org.springframework.aot.hint.RuntimeHints;
  * <p>As an alternative to implementing and registering a {@code TestRuntimeHintsRegistrar},
  * you may choose to annotate a test class with
  * {@link org.springframework.aot.hint.annotation.Reflective @Reflective},
- * {@link org.springframework.aot.hint.annotation.RegisterReflectionForBinding @RegisterReflectionForBinding},
+ * {@link org.springframework.aot.hint.annotation.RegisterReflection @RegisterReflection},
  * or {@link org.springframework.context.annotation.ImportRuntimeHints @ImportRuntimeHints}.
  *
  * @author Sam Brannen

@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2023 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,10 +22,16 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.Consumer;
 import java.util.stream.Stream;
 
 import javax.sql.DataSource;
 
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
+
+import org.springframework.core.convert.ConversionService;
+import org.springframework.dao.DataAccessException;
 import org.springframework.dao.support.DataAccessUtils;
 import org.springframework.jdbc.core.JdbcOperations;
 import org.springframework.jdbc.core.ResultSetExtractor;
@@ -35,7 +41,6 @@ import org.springframework.jdbc.core.namedparam.NamedParameterJdbcOperations;
 import org.springframework.jdbc.core.namedparam.SqlParameterSource;
 import org.springframework.jdbc.support.KeyHolder;
 import org.springframework.jdbc.support.rowset.SqlRowSet;
-import org.springframework.lang.Nullable;
 
 /**
  * A fluent {@code JdbcClient} with common JDBC query and update operations,
@@ -52,12 +57,15 @@ import org.springframework.lang.Nullable;
  *
  * <p>Delegates to {@link org.springframework.jdbc.core.JdbcTemplate} and
  * {@link org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate}.
- * For complex JDBC operations &mdash; for example, batch inserts and stored
- * procedure calls &mdash; you may use those lower-level template classes directly,
- * or alternatively {@link SimpleJdbcInsert} and {@link SimpleJdbcCall}.
+ * Batch updates are supported in a fluent fashion through {@link StatementSpec#batch()};
+ * for other complex JDBC operations &mdash; for example, stored procedure calls &mdash;
+ * you may use those lower-level template classes directly, or alternatively
+ * {@link SimpleJdbcInsert} and {@link SimpleJdbcCall}.
  *
  * @author Juergen Hoeller
  * @author Sam Brannen
+ * @author Jiri Krokviak
+ * @author Yanming Zhou
  * @since 6.1
  * @see ResultSetExtractor
  * @see RowCallbackHandler
@@ -106,7 +114,22 @@ public interface JdbcClient {
 	 * @param jdbcTemplate the delegate to perform operations on
 	 */
 	static JdbcClient create(NamedParameterJdbcOperations jdbcTemplate) {
-		return new DefaultJdbcClient(jdbcTemplate);
+		return new DefaultJdbcClient(jdbcTemplate, null);
+	}
+
+	/**
+	 * Create a {@code JdbcClient} for the given {@link NamedParameterJdbcOperations} delegate,
+	 * typically an {@link org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate}.
+	 * <p>Use this factory method to reuse existing {@code NamedParameterJdbcTemplate}
+	 * configuration, including its underlying {@code JdbcTemplate} and {@code DataSource},
+	 * along with a custom {@link ConversionService} for queries with mapped classes.
+	 * @param jdbcTemplate the delegate to perform operations on
+	 * @param conversionService a {@link ConversionService} for converting fetched JDBC values
+	 * to mapped classes in {@link StatementSpec#query(Class)}
+	 * @since 7.0
+	 */
+	static JdbcClient create(NamedParameterJdbcOperations jdbcTemplate, ConversionService conversionService) {
+		return new DefaultJdbcClient(jdbcTemplate, conversionService);
 	}
 
 
@@ -114,6 +137,30 @@ public interface JdbcClient {
 	 * A statement specification for parameter bindings and query/update execution.
 	 */
 	interface StatementSpec {
+
+		/**
+		 * Apply the given fetch size to any subsequent query statement.
+		 * @param fetchSize the fetch size
+		 * @since 7.0
+		 * @see org.springframework.jdbc.core.JdbcTemplate#setFetchSize
+		 */
+		StatementSpec withFetchSize(int fetchSize);
+
+		/**
+		 * Apply the given maximum number of rows to any subsequent query statement.
+		 * @param maxRows the maximum number of rows
+		 * @since 7.0
+		 * @see org.springframework.jdbc.core.JdbcTemplate#setMaxRows
+		 */
+		StatementSpec withMaxRows(int maxRows);
+
+		/**
+		 * Apply the given query timeout to any subsequent query statement.
+		 * @param queryTimeout the query timeout in seconds
+		 * @since 7.0
+		 * @see org.springframework.jdbc.core.JdbcTemplate#setQueryTimeout
+		 */
+		StatementSpec withQueryTimeout(int queryTimeout);
 
 		/**
 		 * Bind a positional JDBC statement parameter for "?" placeholder resolution
@@ -205,8 +252,9 @@ public interface JdbcClient {
 		 * Bind named statement parameters for ":x" placeholder resolution.
 		 * <p>The given parameter object will define all named parameters
 		 * based on its JavaBean properties, record components, or raw fields.
-		 * A Map instance can be provided as a complete parameter source as well.
-		 * @param namedParamObject a custom parameter object (e.g. a JavaBean,
+		 * A {@link Map} or an {@link SqlParameterSource} instance can be provided
+		 * as a complete parameter source as well.
+		 * @param namedParamObject a custom parameter object (for example, a JavaBean,
 		 * record class, or field holder) with named properties serving as
 		 * statement parameters
 		 * @return this statement specification (for chaining)
@@ -245,7 +293,7 @@ public interface JdbcClient {
 		 * @see org.springframework.jdbc.core.SingleColumnRowMapper
 		 * @see org.springframework.jdbc.core.SimplePropertyRowMapper
 		 */
-		<T> MappedQuerySpec<T> query(Class<T> mappedClass);
+		<T> MappedQuerySpec<@Nullable T> query(Class<T> mappedClass);
 
 		/**
 		 * Proceed towards execution of a mapped query, with several options
@@ -254,7 +302,7 @@ public interface JdbcClient {
 		 * @return the mapped query specification
 		 * @see java.sql.PreparedStatement#executeQuery()
 		 */
-		<T> MappedQuerySpec<T> query(RowMapper<T> rowMapper);
+		<T extends @Nullable Object> MappedQuerySpec<T> query(RowMapper<T> rowMapper);
 
 		/**
 		 * Execute a query with the provided SQL statement,
@@ -271,7 +319,7 @@ public interface JdbcClient {
 		 * @return the value returned by the ResultSetExtractor
 		 * @see java.sql.PreparedStatement#executeQuery()
 		 */
-		<T> T query(ResultSetExtractor<T> rse);
+		<T extends @Nullable Object> T query(ResultSetExtractor<T> rse);
 
 		/**
 		 * Execute the provided SQL statement as an update.
@@ -302,6 +350,255 @@ public interface JdbcClient {
 		 * @see java.sql.DatabaseMetaData#supportsGetGeneratedKeys()
 		 */
 		int update(KeyHolder generatedKeyHolder, String... keyColumnNames);
+
+		/**
+		 * Begin a batch update for the provided SQL statement, accumulating several
+		 * batch entries with each entry representing the parameters for one
+		 * statement execution within the batch.
+		 * <p>Define each batch entry through the returned {@link BatchSpec} and
+		 * finally trigger execution through {@link BatchSpec#update()}:
+		 * <pre class="code">
+		 * int[] rowsAffected = client.sql("INSERT INTO user (first_name, last_name) VALUES (:first, :last)")
+		 *     .batch()
+		 *         .entry(entry -&gt; entry.param("first", "Jane").param("last", "Smith"))
+		 *         .entry(entry -&gt; entry.param("first", "John").param("last", "Doe"))
+		 *     .update();
+		 * </pre>
+		 * <p>Alternatively, provide an entire list of parameter objects at once,
+		 * with each object representing one batch entry:
+		 * <pre class="code">
+		 * List&lt;User&gt; users = ...;
+		 * int[] rowsAffected = client.sql("INSERT INTO user (first_name, last_name) VALUES (:firstName, :lastName)")
+		 *     .batch()
+		 *         .entries(users)
+		 *     .update();
+		 * </pre>
+		 * @return a batch specification for accumulating batch entries
+		 * @since 7.1
+		 * @see java.sql.PreparedStatement#executeBatch()
+		 */
+		BatchSpec batch();
+	}
+
+
+	/**
+	 * A specification for accumulating several batch entries for a batch update,
+	 * with each entry representing the parameters for one statement execution
+	 * within the batch.
+	 *
+	 * <p>Each {@code entry(...)} or {@code entries(...)} call defines one or more
+	 * complete batch entries; calls may be freely combined within the same batch.
+	 * Parameters are bound in the same fashion as for a single {@link StatementSpec},
+	 * either as JDBC-style positional parameters or as Spring-style named parameters
+	 * (but not both within the same batch).
+	 *
+	 * @since 7.1
+	 * @see StatementSpec#batch()
+	 * @see BatchEntry
+	 */
+	interface BatchSpec {
+
+		/**
+		 * Define a batch entry by binding its parameters through the given callback.
+		 * <p>The entry is complete once the callback returns.
+		 * @param entryConsumer a callback for binding the parameters of the entry
+		 * @return this batch specification (for chaining)
+		 * @throws IllegalStateException if the entry does not declare any parameters,
+		 * or if named and indexed parameters are mixed within the batch
+		 */
+		BatchSpec entry(Consumer<BatchEntry> entryConsumer);
+
+		/**
+		 * Define a batch entry with the given list of positional parameters for
+		 * "?" placeholder resolution.
+		 * <p>Each element of the list will be bound as a JDBC positional parameter
+		 * with a corresponding JDBC index (i.e. list index + 1).
+		 * <p>Note that the given list represents the parameters of a <em>single</em>
+		 * entry; see {@link #entries(List)} for defining several entries at once.
+		 * <p>{@code null} elements are bound as SQL {@code NULL} values. Since
+		 * {@link List#of} rejects {@code null} elements, use a list which permits
+		 * them &mdash; for example, {@link java.util.Arrays#asList} &mdash; or bind
+		 * each parameter individually via {@link #entry(Consumer)}.
+		 * @param values the parameter values to bind
+		 * @return this batch specification (for chaining)
+		 * @throws IllegalStateException if the list is empty, or if named and
+		 * indexed parameters are mixed within the batch
+		 * @see StatementSpec#params(List)
+		 */
+		BatchSpec entry(List<?> values);
+
+		/**
+		 * Define a batch entry with the given named parameters for ":x"
+		 * placeholder resolution.
+		 * @param paramMap a map of names and parameter values to bind
+		 * @return this batch specification (for chaining)
+		 * @throws IllegalStateException if the map is empty, or if named and
+		 * indexed parameters are mixed within the batch
+		 * @see StatementSpec#params(Map)
+		 */
+		BatchSpec entry(Map<String, ?> paramMap);
+
+		/**
+		 * Define several batch entries at once, with each given parameter object
+		 * defining the named parameters for one entry.
+		 * <p>Each parameter object is resolved in the same fashion as for
+		 * {@link BatchEntry#paramSource(Object)}: based on its JavaBean properties,
+		 * record components, or raw fields. A {@link Map} or an
+		 * {@link SqlParameterSource} instance is supported as well.
+		 * @param namedParamObjects the parameter objects, one per batch entry
+		 * @return this batch specification (for chaining)
+		 * @throws IllegalStateException if named and indexed parameters are
+		 * mixed within the batch
+		 * @see #entries(List)
+		 */
+		BatchSpec entries(Object... namedParamObjects);
+
+		/**
+		 * Define several batch entries at once, with each element of the given
+		 * list defining the named parameters for one entry.
+		 * <p>Each parameter object is resolved in the same fashion as for
+		 * {@link BatchEntry#paramSource(Object)}: based on its JavaBean properties,
+		 * record components, or raw fields. A {@link Map} or an
+		 * {@link SqlParameterSource} instance is supported as well.
+		 * <p>Note that each element of the given list represents a <em>separate</em>
+		 * entry; see {@link #entry(List)} for defining a single entry with
+		 * positional parameters.
+		 * @param namedParamObjects the parameter objects, one per batch entry
+		 * @return this batch specification (for chaining)
+		 * @throws IllegalStateException if named and indexed parameters are
+		 * mixed within the batch
+		 */
+		BatchSpec entries(List<?> namedParamObjects);
+
+		/**
+		 * Execute the accumulated batch entries as a batch update.
+		 * @return an array containing the numbers of rows affected by each execution in the batch
+		 * (may also contain special JDBC-defined negative values for affected rows such as
+		 * {@link java.sql.Statement#SUCCESS_NO_INFO}/{@link java.sql.Statement#EXECUTE_FAILED})
+		 * @throws DataAccessException if there is any problem issuing the update
+		 * @see java.sql.PreparedStatement#executeBatch()
+		 */
+		int[] update();
+
+		/**
+		 * Execute the accumulated batch entries as a batch update, returning
+		 * generated keys.
+		 * @param generatedKeyHolder a {@link KeyHolder} that will hold the generated keys
+		 * @return an array containing the numbers of rows affected by each execution in the batch
+		 * (may also contain special JDBC-defined negative values for affected rows such as
+		 * {@link java.sql.Statement#SUCCESS_NO_INFO}/{@link java.sql.Statement#EXECUTE_FAILED})
+		 * @throws DataAccessException if there is any problem issuing the update
+		 * @see #update()
+		 * @see org.springframework.jdbc.support.GeneratedKeyHolder
+		 * @see java.sql.DatabaseMetaData#supportsGetGeneratedKeys()
+		 */
+		int[] update(KeyHolder generatedKeyHolder);
+
+		/**
+		 * Execute the accumulated batch entries as a batch update, returning
+		 * generated keys.
+		 * @param generatedKeyHolder a {@link KeyHolder} that will hold the generated keys
+		 * @param keyColumnNames names of the columns that will have keys generated for them
+		 * @return an array containing the numbers of rows affected by each execution in the batch
+		 * (may also contain special JDBC-defined negative values for affected rows such as
+		 * {@link java.sql.Statement#SUCCESS_NO_INFO}/{@link java.sql.Statement#EXECUTE_FAILED})
+		 * @throws DataAccessException if there is any problem issuing the update
+		 * @see #update()
+		 * @see org.springframework.jdbc.support.GeneratedKeyHolder
+		 * @see java.sql.DatabaseMetaData#supportsGetGeneratedKeys()
+		 */
+		int[] update(KeyHolder generatedKeyHolder, String... keyColumnNames);
+	}
+
+
+	/**
+	 * A specification for binding the parameters of a single batch entry,
+	 * as provided to {@link BatchSpec#entry(Consumer)}.
+	 *
+	 * <p>Parameters are bound in the same fashion as for a single {@link StatementSpec},
+	 * either as JDBC-style positional parameters or as Spring-style named parameters
+	 * (but not both).
+	 *
+	 * @since 7.1
+	 * @see BatchSpec#entry(Consumer)
+	 */
+	interface BatchEntry {
+
+		/**
+		 * Bind a positional JDBC statement parameter for "?" placeholder resolution
+		 * by implicit order of parameter value registration.
+		 * <p>This is primarily intended for statements with a single parameter
+		 * or very few parameters, registering each parameter value in the order
+		 * of the parameter's occurrence in the SQL statement.
+		 * @param value the parameter value to bind
+		 * @return this batch entry (for chaining)
+		 * @see StatementSpec#param(Object)
+		 */
+		BatchEntry param(@Nullable Object value);
+
+		/**
+		 * Bind a positional JDBC statement parameter for "?" placeholder resolution
+		 * by explicit JDBC statement parameter index.
+		 * @param jdbcIndex the JDBC-style index (starting with 1)
+		 * @param value the parameter value to bind
+		 * @return this batch entry (for chaining)
+		 * @see StatementSpec#param(int, Object)
+		 */
+		BatchEntry param(int jdbcIndex, @Nullable Object value);
+
+		/**
+		 * Bind a positional JDBC statement parameter for "?" placeholder resolution
+		 * by explicit JDBC statement parameter index.
+		 * @param jdbcIndex the JDBC-style index (starting with 1)
+		 * @param value the parameter value to bind
+		 * @param sqlType the associated SQL type (see {@link java.sql.Types})
+		 * @return this batch entry (for chaining)
+		 * @see StatementSpec#param(int, Object, int)
+		 */
+		BatchEntry param(int jdbcIndex, @Nullable Object value, int sqlType);
+
+		/**
+		 * Bind a named statement parameter for ":x" placeholder resolution,
+		 * with each "x" name matching a ":x" placeholder in the SQL statement.
+		 * @param name the parameter name
+		 * @param value the parameter value to bind
+		 * @return this batch entry (for chaining)
+		 * @see StatementSpec#param(String, Object)
+		 */
+		BatchEntry param(String name, @Nullable Object value);
+
+		/**
+		 * Bind a named statement parameter for ":x" placeholder resolution,
+		 * with each "x" name matching a ":x" placeholder in the SQL statement.
+		 * @param name the parameter name
+		 * @param value the parameter value to bind
+		 * @param sqlType the associated SQL type (see {@link java.sql.Types})
+		 * @return this batch entry (for chaining)
+		 * @see StatementSpec#param(String, Object, int)
+		 */
+		BatchEntry param(String name, @Nullable Object value, int sqlType);
+
+		/**
+		 * Bind named statement parameters for ":x" placeholder resolution.
+		 * <p>The given parameter object will define all named parameters for
+		 * this entry, based on its JavaBean properties, record components, or
+		 * raw fields. A {@link Map} or an {@link SqlParameterSource} instance
+		 * can be provided as a complete parameter source as well.
+		 * @param namedParamObject a custom parameter object
+		 * @return this batch entry (for chaining)
+		 * @see StatementSpec#paramSource(Object)
+		 */
+		BatchEntry paramSource(Object namedParamObject);
+
+		/**
+		 * Bind named statement parameters for ":x" placeholder resolution.
+		 * <p>The given parameter source will define all named parameters for
+		 * this entry, possibly associating specific SQL types with each value.
+		 * @param namedParamSource a custom {@link SqlParameterSource} instance
+		 * @return this batch entry (for chaining)
+		 * @see StatementSpec#paramSource(SqlParameterSource)
+		 */
+		BatchEntry paramSource(SqlParameterSource namedParamSource);
 	}
 
 
@@ -324,14 +621,14 @@ public interface JdbcClient {
 		 * with each result row represented as a map of
 		 * case-insensitive column names to column values
 		 */
-		List<Map<String, Object>> listOfRows();
+		List<Map<String, @Nullable Object>> listOfRows();
 
 		/**
 		 * Retrieve a single row result.
 		 * @return the result row represented as a map of
 		 * case-insensitive column names to column values
 		 */
-		Map<String, Object> singleRow();
+		Map<String, @Nullable Object> singleRow();
 
 		/**
 		 * Retrieve a single column result,
@@ -339,15 +636,29 @@ public interface JdbcClient {
 		 * @return a (potentially empty) list of rows, with each
 		 * row represented as its single column value
 		 */
-		List<Object> singleColumn();
+		List<@Nullable Object> singleColumn();
 
 		/**
 		 * Retrieve a single value result.
-		 * @return the single row represented as its single column value
+		 * <p>Note: As of 6.2, this will enforce non-null result values
+		 * as originally designed (just accidentally not enforced before).
+		 * (never {@code null})
+		 * @see #optionalValue()
 		 * @see DataAccessUtils#requiredSingleResult(Collection)
 		 */
 		default Object singleValue() {
 			return DataAccessUtils.requiredSingleResult(singleColumn());
+		}
+
+		/**
+		 * Retrieve a single value result, if available, as an {@link Optional} handle.
+		 * @return an Optional handle with the single column value from the single row
+		 * @since 6.2
+		 * @see #singleValue()
+		 * @see DataAccessUtils#optionalResult(Collection)
+		 */
+		default Optional<Object> optionalValue() {
+			return DataAccessUtils.optionalResult(singleColumn());
 		}
 	}
 
@@ -357,13 +668,13 @@ public interface JdbcClient {
 	 *
 	 * @param <T> the RowMapper-declared result type
 	 */
-	interface MappedQuerySpec<T> {
+	interface MappedQuerySpec<T extends @Nullable Object> {
 
 		/**
 		 * Retrieve the result as a lazily resolved stream of mapped objects,
 		 * retaining the order from the original database result.
 		 * @return the result Stream, containing mapped objects, needing to be
-		 * closed once fully processed (e.g. through a try-with-resources clause)
+		 * closed once fully processed (for example, through a try-with-resources clause)
 		 */
 		Stream<T> stream();
 
@@ -385,23 +696,25 @@ public interface JdbcClient {
 		}
 
 		/**
-		 * Retrieve a single result, if available, as an {@link Optional} handle.
-		 * @return an Optional handle with a single result object or none
-		 * @see #list()
-		 * @see DataAccessUtils#optionalResult(Collection)
+		 * Retrieve a single result as a required object instance.
+		 * <p>Note: As of 6.2, this will enforce non-null result values
+		 * as originally designed (just accidentally not enforced before).
+		 * @return the single result object (never {@code null})
+		 * @see #optional()
+		 * @see DataAccessUtils#requiredSingleResult(Collection)
 		 */
-		default Optional<T> optional() {
-			return DataAccessUtils.optionalResult(list());
+		default @NonNull T single() {
+			return DataAccessUtils.requiredSingleResult(list());
 		}
 
 		/**
-		 * Retrieve a single result as a required object instance.
-		 * @return the single result object (never {@code null})
-		 * @see #list()
-		 * @see DataAccessUtils#requiredSingleResult(Collection)
+		 * Retrieve a single result, if available, as an {@link Optional} handle.
+		 * @return an Optional handle with a single result object or none
+		 * @see #single()
+		 * @see DataAccessUtils#optionalResult(Collection)
 		 */
-		default T single() {
-			return DataAccessUtils.requiredSingleResult(list());
+		default Optional<@NonNull T> optional() {
+			return DataAccessUtils.optionalResult(list());
 		}
 	}
 

@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -42,6 +42,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * @author Juergen Hoeller
  * @since 4.2
  */
+@SuppressWarnings("removal")
 class XlsViewTests {
 
 	private final MockHttpServletRequest request = new MockHttpServletRequest();
@@ -50,7 +51,7 @@ class XlsViewTests {
 
 
 	@Test
-	void testXls() throws Exception {
+	void xls() throws Exception {
 		View excelView = new AbstractXlsView() {
 			@Override
 			protected void buildExcelDocument(Map<String, Object> model, Workbook workbook,
@@ -73,7 +74,7 @@ class XlsViewTests {
 	}
 
 	@Test
-	void testXlsxView() throws Exception {
+	void xlsxView() throws Exception {
 		View excelView = new AbstractXlsxView() {
 			@Override
 			protected void buildExcelDocument(Map<String, Object> model, Workbook workbook,
@@ -96,7 +97,7 @@ class XlsViewTests {
 	}
 
 	@Test
-	void testXlsxStreamingView() throws Exception {
+	void xlsxStreamingView() throws Exception {
 		View excelView = new AbstractXlsxStreamingView() {
 			@Override
 			protected void buildExcelDocument(Map<String, Object> model, Workbook workbook,

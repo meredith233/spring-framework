@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,7 +23,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import org.springframework.lang.Nullable;
+import org.jspecify.annotations.Nullable;
 
 /**
  * A simple representation of command line arguments, broken into
@@ -46,11 +46,9 @@ class CommandLineArgs {
 	 * without an associated value &mdash; for example, "--foo" vs. "--foo=bar".
 	 */
 	public void addOptionArg(String optionName, @Nullable String optionValue) {
-		if (!this.optionArgs.containsKey(optionName)) {
-			this.optionArgs.put(optionName, new ArrayList<>());
-		}
+		List<String> values = this.optionArgs.computeIfAbsent(optionName, key -> new ArrayList<>());
 		if (optionValue != null) {
-			this.optionArgs.get(optionName).add(optionValue);
+			values.add(optionValue);
 		}
 	}
 
@@ -73,8 +71,7 @@ class CommandLineArgs {
 	 * <p>{@code null} signifies that the option was not present on the command
 	 * line. An empty list signifies that no values were associated with this option.
 	 */
-	@Nullable
-	public List<String> getOptionValues(String optionName) {
+	public @Nullable List<String> getOptionValues(String optionName) {
 		return this.optionArgs.get(optionName);
 	}
 

@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,7 +16,7 @@
 
 package org.springframework.expression;
 
-import org.springframework.lang.Nullable;
+import org.jspecify.annotations.Nullable;
 
 /**
  * A property accessor is able to read from (and possibly write to) an object's
@@ -26,34 +26,27 @@ import org.springframework.lang.Nullable;
  * Implementors are therefore free to access properties directly via fields,
  * through getters, or in any other way they deem appropriate.
  *
- * <p>A property accessor can optionally specify an array of target classes for
- * which it should be called. However, if it returns {@code null} from
- * {@link #getSpecificTargetClasses()}, it will be called for all property
- * references and given a chance to determine if it can read or write them.
+ * <p>A property accessor can specify an array of
+ * {@linkplain #getSpecificTargetClasses() target classes} for which it should be
+ * called. See {@link TargetedAccessor} for details.
  *
- * <p>Property accessors are considered to be ordered, and each will be called in
- * turn. The only rule that affects the call order is that any property accessor
- * which specifies explicit support for the target class via
- * {@link #getSpecificTargetClasses()} will be called first, before the generic
- * property accessors.
+ * <p>SpEL infrastructure may cache a {@code PropertyAccessor} instance on a per-node
+ * basis once it has successfully served a read or write for a given property name and
+ * target type, in order to avoid repeatedly invoking {@link #canRead}/{@link #canWrite}
+ * on every registered accessor for subsequent evaluations of that node. Before reusing
+ * a cached instance, SpEL confirms that it is still registered with the current
+ * {@link EvaluationContext}. Consequently, {@link #canRead}, {@link #canWrite},
+ * {@link #read}, and {@link #write} should behave consistently for a given
+ * {@code (context, target type, name)} combination for as long as the accessor remains
+ * registered with a context, since a change in behavior may not be observed until the
+ * accessor is re-selected from scratch.
  *
  * @author Andy Clement
  * @since 3.0
+ * @see TargetedAccessor
  * @see IndexAccessor
  */
 public interface PropertyAccessor extends TargetedAccessor {
-
-	/**
-	 * Get the set of classes for which this property accessor should be called.
-	 * <p>Returning {@code null} or an empty array indicates this is a generic
-	 * property accessor that can be called in an attempt to access a property on
-	 * any type.
-	 * @return an array of classes that this property accessor is suitable for
-	 * (or {@code null} if a generic property accessor)
-	 */
-	@Override
-	@Nullable
-	Class<?>[] getSpecificTargetClasses();
 
 	/**
 	 * Called to determine if this property accessor is able to read a specified

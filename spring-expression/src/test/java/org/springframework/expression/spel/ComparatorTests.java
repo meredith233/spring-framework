@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,6 +18,7 @@ package org.springframework.expression.spel;
 
 import java.math.BigDecimal;
 
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 
 import org.springframework.expression.EvaluationException;
@@ -27,7 +28,6 @@ import org.springframework.expression.TypeComparator;
 import org.springframework.expression.spel.standard.SpelExpressionParser;
 import org.springframework.expression.spel.support.StandardEvaluationContext;
 import org.springframework.expression.spel.support.StandardTypeComparator;
-import org.springframework.lang.Nullable;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -40,7 +40,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class ComparatorTests {
 
 	@Test
-	void testPrimitives() throws EvaluationException {
+	void primitives() throws EvaluationException {
 		TypeComparator comparator = new StandardTypeComparator();
 		// primitive int
 		assertThat(comparator.compare(1, 2)).isLessThan(0);
@@ -69,7 +69,7 @@ class ComparatorTests {
 	}
 
 	@Test
-	void testNonPrimitiveNumbers() throws EvaluationException {
+	void nonPrimitiveNumbers() throws EvaluationException {
 		TypeComparator comparator = new StandardTypeComparator();
 
 		BigDecimal bdOne = new BigDecimal("1");
@@ -98,7 +98,7 @@ class ComparatorTests {
 	}
 
 	@Test
-	void testNulls() throws EvaluationException {
+	void nulls() throws EvaluationException {
 		TypeComparator comparator = new StandardTypeComparator();
 		assertThat(comparator.compare(null,"abc")).isLessThan(0);
 		assertThat(comparator.compare(null,null)).isEqualTo(0);
@@ -106,7 +106,7 @@ class ComparatorTests {
 	}
 
 	@Test
-	void testObjects() throws EvaluationException {
+	void objects() throws EvaluationException {
 		TypeComparator comparator = new StandardTypeComparator();
 		assertThat(comparator.compare("a","a")).isEqualTo(0);
 		assertThat(comparator.compare("a","b")).isLessThan(0);
@@ -114,7 +114,7 @@ class ComparatorTests {
 	}
 
 	@Test
-	void testCanCompare() throws EvaluationException {
+	void canCompare() throws EvaluationException {
 		TypeComparator comparator = new StandardTypeComparator();
 		assertThat(comparator.canCompare(null,1)).isTrue();
 		assertThat(comparator.canCompare(1,null)).isTrue();

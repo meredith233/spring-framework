@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -27,9 +27,9 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.assertj.core.api.ObjectAssert;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 
-import org.springframework.lang.Nullable;
 import org.springframework.web.servlet.FlashMap;
 import org.springframework.web.testfixture.servlet.MockHttpServletRequest;
 import org.springframework.web.testfixture.servlet.MockHttpServletResponse;
@@ -67,7 +67,7 @@ class FlashMapManagerTests {
 	}
 
 	@Test // SPR-8779
-	public void retrieveAndUpdateMatchByOriginatingPath() {
+	void retrieveAndUpdateMatchByOriginatingPath() {
 		FlashMap flashMap = new FlashMap();
 		flashMap.put("key", "value");
 		flashMap.setTargetRequestPath("/accounts");
@@ -125,7 +125,7 @@ class FlashMapManagerTests {
 	}
 
 	@Test // SPR-8798
-	public void retrieveAndUpdateMatchWithMultiValueParam() {
+	void retrieveAndUpdateMatchWithMultiValueParam() {
 		FlashMap flashMap = new FlashMap();
 		flashMap.put("name", "value");
 		flashMap.addTargetRequestParam("id", "1");
@@ -255,7 +255,7 @@ class FlashMapManagerTests {
 	}
 
 	@Test // gh-23240
-	public void saveOutputFlashMapAndNormalizeEmptyTargetPath() {
+	void saveOutputFlashMapAndNormalizeEmptyTargetPath() {
 		FlashMap flashMap = new FlashMap();
 		flashMap.put("key", "value");
 
@@ -266,7 +266,7 @@ class FlashMapManagerTests {
 	}
 
 	@Test // SPR-9657, SPR-11504
-	public void saveOutputFlashMapDecodeParameters() {
+	void saveOutputFlashMapDecodeParameters() {
 		FlashMap flashMap = new FlashMap();
 		flashMap.put("key", "value");
 		flashMap.setTargetRequestPath("/path");
@@ -293,7 +293,7 @@ class FlashMapManagerTests {
 	}
 
 	@Test // SPR-12569
-	public void flashAttributesWithQueryParamsWithSpace() {
+	void flashAttributesWithQueryParamsWithSpace() {
 		String encodedValue = URLEncoder.encode("1 2", StandardCharsets.UTF_8);
 
 		FlashMap flashMap = new FlashMap();
@@ -315,7 +315,7 @@ class FlashMapManagerTests {
 	}
 
 	@Test // SPR-15505
-	public void retrieveAndUpdateMatchByOriginatingPathAndQueryString() {
+	void retrieveAndUpdateMatchByOriginatingPathAndQueryString() {
 		FlashMap flashMap = new FlashMap();
 		flashMap.put("key", "value");
 		flashMap.setTargetRequestPath("/accounts");

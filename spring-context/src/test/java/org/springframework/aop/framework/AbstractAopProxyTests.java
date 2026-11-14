@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -30,6 +30,7 @@ import java.util.Map;
 import org.aopalliance.aop.Advice;
 import org.aopalliance.intercept.MethodInterceptor;
 import org.aopalliance.intercept.MethodInvocation;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -70,7 +71,6 @@ import org.springframework.beans.testfixture.beans.SerializablePerson;
 import org.springframework.beans.testfixture.beans.TestBean;
 import org.springframework.core.testfixture.TimeStamped;
 import org.springframework.core.testfixture.io.SerializationTestUtils;
-import org.springframework.lang.Nullable;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatException;
@@ -233,8 +233,7 @@ abstract class AbstractAopProxyTests {
 		try {
 			p2.echo(new IOException());
 		}
-		catch (IOException ex) {
-
+		catch (IOException ignored) {
 		}
 		assertThat(cta.getCalls()).isEqualTo(2);
 	}
@@ -338,7 +337,7 @@ abstract class AbstractAopProxyTests {
 
 	@Test
 	// Should fail to get proxy as exposeProxy wasn't set to true
-	public void targetCantGetProxyByDefault() {
+	void targetCantGetProxyByDefault() {
 		NeedsToSeeProxy et = new NeedsToSeeProxy();
 		ProxyFactory pf1 = new ProxyFactory(et);
 		assertThat(pf1.isExposeProxy()).isFalse();
@@ -855,8 +854,7 @@ abstract class AbstractAopProxyTests {
 		assertThat(proxied.getAge()).isEqualTo(10);
 		assertThat(mba.getCalls()).isEqualTo(1);
 
-		boolean condition = proxied instanceof Advised;
-		assertThat(condition).as("Cannot be cast to Advised").isFalse();
+		assertThat(proxied).as("Cannot be cast to Advised").isNotInstanceOf(Advised.class);
 	}
 
 	@Test

@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,6 +18,7 @@ package org.springframework.aop.support;
 
 import java.lang.reflect.Method;
 
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 
 import org.springframework.aop.ClassFilter;
@@ -25,7 +26,6 @@ import org.springframework.aop.MethodMatcher;
 import org.springframework.aop.Pointcut;
 import org.springframework.beans.testfixture.beans.TestBean;
 import org.springframework.core.NestedRuntimeException;
-import org.springframework.lang.Nullable;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -58,14 +58,14 @@ class ComposablePointcutTests {
 
 
 	@Test
-	void testMatchAll() throws NoSuchMethodException {
+	void matchAll() throws NoSuchMethodException {
 		Pointcut pc = new ComposablePointcut();
 		assertThat(pc.getClassFilter().matches(Object.class)).isTrue();
 		assertThat(pc.getMethodMatcher().matches(Object.class.getMethod("hashCode"), Exception.class)).isTrue();
 	}
 
 	@Test
-	void testFilterByClass() {
+	void filterByClass() {
 		ComposablePointcut pc = new ComposablePointcut();
 
 		assertThat(pc.getClassFilter().matches(Object.class)).isTrue();
@@ -85,7 +85,7 @@ class ComposablePointcutTests {
 	}
 
 	@Test
-	void testUnionMethodMatcher() {
+	void unionMethodMatcher() {
 		// Matches the getAge() method in any class
 		ComposablePointcut pc = new ComposablePointcut(ClassFilter.TRUE, GET_AGE_METHOD_MATCHER);
 		assertThat(Pointcuts.matches(pc, PointcutsTests.TEST_BEAN_ABSQUATULATE, TestBean.class)).isFalse();
@@ -108,7 +108,7 @@ class ComposablePointcutTests {
 	}
 
 	@Test
-	void testIntersectionMethodMatcher() {
+	void intersectionMethodMatcher() {
 		ComposablePointcut pc = new ComposablePointcut();
 		assertThat(pc.getMethodMatcher().matches(PointcutsTests.TEST_BEAN_ABSQUATULATE, TestBean.class)).isTrue();
 		assertThat(pc.getMethodMatcher().matches(PointcutsTests.TEST_BEAN_GET_AGE, TestBean.class)).isTrue();
@@ -125,7 +125,7 @@ class ComposablePointcutTests {
 	}
 
 	@Test
-	void testEqualsAndHashCode() {
+	void equalsAndHashCode() {
 		ComposablePointcut pc1 = new ComposablePointcut();
 		ComposablePointcut pc2 = new ComposablePointcut();
 

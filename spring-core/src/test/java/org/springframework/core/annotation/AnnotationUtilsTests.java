@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -30,9 +30,6 @@ import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Set;
 
-import javax.annotation.Nonnull;
-import javax.annotation.ParametersAreNonnullByDefault;
-
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -40,7 +37,6 @@ import org.springframework.core.Ordered;
 import org.springframework.core.annotation.subpackage.NonPublicAnnotatedClass;
 import org.springframework.core.testfixture.ide.IdeUtils;
 import org.springframework.core.testfixture.stereotype.Component;
-import org.springframework.lang.NonNullApi;
 
 import static java.util.Arrays.asList;
 import static java.util.Arrays.stream;
@@ -160,10 +156,11 @@ class AnnotationUtilsTests {
 		assertThat(getAnnotation(bridgeMethod, Order.class)).isNull();
 		assertThat(findAnnotation(bridgeMethod, Order.class)).isNotNull();
 
-		// As of JDK 8, invoking getAnnotation() on a bridge method actually finds an
-		// annotation on its 'bridged' method [1]; however, the Eclipse compiler does
-		// not support this [2]. Thus, we effectively ignore the following
-		// assertion if the test is currently executing within the Eclipse IDE.
+		// For code compiled with OpenJDK, invoking getAnnotation() on a bridge
+		// method actually finds an annotation on its 'bridged' method [1]; however,
+		// the Eclipse compiler does not support this [2]. Thus, we effectively
+		// ignore the following assertion if the test is currently executing within
+		// the Eclipse IDE.
 		//
 		// [1] https://bugs.openjdk.java.net/browse/JDK-6695379
 		// [2] https://bugs.eclipse.org/bugs/show_bug.cgi?id=495396
@@ -429,9 +426,6 @@ class AnnotationUtilsTests {
 	@Test
 	void isAnnotationMetaPresentForPlainType() {
 		assertThat(isAnnotationMetaPresent(Order.class, Documented.class)).isTrue();
-		assertThat(isAnnotationMetaPresent(NonNullApi.class, Documented.class)).isTrue();
-		assertThat(isAnnotationMetaPresent(NonNullApi.class, Nonnull.class)).isTrue();
-		assertThat(isAnnotationMetaPresent(ParametersAreNonnullByDefault.class, Nonnull.class)).isTrue();
 	}
 
 	@Test
@@ -577,7 +571,7 @@ class AnnotationUtilsTests {
 		final List<String> expectedValuesJava = asList("A", "B", "C");
 		final List<String> expectedValuesSpring = asList("A", "B", "C", "meta1");
 
-		// Java 8
+		// Java
 		MyRepeatable[] array = MyRepeatableClass.class.getAnnotationsByType(MyRepeatable.class);
 		assertThat(array).isNotNull();
 		List<String> values = stream(array).map(MyRepeatable::value).collect(toList());
@@ -602,7 +596,7 @@ class AnnotationUtilsTests {
 		final List<String> expectedValuesJava = asList("A", "B", "C");
 		final List<String> expectedValuesSpring = asList("A", "B", "C", "meta1");
 
-		// Java 8
+		// Java
 		MyRepeatable[] array = clazz.getAnnotationsByType(MyRepeatable.class);
 		assertThat(array).isNotNull();
 		List<String> values = stream(array).map(MyRepeatable::value).collect(toList());
@@ -627,7 +621,7 @@ class AnnotationUtilsTests {
 		final List<String> expectedValuesJava = asList("X", "Y", "Z");
 		final List<String> expectedValuesSpring = asList("X", "Y", "Z", "meta2");
 
-		// Java 8
+		// Java
 		MyRepeatable[] array = clazz.getAnnotationsByType(MyRepeatable.class);
 		assertThat(array).isNotNull();
 		List<String> values = stream(array).map(MyRepeatable::value).collect(toList());
@@ -652,7 +646,7 @@ class AnnotationUtilsTests {
 		final List<String> expectedValuesJava = asList("X", "Y", "Z");
 		final List<String> expectedValuesSpring = asList("X", "Y", "Z", "meta2");
 
-		// Java 8
+		// Java
 		MyRepeatable[] array = clazz.getAnnotationsByType(MyRepeatable.class);
 		assertThat(array).isNotNull();
 		List<String> values = stream(array).map(MyRepeatable::value).collect(toList());
@@ -676,7 +670,7 @@ class AnnotationUtilsTests {
 		final List<String> expectedValuesJava = asList("A", "B", "C");
 		final List<String> expectedValuesSpring = asList("A", "B", "C", "meta1");
 
-		// Java 8
+		// Java
 		MyRepeatable[] array = MyRepeatableClass.class.getDeclaredAnnotationsByType(MyRepeatable.class);
 		assertThat(array).isNotNull();
 		List<String> values = stream(array).map(MyRepeatable::value).collect(toList());
@@ -700,7 +694,7 @@ class AnnotationUtilsTests {
 	void getDeclaredRepeatableAnnotationsDeclaredOnSuperclass() {
 		final Class<?> clazz = SubMyRepeatableClass.class;
 
-		// Java 8
+		// Java
 		MyRepeatable[] array = clazz.getDeclaredAnnotationsByType(MyRepeatable.class);
 		assertThat(array).isNotNull();
 		assertThat(array).isEmpty();
@@ -724,11 +718,11 @@ class AnnotationUtilsTests {
 		ImplicitAliasesWithMissingDefaultValuesContextConfig config = clazz.getAnnotation(annotationType);
 		assertThat(config).isNotNull();
 
-		assertThatExceptionOfType(AnnotationConfigurationException.class).isThrownBy(() ->
-				synthesizeAnnotation(config, clazz))
+		assertThatExceptionOfType(AnnotationConfigurationException.class)
+			.isThrownBy(() -> synthesizeAnnotation(config, clazz))
 			.withMessageStartingWith("Misconfigured aliases:")
-			.withMessageContaining("attribute 'location1' in annotation [" + annotationType.getName() + "]")
-			.withMessageContaining("attribute 'location2' in annotation [" + annotationType.getName() + "]")
+			.withMessageContaining("attribute 'location1' in annotation [%s]", annotationType.getCanonicalName())
+			.withMessageContaining("attribute 'location2' in annotation [%s]", annotationType.getCanonicalName())
 			.withMessageContaining("default values");
 	}
 
@@ -739,11 +733,11 @@ class AnnotationUtilsTests {
 				ImplicitAliasesWithDifferentDefaultValuesContextConfig.class;
 		ImplicitAliasesWithDifferentDefaultValuesContextConfig config = clazz.getAnnotation(annotationType);
 		assertThat(config).isNotNull();
-		assertThatExceptionOfType(AnnotationConfigurationException.class).isThrownBy(() ->
-				synthesizeAnnotation(config, clazz))
+		assertThatExceptionOfType(AnnotationConfigurationException.class)
+			.isThrownBy(() -> synthesizeAnnotation(config, clazz))
 			.withMessageStartingWith("Misconfigured aliases:")
-			.withMessageContaining("attribute 'location1' in annotation [" + annotationType.getName() + "]")
-			.withMessageContaining("attribute 'location2' in annotation [" + annotationType.getName() + "]")
+			.withMessageContaining("attribute 'location1' in annotation [%s]", annotationType.getCanonicalName())
+			.withMessageContaining("attribute 'location2' in annotation [%s]", annotationType.getCanonicalName())
 			.withMessageContaining("same default value");
 	}
 
@@ -925,8 +919,18 @@ class AnnotationUtilsTests {
 		Map<String, Object> map = Collections.singletonMap(VALUE, 42L);
 		assertThatIllegalStateException().isThrownBy(() ->
 				synthesizeAnnotation(map, Component.class, null).value())
-			.withMessageContaining("Attribute 'value' in annotation org.springframework.core.testfixture.stereotype.Component "
-					+ "should be compatible with java.lang.String but a java.lang.Long value was returned");
+			.withMessageContaining("Attribute 'value' in annotation %s should be compatible with " +
+					"java.lang.String but a java.lang.Long value was returned",
+					Component.class.getCanonicalName());
+	}
+
+	@Test
+	void synthesizeAnnotationFromMapWithAttributeOfIncorrectArrayType() {
+		Map<String, Object> map = Collections.singletonMap(VALUE, new int[] {42});
+		assertThatIllegalStateException().isThrownBy(() ->
+				synthesizeAnnotation(map, CharsContainer.class, null).chars())
+			.withMessageContaining("Attribute 'chars' in annotation %s should be compatible with " +
+					"char[] but a int[] value was returned", CharsContainer.class.getCanonicalName());
 	}
 
 	@Test
@@ -1358,14 +1362,15 @@ class AnnotationUtilsTests {
 
 	/**
 	 * Mock of {@code org.springframework.web.bind.annotation.PostMapping}, except
-	 * that the path is overridden by convention with single String element.
+	 * that the path is intended to be overridden by convention with single String
+	 * element. However, convention-based annotation attribute overrides are no
+	 * longer supported as of Spring Framework 7.0.
 	 */
 	@Retention(RetentionPolicy.RUNTIME)
 	@WebMapping(method = RequestMethod.POST, name = "")
 	@interface Post {
 
-		// Do NOT use @AliasFor here until Spring 6.1
-		// @AliasFor(annotation = WebMapping.class)
+		// Do NOT use @AliasFor here
 		String path() default "";
 	}
 

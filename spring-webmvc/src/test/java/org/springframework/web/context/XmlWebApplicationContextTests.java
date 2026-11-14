@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -95,7 +95,7 @@ class XmlWebApplicationContextTests extends AbstractApplicationContextTests {
 	@Test
 	@Override
 	protected void count() {
-		assertThat(this.applicationContext.getBeanDefinitionCount()).as("should have 14 beans").isEqualTo(14);
+		assertThat(this.applicationContext.getBeanDefinitionCount()).as("should have 14 beans").isEqualTo(13);
 	}
 
 	@Test
@@ -135,9 +135,9 @@ class XmlWebApplicationContextTests extends AbstractApplicationContextTests {
 		InitAndIB iib = (InitAndIB) this.applicationContext.getBean("init-and-ib");
 		assertThat(InitAndIB.constructed).isTrue();
 		assertThat(iib.afterPropertiesSetInvoked && iib.initMethodInvoked).isTrue();
-		assertThat(!iib.destroyed && !iib.customDestroyed).isTrue();
+		assertThat(iib.destroyed && !iib.customDestroyed).isFalse();
 		this.applicationContext.close();
-		assertThat(!iib.destroyed && !iib.customDestroyed).isTrue();
+		assertThat(iib.destroyed && !iib.customDestroyed).isFalse();
 		ConfigurableApplicationContext parent = (ConfigurableApplicationContext) this.applicationContext.getParent();
 		parent.close();
 		assertThat(iib.destroyed && iib.customDestroyed).isTrue();

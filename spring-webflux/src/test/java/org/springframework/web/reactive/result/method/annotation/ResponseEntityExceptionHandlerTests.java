@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,6 +23,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
 
+import io.micrometer.observation.tck.TestObservationRegistry;
 import org.junit.jupiter.api.Test;
 import reactor.core.publisher.Mono;
 
@@ -35,6 +36,7 @@ import org.springframework.http.HttpStatusCode;
 import org.springframework.http.MediaType;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.server.reactive.observation.ServerRequestObservationContext;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.validation.BeanPropertyBindingResult;
 import org.springframework.validation.method.MethodValidationException;
@@ -52,11 +54,13 @@ import org.springframework.web.server.ServerWebExchange;
 import org.springframework.web.server.ServerWebInputException;
 import org.springframework.web.server.UnsatisfiedRequestParameterException;
 import org.springframework.web.server.UnsupportedMediaTypeStatusException;
+import org.springframework.web.server.adapter.HttpWebHandlerAdapter;
 import org.springframework.web.testfixture.http.server.reactive.MockServerHttpRequest;
+import org.springframework.web.testfixture.http.server.reactive.MockServerHttpResponse;
 import org.springframework.web.testfixture.server.MockServerWebExchange;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.BDDMockito.mock;
+import static org.mockito.Mockito.mock;
 
 /**
  * Tests for {@link ResponseEntityExceptionHandler}.
@@ -115,6 +119,36 @@ class ResponseEntityExceptionHandlerTests {
 	}
 
 	@Test
+	void serverErrorIsRecordedOnObservation() {
+		ServerErrorException ex = new ServerErrorException("simulated failure", (Throwable) null);
+
+		assertThat(observe(ex)).hasObservationWithNameEqualTo("http.server.requests").that()
+				.hasError(ex).hasBeenStopped();
+	}
+
+	@Test
+	void serverErrorResponseIsRecordedOnObservation() {
+		ErrorResponseException ex = new ErrorResponseException(HttpStatus.SERVICE_UNAVAILABLE);
+
+		assertThat(observe(ex)).hasObservationWithNameEqualTo("http.server.requests").that()
+				.hasError(ex).hasBeenStopped();
+	}
+
+	@Test
+	void clientErrorIsNotRecordedOnObservation() {
+		assertThat(observe(new ServerWebInputException(""))).hasObservationWithNameEqualTo("http.server.requests")
+				.that().doesNotHaveError().hasBeenStopped();
+		assertThat(observe(new ErrorResponseException(HttpStatus.CONFLICT)))
+				.hasObservationWithNameEqualTo("http.server.requests").that().doesNotHaveError().hasBeenStopped();
+	}
+
+	@Test
+	void serverErrorWithoutObservation() {
+		testException(new ErrorResponseException(HttpStatus.SERVICE_UNAVAILABLE));
+		assertThat(ServerRequestObservationContext.findCurrent(this.exchange.getAttributes())).isEmpty();
+	}
+
+	@Test
 	void methodValidationException() {
 		MethodValidationException ex = new MethodValidationException(mock(MethodValidationResult.class));
 		ResponseEntity<?> entity = this.exceptionHandler.handleException(ex, this.exchange).block();
@@ -135,6 +169,7 @@ class ResponseEntityExceptionHandlerTests {
 	}
 
 	@Test
+	@SuppressWarnings("deprecation")
 	void handleResponseStatusException() {
 		testException(new ResponseStatusException(HttpStatus.BANDWIDTH_LIMIT_EXCEEDED));
 	}
@@ -200,6 +235,15 @@ class ResponseEntityExceptionHandlerTests {
 		assertThat(body.getDetail()).isEqualTo("Invalid state: A");
 	}
 
+
+	private TestObservationRegistry observe(Exception ex) {
+		TestObservationRegistry registry = TestObservationRegistry.create();
+		HttpWebHandlerAdapter adapter = new HttpWebHandlerAdapter(
+				webExchange -> this.exceptionHandler.handleException(ex, webExchange).then());
+		adapter.setObservationRegistry(registry);
+		adapter.handle(MockServerHttpRequest.get("/").build(), new MockServerHttpResponse()).block();
+		return registry;
+	}
 
 	@SuppressWarnings("unchecked")
 	private ResponseEntity<ProblemDetail> testException(ErrorResponseException exception) {

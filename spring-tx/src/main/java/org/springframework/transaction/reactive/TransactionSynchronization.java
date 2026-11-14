@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2019 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -101,7 +101,7 @@ public interface TransactionSynchronization {
 	/**
 	 * Invoked after transaction commit. Can perform further operations right
 	 * <i>after</i> the main transaction has <i>successfully</i> committed.
-	 * <p>Can e.g. commit further operations that are supposed to follow on a successful
+	 * <p>Can, for example, commit further operations that are supposed to follow on a successful
 	 * commit of the main transaction, like confirmation messages or emails.
 	 * <p><b>NOTE:</b> The transaction will have been committed already, but the
 	 * transactional resources might still be active and accessible. As a consequence,

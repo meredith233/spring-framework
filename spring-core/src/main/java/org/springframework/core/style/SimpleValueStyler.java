@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2022 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -24,6 +24,8 @@ import java.util.StringJoiner;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+import org.springframework.util.ClassUtils;
+
 /**
  * {@link ValueStyler} that converts objects to String form &mdash; generally for
  * debugging purposes &mdash; using simple styling conventions that mimic the
@@ -45,7 +47,7 @@ public class SimpleValueStyler extends DefaultValueStyler {
 	/**
 	 * Default {@link Class} styling function: {@link Class#getCanonicalName()}.
 	 */
-	public static final Function<Class<?>, String> DEFAULT_CLASS_STYLER = Class::getCanonicalName;
+	public static final Function<Class<?>, String> DEFAULT_CLASS_STYLER = ClassUtils::getCanonicalName;
 
 	/**
 	 * Default {@link Method} styling function: converts the supplied {@link Method}

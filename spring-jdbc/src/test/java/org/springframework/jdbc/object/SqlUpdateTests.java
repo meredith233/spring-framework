@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -95,7 +95,7 @@ class SqlUpdateTests {
 
 
 	@Test
-	void testUpdate() throws SQLException {
+	void update() throws SQLException {
 		given(preparedStatement.executeUpdate()).willReturn(1);
 		given(connection.prepareStatement(UPDATE)).willReturn(preparedStatement);
 
@@ -106,7 +106,7 @@ class SqlUpdateTests {
 	}
 
 	@Test
-	void testUpdateInt() throws SQLException {
+	void updateInt() throws SQLException {
 		given(preparedStatement.executeUpdate()).willReturn(1);
 		given(connection.prepareStatement(UPDATE_INT)).willReturn(preparedStatement);
 
@@ -118,7 +118,7 @@ class SqlUpdateTests {
 	}
 
 	@Test
-	void testUpdateIntInt() throws SQLException {
+	void updateIntInt() throws SQLException {
 		given(preparedStatement.executeUpdate()).willReturn(1);
 		given(connection.prepareStatement(UPDATE_INT_INT)).willReturn(preparedStatement);
 
@@ -131,12 +131,12 @@ class SqlUpdateTests {
 	}
 
 	@Test
-	void testNamedParameterUpdateWithUnnamedDeclarations() throws SQLException {
+	void namedParameterUpdateWithUnnamedDeclarations() throws SQLException {
 		doTestNamedParameterUpdate(false);
 	}
 
 	@Test
-	void testNamedParameterUpdateWithNamedDeclarations() throws SQLException {
+	void namedParameterUpdateWithNamedDeclarations() throws SQLException {
 		doTestNamedParameterUpdate(true);
 	}
 
@@ -176,7 +176,7 @@ class SqlUpdateTests {
 	}
 
 	@Test
-	void testUpdateString() throws SQLException {
+	void updateString() throws SQLException {
 		given(preparedStatement.executeUpdate()).willReturn(1);
 		given(connection.prepareStatement(UPDATE_STRING)).willReturn(preparedStatement);
 
@@ -188,7 +188,7 @@ class SqlUpdateTests {
 	}
 
 	@Test
-	void testUpdateMixed() throws SQLException {
+	void updateMixed() throws SQLException {
 		given(preparedStatement.executeUpdate()).willReturn(1);
 		given(connection.prepareStatement(UPDATE_OBJECTS)).willReturn(preparedStatement);
 
@@ -199,11 +199,11 @@ class SqlUpdateTests {
 		verify(preparedStatement).setObject(1, 1, Types.NUMERIC);
 		verify(preparedStatement).setObject(2, 1, Types.NUMERIC, 2);
 		verify(preparedStatement).setString(3, "rod");
-		verify(preparedStatement).setBoolean(4, Boolean.TRUE);
+		verify(preparedStatement).setBoolean(4, true);
 	}
 
 	@Test
-	void testUpdateAndGeneratedKeys() throws SQLException {
+	void updateAndGeneratedKeys() throws SQLException {
 		given(resultSetMetaData.getColumnCount()).willReturn(1);
 		given(resultSetMetaData.getColumnLabel(1)).willReturn("1");
 		given(resultSet.getMetaData()).willReturn(resultSetMetaData);
@@ -226,7 +226,7 @@ class SqlUpdateTests {
 	}
 
 	@Test
-	void testUpdateConstructor() throws SQLException {
+	void updateConstructor() throws SQLException {
 		given(preparedStatement.executeUpdate()).willReturn(1);
 		given(connection.prepareStatement(UPDATE_OBJECTS)).willReturn(preparedStatement);
 		ConstructorUpdater pc = new ConstructorUpdater();
@@ -237,11 +237,11 @@ class SqlUpdateTests {
 		verify(preparedStatement).setObject(1, 1, Types.NUMERIC);
 		verify(preparedStatement).setObject(2, 1, Types.NUMERIC);
 		verify(preparedStatement).setString(3, "rod");
-		verify(preparedStatement).setBoolean(4, Boolean.TRUE);
+		verify(preparedStatement).setBoolean(4, true);
 	}
 
 	@Test
-	void testUnderMaxRows() throws SQLException {
+	void underMaxRows() throws SQLException {
 		given(preparedStatement.executeUpdate()).willReturn(3);
 		given(connection.prepareStatement(UPDATE)).willReturn(preparedStatement);
 
@@ -252,7 +252,7 @@ class SqlUpdateTests {
 	}
 
 	@Test
-	void testMaxRows() throws SQLException {
+	void maxRows() throws SQLException {
 		given(preparedStatement.executeUpdate()).willReturn(5);
 		given(connection.prepareStatement(UPDATE)).willReturn(preparedStatement);
 
@@ -263,7 +263,7 @@ class SqlUpdateTests {
 	}
 
 	@Test
-	void testOverMaxRows() throws SQLException {
+	void overMaxRows() throws SQLException {
 		given(preparedStatement.executeUpdate()).willReturn(8);
 		given(connection.prepareStatement(UPDATE)).willReturn(preparedStatement);
 
@@ -274,7 +274,7 @@ class SqlUpdateTests {
 	}
 
 	@Test
-	void testRequiredRows() throws SQLException {
+	void requiredRows() throws SQLException {
 		given(preparedStatement.executeUpdate()).willReturn(3);
 		given(connection.prepareStatement(UPDATE)).willReturn(preparedStatement);
 
@@ -285,7 +285,7 @@ class SqlUpdateTests {
 	}
 
 	@Test
-	void testNotRequiredRows() throws SQLException {
+	void notRequiredRows() throws SQLException {
 		given(preparedStatement.executeUpdate()).willReturn(2);
 		given(connection.prepareStatement(UPDATE)).willReturn(preparedStatement);
 		RequiredRowsUpdater pc = new RequiredRowsUpdater();

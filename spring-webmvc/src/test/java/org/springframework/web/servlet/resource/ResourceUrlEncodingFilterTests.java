@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -104,7 +104,7 @@ class ResourceUrlEncodingFilterTests {
 	}
 
 	@Test // SPR-13757
-	public void encodeContextPathUrlWithoutSuffix() throws Exception {
+	void encodeContextPathUrlWithoutSuffix() throws Exception {
 		MockHttpServletRequest request = new MockHttpServletRequest("GET", "/context");
 		request.setContextPath("/context");
 
@@ -122,7 +122,7 @@ class ResourceUrlEncodingFilterTests {
 	}
 
 	@Test // SPR-13018
-	public void encodeEmptyUrlWithContext() throws Exception {
+	void encodeEmptyUrlWithContext() throws Exception {
 		MockHttpServletRequest request = new MockHttpServletRequest("GET", "/context/foo");
 		request.setContextPath("/context");
 
@@ -130,7 +130,7 @@ class ResourceUrlEncodingFilterTests {
 	}
 
 	@Test // SPR-13374
-	public void encodeUrlWithRequestParams() throws Exception {
+	void encodeUrlWithRequestParams() throws Exception {
 		MockHttpServletRequest request = new MockHttpServletRequest("GET", "/foo");
 		request.setContextPath("/");
 
@@ -139,7 +139,7 @@ class ResourceUrlEncodingFilterTests {
 	}
 
 	@Test // SPR-13847
-	public void encodeUrlPreventStringOutOfBounds() throws Exception {
+	void encodeUrlPreventStringOutOfBounds() throws Exception {
 		MockHttpServletRequest request = new MockHttpServletRequest("GET", "/context-path/index");
 		request.setContextPath("/context-path");
 		request.setServletPath("");
@@ -148,7 +148,7 @@ class ResourceUrlEncodingFilterTests {
 	}
 
 	@Test // SPR-17535
-	public void encodeUrlWithFragment() throws Exception {
+	void encodeUrlWithFragment() throws Exception {
 		MockHttpServletRequest request = new MockHttpServletRequest("GET", "/foo");
 		request.setContextPath("/");
 
@@ -161,7 +161,7 @@ class ResourceUrlEncodingFilterTests {
 	}
 
 	@Test // gh-23508
-	public void invalidLookupPath() throws Exception {
+	void invalidLookupPath() throws Exception {
 		MockHttpServletRequest request = new MockHttpServletRequest();
 		request.setRequestURI("/a/b/../logo.png");
 		request.setServletPath("/a/logo.png");

@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2022 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,10 +18,10 @@ package org.springframework.aot.test.generate;
 
 import java.util.function.UnaryOperator;
 
-import org.springframework.aot.generate.ClassNameGenerator;
 import org.springframework.aot.generate.DefaultGenerationContext;
 import org.springframework.aot.generate.GenerationContext;
 import org.springframework.aot.generate.InMemoryGeneratedFiles;
+import org.springframework.aot.generate.NameGenerator;
 import org.springframework.core.test.tools.TestCompiler;
 import org.springframework.javapoet.ClassName;
 
@@ -42,11 +42,11 @@ public class TestGenerationContext extends DefaultGenerationContext implements U
 	public static final ClassName TEST_TARGET = ClassName.get("com.example", "TestTarget");
 
 	/**
-	 * Create an instance using the specified {@link ClassNameGenerator}.
-	 * @param classNameGenerator the class name generator to use
+	 * Create an instance using the specified {@link NameGenerator}.
+	 * @param nameGenerator the name generator to use for classes and resources
 	 */
-	public TestGenerationContext(ClassNameGenerator classNameGenerator) {
-		super(classNameGenerator, new InMemoryGeneratedFiles());
+	public TestGenerationContext(NameGenerator nameGenerator) {
+		super(nameGenerator, new InMemoryGeneratedFiles());
 	}
 
 	/**
@@ -54,7 +54,7 @@ public class TestGenerationContext extends DefaultGenerationContext implements U
 	 * @param target the default target class name to use
 	 */
 	public TestGenerationContext(ClassName target) {
-		this(new ClassNameGenerator(target));
+		this(new NameGenerator(target));
 	}
 
 	/**

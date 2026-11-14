@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,6 +18,7 @@ package org.springframework.orm.jpa.persistenceunit;
 
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.lang.annotation.Annotation;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -29,6 +30,7 @@ import jakarta.persistence.Embeddable;
 import jakarta.persistence.Entity;
 import jakarta.persistence.MappedSuperclass;
 import jakarta.persistence.PersistenceException;
+import org.jspecify.annotations.Nullable;
 
 import org.springframework.context.index.CandidateComponentsIndex;
 import org.springframework.context.index.CandidateComponentsIndexLoader;
@@ -43,7 +45,6 @@ import org.springframework.core.type.classreading.MetadataReader;
 import org.springframework.core.type.classreading.MetadataReaderFactory;
 import org.springframework.core.type.filter.AnnotationTypeFilter;
 import org.springframework.core.type.filter.TypeFilter;
-import org.springframework.lang.Nullable;
 import org.springframework.util.ClassUtils;
 import org.springframework.util.CollectionUtils;
 import org.springframework.util.ResourceUtils;
@@ -54,12 +55,9 @@ import org.springframework.util.ResourceUtils;
  * @author Stephane Nicoll
  * @since 6.0
  */
-@SuppressWarnings("removal") // components index
 public final class PersistenceManagedTypesScanner {
 
 	private static final String CLASS_RESOURCE_PATTERN = "/**/*.class";
-
-	private static final String PACKAGE_INFO_SUFFIX = ".package-info";
 
 	private static final String IGNORE_CLASSFORMAT_PROPERTY_NAME = "spring.classformat.ignore";
 
@@ -73,12 +71,20 @@ public final class PersistenceManagedTypesScanner {
 		entityTypeFilters.add(new AnnotationTypeFilter(Embeddable.class, false));
 		entityTypeFilters.add(new AnnotationTypeFilter(MappedSuperclass.class, false));
 		entityTypeFilters.add(new AnnotationTypeFilter(Converter.class, false));
+		try {
+			@SuppressWarnings("unchecked")
+			Class<? extends Annotation> discoverable = (Class<? extends Annotation>) ClassUtils.forName(
+					"jakarta.persistence.spi.Discoverable", PersistenceManagedTypesScanner.class.getClassLoader());
+			entityTypeFilters.add(new AnnotationTypeFilter(discoverable, true));
+		}
+		catch (ClassNotFoundException ex) {
+			// JPA 4.0 API not present - simply skip.
+		}
 	}
 
 	private final ResourcePatternResolver resourcePatternResolver;
 
-	@Nullable
-	private final CandidateComponentsIndex componentsIndex;
+	private final @Nullable CandidateComponentsIndex componentsIndex;
 
 	private final ManagedClassNameFilter managedClassNameFilter;
 
@@ -140,7 +146,11 @@ public final class PersistenceManagedTypesScanner {
 				try {
 					MetadataReader reader = factory.getMetadataReader(resource);
 					String className = reader.getClassMetadata().getClassName();
-					if (matchesEntityTypeFilter(reader, factory) && this.managedClassNameFilter.matches(className)) {
+					if (className.endsWith(ClassUtils.PACKAGE_INFO_SUFFIX)) {
+						scanResult.managedPackages.add(className.substring(0,
+								className.length() - ClassUtils.PACKAGE_INFO_SUFFIX.length()));
+					}
+					else if (matchesEntityTypeFilter(reader, factory) && this.managedClassNameFilter.matches(className)) {
 						scanResult.managedClassNames.add(className);
 						if (scanResult.persistenceUnitRootUrl == null) {
 							URL url = resource.getURL();
@@ -148,10 +158,6 @@ public final class PersistenceManagedTypesScanner {
 								scanResult.persistenceUnitRootUrl = ResourceUtils.extractJarFileURL(url);
 							}
 						}
-					}
-					else if (className.endsWith(PACKAGE_INFO_SUFFIX)) {
-						scanResult.managedPackages.add(className.substring(0,
-								className.length() - PACKAGE_INFO_SUFFIX.length()));
 					}
 				}
 				catch (FileNotFoundException ex) {
@@ -163,7 +169,7 @@ public final class PersistenceManagedTypesScanner {
 					}
 				}
 				catch (Throwable ex) {
-					throw new PersistenceException("Failed to read candidate component class: " + resource, ex);
+					throw new PersistenceException("Failed to read candidate entity class: " + resource, ex);
 				}
 			}
 		}
@@ -192,8 +198,7 @@ public final class PersistenceManagedTypesScanner {
 
 		private final List<String> managedPackages = new ArrayList<>();
 
-		@Nullable
-		private URL persistenceUnitRootUrl;
+		private @Nullable URL persistenceUnitRootUrl;
 
 		PersistenceManagedTypes toJpaManagedTypes() {
 			return new SimplePersistenceManagedTypes(this.managedClassNames,

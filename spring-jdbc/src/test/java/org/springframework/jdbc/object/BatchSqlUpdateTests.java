@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -40,12 +40,12 @@ import static org.mockito.Mockito.verify;
 class BatchSqlUpdateTests {
 
 	@Test
-	void testBatchUpdateWithExplicitFlush() throws Exception {
+	void batchUpdateWithExplicitFlush() throws Exception {
 		doTestBatchUpdate(false);
 	}
 
 	@Test
-	void testBatchUpdateWithFlushThroughBatchSize() throws Exception {
+	void batchUpdateWithFlushThroughBatchSize() throws Exception {
 		doTestBatchUpdate(true);
 	}
 

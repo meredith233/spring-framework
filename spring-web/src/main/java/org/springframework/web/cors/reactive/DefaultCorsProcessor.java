@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,13 +21,13 @@ import java.util.List;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.jspecify.annotations.Nullable;
 
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.server.reactive.ServerHttpRequest;
 import org.springframework.http.server.reactive.ServerHttpResponse;
-import org.springframework.lang.Nullable;
 import org.springframework.util.CollectionUtils;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.server.ServerWebExchange;
@@ -37,9 +37,9 @@ import org.springframework.web.server.ServerWebExchange;
  * as defined by the <a href="https://www.w3.org/TR/cors/">CORS W3C recommendation</a>.
  *
  * <p>Note that when the supplied {@link CorsConfiguration} is {@code null}, this
- * implementation does not reject simple or actual requests outright but simply
- * avoids adding CORS headers to the response. CORS processing is also skipped
- * if the response already contains CORS headers.
+ * implementation does not reject CORS requests outright but simply avoids adding
+ * CORS headers to the response. CORS processing is also skipped if the response
+ * already contains CORS headers.
  *
  * @author Sebastien Deleuze
  * @author Rossen Stoyanchev
@@ -68,6 +68,14 @@ public class DefaultCorsProcessor implements CorsProcessor {
 	@Override
 	public boolean process(@Nullable CorsConfiguration config, ServerWebExchange exchange) {
 		ServerHttpRequest request = exchange.getRequest();
+
+		if (config == null) {
+			if (logger.isDebugEnabled() && CorsUtils.isCorsRequest(request)) {
+				logger.debug("Skip: no CORS configuration has been provided");
+			}
+			return true;
+		}
+
 		ServerHttpResponse response = exchange.getResponse();
 		HttpHeaders responseHeaders = response.getHeaders();
 
@@ -83,8 +91,15 @@ public class DefaultCorsProcessor implements CorsProcessor {
 			}
 		}
 
-		if (!CorsUtils.isCorsRequest(request)) {
-			return true;
+		try {
+			if (!CorsUtils.isCorsRequest(request)) {
+				return true;
+			}
+		}
+		catch (IllegalArgumentException ex) {
+			logger.debug("Reject: origin is malformed");
+			rejectRequest(response);
+			return false;
 		}
 
 		if (responseHeaders.getFirst(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN) != null) {
@@ -92,18 +107,7 @@ public class DefaultCorsProcessor implements CorsProcessor {
 			return true;
 		}
 
-		boolean preFlightRequest = CorsUtils.isPreFlightRequest(request);
-		if (config == null) {
-			if (preFlightRequest) {
-				rejectRequest(response);
-				return false;
-			}
-			else {
-				return true;
-			}
-		}
-
-		return handleInternal(exchange, config, preFlightRequest);
+		return handleInternal(exchange, config, CorsUtils.isPreFlightRequest(request));
 	}
 
 	/**
@@ -182,8 +186,7 @@ public class DefaultCorsProcessor implements CorsProcessor {
 	 * implementation simply delegates to
 	 * {@link CorsConfiguration#checkOrigin(String)}.
 	 */
-	@Nullable
-	protected String checkOrigin(CorsConfiguration config, @Nullable String requestOrigin) {
+	protected @Nullable String checkOrigin(CorsConfiguration config, @Nullable String requestOrigin) {
 		return config.checkOrigin(requestOrigin);
 	}
 
@@ -192,13 +195,11 @@ public class DefaultCorsProcessor implements CorsProcessor {
 	 * pre-flight request. The default implementation simply delegates to
 	 * {@link CorsConfiguration#checkHttpMethod(HttpMethod)}.
 	 */
-	@Nullable
-	protected List<HttpMethod> checkMethods(CorsConfiguration config, @Nullable HttpMethod requestMethod) {
+	protected @Nullable List<HttpMethod> checkMethods(CorsConfiguration config, @Nullable HttpMethod requestMethod) {
 		return config.checkHttpMethod(requestMethod);
 	}
 
-	@Nullable
-	private HttpMethod getMethodToUse(ServerHttpRequest request, boolean isPreFlight) {
+	private @Nullable HttpMethod getMethodToUse(ServerHttpRequest request, boolean isPreFlight) {
 		return (isPreFlight ? request.getHeaders().getAccessControlRequestMethod() : request.getMethod());
 	}
 
@@ -207,14 +208,13 @@ public class DefaultCorsProcessor implements CorsProcessor {
 	 * pre-flight request. The default implementation simply delegates to
 	 * {@link CorsConfiguration#checkHeaders(List)}.
 	 */
-	@Nullable
-	protected List<String> checkHeaders(CorsConfiguration config, List<String> requestHeaders) {
+	protected @Nullable List<String> checkHeaders(CorsConfiguration config, List<String> requestHeaders) {
 		return config.checkHeaders(requestHeaders);
 	}
 
 	private List<String> getHeadersToUse(ServerHttpRequest request, boolean isPreFlight) {
 		HttpHeaders headers = request.getHeaders();
-		return (isPreFlight ? headers.getAccessControlRequestHeaders() : new ArrayList<>(headers.keySet()));
+		return (isPreFlight ? headers.getAccessControlRequestHeaders() : new ArrayList<>(headers.headerNames()));
 	}
 
 }

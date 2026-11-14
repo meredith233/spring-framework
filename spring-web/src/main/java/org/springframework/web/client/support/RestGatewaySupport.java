@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2022 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -32,7 +32,10 @@ import org.springframework.web.client.RestTemplate;
  * @since 3.0
  * @see #setRestTemplate
  * @see org.springframework.web.client.RestTemplate
+ * @deprecated as of 7.1, in favor of {@link org.springframework.web.client.RestClient}.
  */
+@Deprecated(since = "7.1", forRemoval = true)
+@SuppressWarnings("removal")
 public class RestGatewaySupport {
 
 	/** Logger available to subclasses. */

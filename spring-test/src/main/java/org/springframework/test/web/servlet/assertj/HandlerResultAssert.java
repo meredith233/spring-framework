@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,9 +20,9 @@ import java.lang.reflect.Method;
 
 import org.assertj.core.api.AbstractObjectAssert;
 import org.assertj.core.api.Assertions;
+import org.jspecify.annotations.Nullable;
 
 import org.springframework.cglib.core.internal.Function;
-import org.springframework.lang.Nullable;
 import org.springframework.test.util.MethodAssert;
 import org.springframework.util.ClassUtils;
 import org.springframework.web.method.HandlerMethod;
@@ -30,8 +30,8 @@ import org.springframework.web.servlet.mvc.method.annotation.MvcUriComponentsBui
 import org.springframework.web.servlet.mvc.method.annotation.MvcUriComponentsBuilder.MethodInvocationInfo;
 
 /**
- * AssertJ {@link org.assertj.core.api.Assert assertions} that can be applied to
- * a handler or handler method.
+ * AssertJ {@linkplain org.assertj.core.api.Assert assertions} that can be applied
+ * to a handler or handler method.
 
  * @author Stephane Nicoll
  * @since 6.2
@@ -48,9 +48,9 @@ public class HandlerResultAssert extends AbstractObjectAssert<HandlerResultAsser
 	 * the {@link Method} that handles the request as the object to test.
 	 * <p>Verifies first that the handler is a {@linkplain #isMethodHandler()
 	 * method handler}.
-	 * <p>Example: <pre><code class='java'>
+	 * <p>Example: <pre><code class="java">
 	 * // Check that a GET to "/greet" is invoked on a "handleGreet" method name
-	 * assertThat(mvc.perform(get("/greet")).handler().method().hasName("sayGreet");
+	 * assertThat(mvc.perform(get("/greet")).handler().method().hasName("handleGreet");
 	 * </code></pre>
 	 */
 	public MethodAssert method() {
@@ -71,7 +71,7 @@ public class HandlerResultAssert extends AbstractObjectAssert<HandlerResultAsser
 	 * the method invocation in the {@code handlerMethod}. The arguments used by
 	 * the target method invocation can be {@code null} as the purpose of the mock
 	 * is to identify the method that was invoked.
-	 * <p>Example: <pre><code class='java'>
+	 * <p>Example: <pre><code class="java">
 	 * // If the method has a return type, you can return the result of the invocation
 	 * assertThat(mvc.perform(get("/greet")).handler().isInvokedOn(
 	 *         GreetController.class, controller -> controller.sayGreet());
@@ -96,7 +96,7 @@ public class HandlerResultAssert extends AbstractObjectAssert<HandlerResultAsser
 	/**
 	 * Verify that the handler is of the given {@code type}. For a controller
 	 * method, this is the type of the controller.
-	 * <p>Example: <pre><code class='java'>
+	 * <p>Example: <pre><code class="java">
 	 * // Check that a GET to "/greet" is managed by GreetController
 	 * assertThat(mvc.perform(get("/greet")).handler().hasType(GreetController.class);
 	 * </code></pre>

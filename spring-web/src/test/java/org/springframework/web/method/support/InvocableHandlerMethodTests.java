@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,6 +18,7 @@ package org.springframework.web.method.support;
 
 import java.lang.reflect.Method;
 
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -25,6 +26,7 @@ import org.springframework.core.MethodParameter;
 import org.springframework.web.bind.support.WebDataBinderFactory;
 import org.springframework.web.context.request.NativeWebRequest;
 import org.springframework.web.context.request.ServletWebRequest;
+import org.springframework.web.method.HandlerMethod;
 import org.springframework.web.testfixture.method.ResolvableMethod;
 import org.springframework.web.testfixture.servlet.MockHttpServletRequest;
 import org.springframework.web.testfixture.servlet.MockHttpServletResponse;
@@ -49,7 +51,7 @@ class InvocableHandlerMethodTests {
 
 
 	@BeforeEach
-	void setUp() {
+	void setup() {
 		this.request = new ServletWebRequest(new MockHttpServletRequest(), new MockHttpServletResponse());
 	}
 
@@ -82,9 +84,9 @@ class InvocableHandlerMethodTests {
 
 	@Test
 	void cannotResolveArg() {
-		assertThatIllegalStateException().isThrownBy(() ->
-				getInvocable(Integer.class, String.class).invokeForRequest(request, null))
-			.withMessageContaining("Could not resolve parameter [0]");
+		assertThatIllegalStateException()
+				.isThrownBy(() -> getInvocable(Integer.class, String.class).invokeForRequest(request, null))
+				.withMessageContaining("Could not resolve parameter [0]");
 	}
 
 	@Test
@@ -106,56 +108,63 @@ class InvocableHandlerMethodTests {
 	}
 
 	@Test
+	void resolveHandlerMethodArgToNull() throws Exception {
+		Object value = getInvocable(HandlerMethod.class).invokeForRequest(request, null);
+
+		assertThat(value).isNotNull();
+		assertThat(value).isEqualTo("success");
+	}
+
+	@Test
 	void exceptionInResolvingArg() {
 		this.composite.addResolver(new ExceptionRaisingArgumentResolver());
-		assertThatIllegalArgumentException().isThrownBy(() ->
-				getInvocable(Integer.class, String.class).invokeForRequest(request, null));
+		assertThatIllegalArgumentException()
+				.isThrownBy(() -> getInvocable(Integer.class, String.class).invokeForRequest(request, null));
 	}
 
 	@Test
 	void illegalArgumentException() {
 		this.composite.addResolver(new StubArgumentResolver(Integer.class, "__not_an_int__"));
 		this.composite.addResolver(new StubArgumentResolver("value"));
-		assertThatIllegalStateException().isThrownBy(() ->
-				getInvocable(Integer.class, String.class).invokeForRequest(request, null))
-			.withCauseInstanceOf(IllegalArgumentException.class)
-			.withMessageContaining("Controller [")
-			.withMessageContaining("Method [")
-			.withMessageContaining("with argument values:")
-			.withMessageContaining("[0] [type=java.lang.String] [value=__not_an_int__]")
-			.withMessageContaining("[1] [type=java.lang.String] [value=value");
+		assertThatIllegalStateException()
+				.isThrownBy(() -> getInvocable(Integer.class, String.class).invokeForRequest(request, null))
+				.withCauseInstanceOf(IllegalArgumentException.class)
+				.withMessageContaining("[" + Handler.class.getName() + "]")
+				.withMessageContaining(Handler.class.getName() + ".handle")
+				.withMessageContaining("[0] [type=java.lang.String] [value=__not_an_int__]")
+				.withMessageContaining("[1] [type=java.lang.String] [value=value");
 	}
 
 	@Test
 	void invocationTargetException() {
 		RuntimeException runtimeException = new RuntimeException("error");
 		assertThatRuntimeException()
-			.isThrownBy(() -> getInvocable(Throwable.class).invokeForRequest(this.request, null, runtimeException))
-			.isSameAs(runtimeException);
+				.isThrownBy(() -> getInvocable(Throwable.class).invokeForRequest(this.request, null, runtimeException))
+				.isSameAs(runtimeException);
 
 		Error error = new Error("error");
 		assertThatExceptionOfType(Error.class)
-			.isThrownBy(() -> getInvocable(Throwable.class).invokeForRequest(this.request, null, error))
-			.isSameAs(error);
+				.isThrownBy(() -> getInvocable(Throwable.class).invokeForRequest(this.request, null, error))
+				.isSameAs(error);
 
 		Exception exception = new Exception("error");
 		assertThatException()
-			.isThrownBy(() -> getInvocable(Throwable.class).invokeForRequest(this.request, null, exception))
-			.isSameAs(exception);
+				.isThrownBy(() -> getInvocable(Throwable.class).invokeForRequest(this.request, null, exception))
+				.isSameAs(exception);
 
 		Throwable throwable = new Throwable("error");
 		assertThatIllegalStateException()
-			.isThrownBy(() -> getInvocable(Throwable.class).invokeForRequest(this.request, null, throwable))
-			.withCause(throwable)
-			.withMessageContaining("Invocation failure");
+				.isThrownBy(() -> getInvocable(Throwable.class).invokeForRequest(this.request, null, throwable))
+				.withCause(throwable)
+				.withMessageContaining("Invocation failure");
 	}
 
 	@Test  // SPR-13917
-	public void invocationErrorMessage() {
+	void invocationErrorMessage() {
 		this.composite.addResolver(new StubArgumentResolver(double.class));
 		assertThatIllegalStateException()
-			.isThrownBy(() -> getInvocable(double.class).invokeForRequest(this.request, null))
-			.withMessageContaining("Illegal argument");
+				.isThrownBy(() -> getInvocable(double.class).invokeForRequest(this.request, null))
+				.withMessageContaining("Illegal argument");
 	}
 
 	private InvocableHandlerMethod getInvocable(Class<?>... argTypes) {
@@ -170,7 +179,6 @@ class InvocableHandlerMethodTests {
 	}
 
 
-
 	@SuppressWarnings("unused")
 	private static class Handler {
 
@@ -183,6 +191,10 @@ class InvocableHandlerMethodTests {
 
 		public void handleWithException(Throwable ex) throws Throwable {
 			throw ex;
+		}
+
+		public String handleHandlerMethod(@Nullable HandlerMethod handlerMethod) {
+			return "success";
 		}
 	}
 

@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,6 +23,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -54,11 +55,14 @@ import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
  * @author Juergen Hoeller
  * @author Jeremy Grelle
  * @author Dave Syer
+ * @author Sam Brannen
  */
 @SuppressWarnings({ "rawtypes", "unchecked" })
-public class SelectTagTests extends AbstractFormTagTests {
+class SelectTagTests extends AbstractFormTagTests {
 
+	@SuppressWarnings("deprecation")  // for Locale constructors on JDK 19
 	private static final Locale LOCALE_AT = new Locale("de", "AT");
+	@SuppressWarnings("deprecation")  // for Locale constructors on JDK 19
 	private static final Locale LOCALE_NL = new Locale("nl", "NL");
 
 	private SelectTag tag;
@@ -67,6 +71,7 @@ public class SelectTagTests extends AbstractFormTagTests {
 
 
 	@Override
+	@SuppressWarnings("serial")
 	protected void onSetUp() {
 		this.tag = new SelectTag() {
 			@Override
@@ -76,6 +81,18 @@ public class SelectTagTests extends AbstractFormTagTests {
 		};
 		this.tag.setPageContext(getPageContext());
 	}
+
+	@Override
+	protected TestBean createTestBean() {
+		this.bean = new TestBeanWithRealCountry();
+		this.bean.setName("Rob");
+		this.bean.setCountry("UK");
+		this.bean.setSex("M");
+		this.bean.setMyFloat(Float.valueOf("12.34"));
+		this.bean.setSomeIntegerArray(new Integer[]{12, 34});
+		return this.bean;
+	}
+
 
 	@Test
 	void dynamicAttributes() throws JspException {
@@ -130,6 +147,78 @@ public class SelectTagTests extends AbstractFormTagTests {
 		this.tag.setPath("country");
 		this.tag.setItems(Country.getCountries());
 		assertList(true);
+	}
+
+	@Test  // gh-33023
+	void withListWithHtmlEscapingInPath() throws Exception {
+		this.tag.setPath("favoriteCafé");
+		this.tag.setItems(List.of("Cup of Joe", "Jane's Coffee Shop"));
+		this.tag.setSize("2");
+
+		var expectedOutput = """
+				<select id="favoriteCaf&eacute;" name="favoriteCaf&eacute;" size="2">
+				<option value="Cup of Joe">Cup of Joe</option>
+				<option value="Jane&#39;s Coffee Shop">Jane&#39;s Coffee Shop</option>
+				</select>
+				""".replace("\n", "");
+
+		assertThat(this.tag.doStartTag()).isEqualTo(Tag.SKIP_BODY);
+		assertThat(getOutput()).isEqualTo(expectedOutput);
+	}
+
+	@Test  // gh-33023
+	void withListWithHtmlEscapingAndCharacterEncodingInPath() throws Exception {
+		this.getPageContext().getResponse().setCharacterEncoding("UTF-8");
+
+		this.tag.setPath("favoriteCafé");
+		this.tag.setItems(List.of("Cup of Joe", "Jane's Coffee Shop"));
+		this.tag.setSize("2");
+
+		var expectedOutput = """
+				<select id="favoriteCafé" name="favoriteCafé" size="2">
+				<option value="Cup of Joe">Cup of Joe</option>
+				<option value="Jane&#39;s Coffee Shop">Jane&#39;s Coffee Shop</option>
+				</select>
+				""".replace("\n", "");
+
+		assertThat(this.tag.doStartTag()).isEqualTo(Tag.SKIP_BODY);
+		assertThat(getOutput()).isEqualTo(expectedOutput);
+	}
+
+	@Test  // gh-35783
+	void withListWithHtmlEscapingInOptions() throws Exception {
+		this.tag.setPath("name");
+		this.tag.setItems(List.of("café", "Jane \"I Love Cafés\" Smith"));
+		this.tag.setSize("2");
+
+		var expectedOutput = """
+				<select id="name" name="name" size="2">
+				<option value="caf&eacute;">caf&eacute;</option>
+				<option value="Jane &quot;I Love Caf&eacute;s&quot; Smith">Jane &quot;I Love Caf&eacute;s&quot; Smith</option>
+				</select>
+				""".replace("\n", "");
+
+		assertThat(this.tag.doStartTag()).isEqualTo(Tag.SKIP_BODY);
+		assertThat(getOutput()).isEqualTo(expectedOutput);
+	}
+
+	@Test  // gh-35783
+	void withListWithHtmlEscapingAndCharacterEncodingInOptions() throws Exception {
+		this.getPageContext().getResponse().setCharacterEncoding("UTF-8");
+
+		this.tag.setPath("name");
+		this.tag.setItems(List.of("café", "Jane \"I Love Cafés\" Smith"));
+		this.tag.setSize("2");
+
+		var expectedOutput = """
+				<select id="name" name="name" size="2">
+				<option value="café">café</option>
+				<option value="Jane &quot;I Love Cafés&quot; Smith">Jane &quot;I Love Cafés&quot; Smith</option>
+				</select>
+				""".replace("\n", "");
+
+		assertThat(this.tag.doStartTag()).isEqualTo(Tag.SKIP_BODY);
+		assertThat(getOutput()).isEqualTo(expectedOutput);
 	}
 
 	@Test
@@ -335,8 +424,58 @@ public class SelectTagTests extends AbstractFormTagTests {
 	void withMap() throws Exception {
 		this.tag.setPath("sex");
 		this.tag.setItems(getSexes());
-		int result = this.tag.doStartTag();
-		assertThat(result).isEqualTo(Tag.SKIP_BODY);
+
+		var expectedOutput = """
+				<select id="sex" name="sex">
+				<option value="F">Female</option>
+				<option value="M" selected="selected">Male</option>
+				</select>
+				""".replace("\n", "");
+
+		assertThat(this.tag.doStartTag()).isEqualTo(Tag.SKIP_BODY);
+		assertThat(getOutput()).isEqualTo(expectedOutput);
+	}
+
+	@Test  // gh-35783
+	void withMapWithHtmlEscapingInOptions() throws Exception {
+		var map = new LinkedHashMap<String, String>();
+		map.put("F", "Jane \"I Love Cafés\" Smith");
+		map.put("M", "Joe Café");
+
+		this.tag.setPath("sex");
+		this.tag.setItems(map);
+
+		var expectedOutput = """
+				<select id="sex" name="sex">
+				<option value="F">Jane &quot;I Love Caf&eacute;s&quot; Smith</option>
+				<option value="M" selected="selected">Joe Caf&eacute;</option>
+				</select>
+				""".replace("\n", "");
+
+		assertThat(this.tag.doStartTag()).isEqualTo(Tag.SKIP_BODY);
+		assertThat(getOutput()).isEqualTo(expectedOutput);
+	}
+
+	@Test  // gh-35783
+	void withMapWithHtmlEscapingAndCharacterEncodingInOptions() throws Exception {
+		this.getPageContext().getResponse().setCharacterEncoding("UTF-8");
+
+		var map = new LinkedHashMap<String, String>();
+		map.put("F", "Jane \"I Love Cafés\" Smith");
+		map.put("M", "Joe Café");
+
+		this.tag.setPath("sex");
+		this.tag.setItems(map);
+
+		var expectedOutput = """
+				<select id="sex" name="sex">
+				<option value="F">Jane &quot;I Love Cafés&quot; Smith</option>
+				<option value="M" selected="selected">Joe Café</option>
+				</select>
+				""".replace("\n", "");
+
+		assertThat(this.tag.doStartTag()).isEqualTo(Tag.SKIP_BODY);
+		assertThat(getOutput()).isEqualTo(expectedOutput);
 	}
 
 	@Test
@@ -688,7 +827,7 @@ public class SelectTagTests extends AbstractFormTagTests {
 		// Save original default locale.
 		final Locale defaultLocale = Locale.getDefault();
 		// Use a locale that doesn't result in the generation of HTML entities
-		// (e.g., not German, where \u00e4 becomes &auml;)
+		// (for example, not German, where \u00e4 becomes &auml;)
 		Locale.setDefault(Locale.US);
 
 		try {
@@ -958,7 +1097,7 @@ public class SelectTagTests extends AbstractFormTagTests {
 	}
 
 	private Map getSexes() {
-		Map<String, String> sexes = new HashMap<>();
+		Map<String, String> sexes = new LinkedHashMap<>();
 		sexes.put("F", "Female");
 		sexes.put("M", "Male");
 		return sexes;
@@ -989,22 +1128,11 @@ public class SelectTagTests extends AbstractFormTagTests {
 		Element e = (Element) rootElement.selectSingleNode("option[@value = 'UK']");
 		Attribute selectedAttr = e.attribute("selected");
 		if (selected) {
-			assertThat(selectedAttr != null && "selected".equals(selectedAttr.getValue())).isTrue();
+			assertThat(selectedAttr.getValue()).isEqualTo("selected");
 		}
 		else {
 			assertThat(selectedAttr).isNull();
 		}
-	}
-
-	@Override
-	protected TestBean createTestBean() {
-		this.bean = new TestBeanWithRealCountry();
-		this.bean.setName("Rob");
-		this.bean.setCountry("UK");
-		this.bean.setSex("M");
-		this.bean.setMyFloat(Float.valueOf("12.34"));
-		this.bean.setSomeIntegerArray(new Integer[]{12, 34});
-		return this.bean;
 	}
 
 	private TestBean getTestBean() {

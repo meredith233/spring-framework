@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -25,6 +25,7 @@ import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.GenericArrayType;
 import java.lang.reflect.Method;
+import java.lang.reflect.Parameter;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.lang.reflect.TypeVariable;
@@ -208,6 +209,29 @@ class ResolvableTypeTests {
 	}
 
 	@Test
+	void forParameterForMethod() throws Exception {
+		Method method = Methods.class.getMethod("charSequenceParameter", List.class);
+		Parameter parameter = method.getParameters()[0];
+		ResolvableType type = ResolvableType.forParameter(parameter);
+		assertThat(type.getType()).isEqualTo(method.getGenericParameterTypes()[0]);
+	}
+
+	@Test
+	void forParameterForConstructor() throws Exception {
+		Constructor<Constructors> constructor = Constructors.class.getConstructor(List.class);
+		Parameter parameter = constructor.getParameters()[0];
+		ResolvableType type = ResolvableType.forParameter(parameter);
+		assertThat(type.getType()).isEqualTo(constructor.getGenericParameterTypes()[0]);
+	}
+
+	@Test
+	void forParameterMustNotBeNull() {
+		assertThatIllegalArgumentException()
+				.isThrownBy(() -> ResolvableType.forParameter(null))
+				.withMessage("Parameter must not be null");
+	}
+
+	@Test
 	void forConstructorParameter() throws Exception {
 		Constructor<Constructors> constructor = Constructors.class.getConstructor(List.class);
 		ResolvableType type = ResolvableType.forConstructorParameter(constructor, 0);
@@ -222,6 +246,13 @@ class ResolvableTypeTests {
 	}
 
 	@Test
+	void forConstructorParameterWithImplementationClassMustNotBeNull() {
+		assertThatIllegalArgumentException()
+				.isThrownBy(() -> ResolvableType.forConstructorParameter(null, 0, TypedConstructors.class))
+				.withMessage("Executable must not be null");
+	}
+
+	@Test
 	void forMethodParameterByIndex() throws Exception {
 		Method method = Methods.class.getMethod("charSequenceParameter", List.class);
 		ResolvableType type = ResolvableType.forMethodParameter(method, 0);
@@ -233,6 +264,13 @@ class ResolvableTypeTests {
 		assertThatIllegalArgumentException()
 				.isThrownBy(() -> ResolvableType.forMethodParameter(null, 0))
 				.withMessage("Method must not be null");
+	}
+
+	@Test
+	void forMethodParameterByIndexWithImplementationClassMustNotBeNull() {
+		assertThatIllegalArgumentException()
+				.isThrownBy(() -> ResolvableType.forMethodParameter(null, 0, TypedMethods.class))
+				.withMessage("Executable must not be null");
 	}
 
 	@Test
@@ -300,6 +338,13 @@ class ResolvableTypeTests {
 		assertThatIllegalArgumentException()
 				.isThrownBy(() -> ResolvableType.forMethodReturnType(null))
 				.withMessage("Method must not be null");
+	}
+
+	@Test
+	void forMethodReturnWithImplementationClassMustNotBeNull() {
+		assertThatIllegalArgumentException()
+				.isThrownBy(() -> ResolvableType.forMethodReturnType(null, TypedMethods.class))
+				.withMessage("Executable must not be null");
 	}
 
 	@Test  // gh-27748
@@ -1189,6 +1234,65 @@ class ResolvableTypeTests {
 	}
 
 	@Test
+	void isAssignableFromForUnresolvedWildcard() {
+		ResolvableType wildcard = ResolvableType.forInstance(new Wildcard<>());
+		ResolvableType wildcardFixed = ResolvableType.forInstance(new WildcardFixed());
+		ResolvableType wildcardConcrete = ResolvableType.forClassWithGenerics(Wildcard.class, CharSequence.class);
+		ResolvableType wildcardConsumer = ResolvableType.forInstance(new WildcardConsumer<>());
+
+		assertThat(wildcard.isAssignableFrom(wildcardFixed)).isTrue();
+		assertThat(wildcard.isAssignableFromResolvedPart(wildcardFixed)).isTrue();
+		assertThat(wildcard.isAssignableFrom(wildcardConcrete)).isTrue();
+		assertThat(wildcard.isAssignableFromResolvedPart(wildcardConcrete)).isTrue();
+		assertThat(wildcardFixed.isAssignableFrom(wildcard)).isFalse();
+		assertThat(wildcardFixed.isAssignableFromResolvedPart(wildcard)).isFalse();
+		assertThat(wildcardFixed.isAssignableFrom(wildcardConcrete)).isFalse();
+		assertThat(wildcardFixed.isAssignableFromResolvedPart(wildcardConcrete)).isFalse();
+		assertThat(wildcardConcrete.isAssignableFrom(wildcard)).isTrue();
+		assertThat(wildcardConcrete.isAssignableFromResolvedPart(wildcard)).isTrue();
+		assertThat(wildcardConcrete.isAssignableFrom(wildcardFixed)).isFalse();
+		assertThat(wildcardConcrete.isAssignableFromResolvedPart(wildcardFixed)).isFalse();
+		assertThat(wildcardConsumer.as(Consumer.class).getGeneric().isAssignableFrom(wildcard)).isFalse();
+		assertThat(wildcardConsumer.as(Consumer.class).getGeneric().isAssignableFromResolvedPart(wildcard)).isTrue();
+	}
+
+	@Test
+	void isAssignableFromForUnresolvedDoubleWildcard() {
+		ResolvableType wildcard = ResolvableType.forInstance(new DoubleWildcard<>());
+		ResolvableType wildcardFixed = ResolvableType.forInstance(new DoubleWildcardFixed());
+		ResolvableType wildcardConsumer = ResolvableType.forInstance(new DoubleWildcardConsumer<>());
+
+		assertThat(wildcard.isAssignableFrom(wildcardFixed)).isTrue();
+		assertThat(wildcard.isAssignableFromResolvedPart(wildcardFixed)).isTrue();
+		assertThat(wildcardFixed.isAssignableFrom(wildcard)).isFalse();
+		assertThat(wildcardFixed.isAssignableFromResolvedPart(wildcard)).isFalse();
+		assertThat(wildcardConsumer.as(Consumer.class).getGeneric().isAssignableFrom(wildcard)).isTrue();
+		assertThat(wildcardConsumer.as(Consumer.class).getGeneric().isAssignableFromResolvedPart(wildcard)).isTrue();
+	}
+
+	@Test
+	void strictGenericsMatching() {
+		ResolvableType consumerUnresolved = ResolvableType.forClass(Consumer.class);
+		ResolvableType consumerObject = ResolvableType.forClassWithGenerics(Consumer.class, Object.class);
+		ResolvableType consumerNestedUnresolved = ResolvableType.forClassWithGenerics(Consumer.class, ResolvableType.forClass(Consumer.class));
+		ResolvableType consumerNumber = ResolvableType.forClassWithGenerics(Consumer.class, Number.class);
+		ResolvableType consumerExtendsNumber = ResolvableType.forClass(SubConsumer.class);
+
+		assertThat(consumerUnresolved.isAssignableFrom(consumerObject)).isTrue();
+		assertThat(consumerUnresolved.isAssignableFromResolvedPart(consumerObject)).isTrue();
+		assertThat(consumerObject.isAssignableFrom(consumerUnresolved)).isTrue();
+		assertThat(consumerObject.isAssignableFromResolvedPart(consumerUnresolved)).isTrue();
+		assertThat(consumerUnresolved.isAssignableFrom(consumerNestedUnresolved)).isTrue();
+		assertThat(consumerUnresolved.isAssignableFromResolvedPart(consumerNestedUnresolved)).isTrue();
+		assertThat(consumerObject.isAssignableFrom(consumerNestedUnresolved)).isFalse();
+		assertThat(consumerObject.isAssignableFromResolvedPart(consumerNestedUnresolved)).isFalse();
+		assertThat(consumerObject.isAssignableFrom(consumerNumber)).isFalse();
+		assertThat(consumerObject.isAssignableFromResolvedPart(consumerNumber)).isFalse();
+		assertThat(consumerObject.isAssignableFrom(consumerExtendsNumber)).isFalse();
+		assertThat(consumerObject.isAssignableFromResolvedPart(consumerExtendsNumber)).isTrue();
+	}
+
+	@Test
 	void identifyTypeVariable() throws Exception {
 		Method method = ClassArguments.class.getMethod("typedArgumentFirst", Class.class, Class.class, Class.class);
 		ResolvableType returnType = ResolvableType.forMethodReturnType(method, ClassArguments.class);
@@ -1197,9 +1301,9 @@ class ResolvableTypeTests {
 		ResolvableType arg1 = ResolvableType.forMethodParameter(method, 1, ClassArguments.class);
 		ResolvableType arg2 = ResolvableType.forMethodParameter(method, 2, ClassArguments.class);
 
-		assertThat(returnType.getType().equals(arg0.as(Class.class).getGeneric(0).getType())).isTrue();
-		assertThat(returnType.getType().equals(arg1.as(Class.class).getGeneric(0).getType())).isFalse();
-		assertThat(returnType.getType().equals(arg2.as(Class.class).getGeneric(0).getType())).isFalse();
+		assertThat(returnType.getType()).isEqualTo(arg0.as(Class.class).getGeneric(0).getType());
+		assertThat(returnType.getType()).isNotEqualTo(arg1.as(Class.class).getGeneric(0).getType());
+		assertThat(returnType.getType()).isNotEqualTo(arg2.as(Class.class).getGeneric(0).getType());
 	}
 
 	@Test
@@ -1249,6 +1353,13 @@ class ResolvableTypeTests {
 	}
 
 	@Test
+	void forClassWithGenericsClassMustNotBeNull() {
+		assertThatIllegalArgumentException()
+				.isThrownBy(() -> ResolvableType.forClassWithGenerics(null, String.class))
+				.withMessage("Class must not be null");
+	}
+
+	@Test
 	void forClassWithMismatchedGenerics() {
 		assertThatIllegalArgumentException()
 				.isThrownBy(() -> ResolvableType.forClassWithGenerics(Map.class, Integer.class))
@@ -1277,6 +1388,22 @@ class ResolvableTypeTests {
 	}
 
 	@Test
+	void serializeWithCachedState() throws Exception {
+		ResolvableType type = ResolvableType.forClass(List.class);
+		testSerialization(type);
+		type.getSuperType();
+		type.getInterfaces();
+		type.getGenerics();
+		type.hasUnresolvableGenerics();
+		testSerialization(type);
+		type.getSuperType();
+		type.getInterfaces();
+		type.getGenerics();
+		type.hasUnresolvableGenerics();
+		testSerialization(type);
+	}
+
+	@Test
 	void canResolveVoid() {
 		ResolvableType type = ResolvableType.forClass(void.class);
 		assertThat(type.resolve()).isEqualTo(void.class);
@@ -1287,6 +1414,30 @@ class ResolvableTypeTests {
 		ResolvableType type = ResolvableType.forField(Fields.class.getField("stringList"));
 		ResolvableType narrow = ResolvableType.forType(ArrayList.class, type);
 		assertThat(narrow.getGeneric().resolve()).isEqualTo(String.class);
+	}
+
+	@Test
+	void hasResolvableGenerics() throws Exception {
+		ResolvableType type = ResolvableType.forField(Fields.class.getField("stringList"));
+		assertThat(type.hasResolvableGenerics()).isTrue();
+	}
+
+	@Test
+	void hasResolvableGenericsWithSingleBoundedWildcard() throws Exception {
+		ResolvableType type = ResolvableType.forField(Fields.class.getField("wildcardType"));
+		assertThat(type.hasResolvableGenerics()).isTrue();
+	}
+
+	@Test
+	void hasResolvableGenericsWithSingleParameterizedType() throws Exception {
+		ResolvableType type = ResolvableType.forField(Fields.class.getField("parameterizedType"));
+		assertThat(type.hasResolvableGenerics()).isFalse();
+	}
+
+	@Test
+	void hasResolvableGenericsWithSingleWildcard() throws Exception {
+		ResolvableType type = ResolvableType.forField(Fields.class.getField("anyListElement"));
+		assertThat(type.hasResolvableGenerics()).isFalse();
 	}
 
 	@Test
@@ -1341,6 +1492,30 @@ class ResolvableTypeTests {
 	void hasUnresolvableGenericsWithEnum() {
 		ResolvableType type = ResolvableType.forType(SimpleEnum.class.getGenericSuperclass());
 		assertThat(type.hasUnresolvableGenerics()).isFalse();
+	}
+
+	@Test  // gh-33932
+	void recursiveType() {
+		assertThat(ResolvableType.forClass(RecursiveMap.class)).isEqualTo(
+				ResolvableType.forClass(RecursiveMap.class));
+
+		ResolvableType resolvableType1 = ResolvableType.forClassWithGenerics(Map.class,
+				String.class, RecursiveMap.class);
+		ResolvableType resolvableType2 = ResolvableType.forClassWithGenerics(Map.class,
+				String.class, RecursiveMap.class);
+		assertThat(resolvableType1).isEqualTo(resolvableType2);
+	}
+
+	@Test  // gh-33932
+	void recursiveTypeWithInterface() {
+		assertThat(ResolvableType.forClass(RecursiveMapWithInterface.class)).isEqualTo(
+				ResolvableType.forClass(RecursiveMapWithInterface.class));
+
+		ResolvableType resolvableType1 = ResolvableType.forClassWithGenerics(Map.class,
+				String.class, RecursiveMapWithInterface.class);
+		ResolvableType resolvableType2 = ResolvableType.forClassWithGenerics(Map.class,
+				String.class, RecursiveMapWithInterface.class);
+		assertThat(resolvableType1).isEqualTo(resolvableType2);
 	}
 
 	@Test
@@ -1401,6 +1576,29 @@ class ResolvableTypeTests {
 		assertThat(repository3.hasUnresolvableGenerics()).isTrue();
 		assertThat(repository3.isAssignableFrom(repository1)).isFalse();
 		assertThat(repository3.isAssignableFromResolvedPart(repository1)).isFalse();
+	}
+
+	@Test
+	void gh33535() throws Exception {
+		ResolvableType repository1 = ResolvableType.forField(Fields.class.getField("stringRepository"));
+		ResolvableType repository2 = ResolvableType.forField(Fields.class.getField("arrayRepository"));
+		ResolvableType repository3 = ResolvableType.forMethodReturnType(Methods.class.getMethod("someRepository"));
+		assertThat(repository1.hasUnresolvableGenerics()).isFalse();
+		assertThat(repository1.isAssignableFrom(repository3)).isFalse();
+		assertThat(repository1.isAssignableFromResolvedPart(repository3)).isTrue();
+		assertThat(repository3.isAssignableFrom(repository1)).isTrue();
+		assertThat(repository3.isAssignableFromResolvedPart(repository1)).isTrue();
+		assertThat(repository2.hasUnresolvableGenerics()).isFalse();
+		assertThat(repository2.isAssignableFrom(repository3)).isFalse();
+		assertThat(repository2.isAssignableFromResolvedPart(repository3)).isTrue();
+		assertThat(repository3.isAssignableFrom(repository2)).isTrue();
+		assertThat(repository3.isAssignableFromResolvedPart(repository2)).isTrue();
+	}
+
+	@Test
+	void gh34541() throws Exception {
+		ResolvableType typeWithGenerics = ResolvableType.forField(getClass().getDeclaredField("paymentCreator"));
+		assertThat(typeWithGenerics.isAssignableFrom(PaymentCreator.class)).isTrue();
 	}
 
 
@@ -1466,6 +1664,8 @@ class ResolvableTypeTests {
 
 		public List<String>[][][] genericMultiArrayType;
 
+		public List<?> anyListElement;
+
 		public List<? extends Number> wildcardType;
 
 		public List<? super Number> wildcardSuperType = new ArrayList<Object>();
@@ -1499,6 +1699,10 @@ class ResolvableTypeTests {
 		public int[] intArray;
 
 		public SomeRepository<? extends Serializable> repository;
+
+		public SomeRepository<String> stringRepository;
+
+		public SomeRepository<String[]> arrayRepository;
 	}
 
 
@@ -1621,7 +1825,7 @@ class ResolvableTypeTests {
 	public interface MyInterfaceType<T> {
 	}
 
-	public class MyGenericInterfaceType<T> implements MyInterfaceType<T>, ResolvableTypeProvider {
+	public static class MyGenericInterfaceType<T> implements MyInterfaceType<T>, ResolvableTypeProvider {
 
 		private final Class<T> type;
 
@@ -1638,39 +1842,53 @@ class ResolvableTypeTests {
 		}
 	}
 
-
-	public class MySimpleInterfaceType implements MyInterfaceType<String> {
+	public static class MySimpleInterfaceType implements MyInterfaceType<String> {
 	}
 
-	public abstract class MySimpleInterfaceTypeWithImplementsRaw implements MyInterfaceType<String>, List {
+	public abstract static class MySimpleInterfaceTypeWithImplementsRaw implements MyInterfaceType<String>, List {
 	}
 
-	public abstract class ExtendsMySimpleInterfaceTypeWithImplementsRaw extends MySimpleInterfaceTypeWithImplementsRaw {
+	public abstract static class ExtendsMySimpleInterfaceTypeWithImplementsRaw extends MySimpleInterfaceTypeWithImplementsRaw {
 	}
 
-
-	public class MyCollectionInterfaceType implements MyInterfaceType<Collection<String>> {
-	}
-
-
-	public abstract class MySuperclassType<T> {
+	public static class MyCollectionInterfaceType implements MyInterfaceType<Collection<String>> {
 	}
 
 
-	public class MySimpleSuperclassType extends MySuperclassType<String> {
+	public abstract static class MySuperclassType<T> {
+	}
+
+	public static class MySimpleSuperclassType extends MySuperclassType<String> {
+	}
+
+	public static class MyCollectionSuperclassType extends MySuperclassType<Collection<String>> {
 	}
 
 
-	public class MyCollectionSuperclassType extends MySuperclassType<Collection<String>> {
+	public interface Consumer<T> {
 	}
 
-
-	interface Wildcard<T extends Number> extends List<T> {
+	private static class SubConsumer<N extends Number> implements Consumer<N> {
 	}
 
-
-	interface RawExtendsWildcard extends Wildcard {
+	public static class Wildcard<T extends CharSequence> {
 	}
+
+	public static class WildcardFixed extends Wildcard<String> {
+	}
+
+	public static class WildcardConsumer<T extends CharSequence & Serializable> implements Consumer<Wildcard<T>> {
+	}
+
+	public static class DoubleWildcard<T extends CharSequence & Serializable> {
+	}
+
+	public static class DoubleWildcardFixed extends DoubleWildcard<String> {
+	}
+
+	public static class DoubleWildcardConsumer<T extends CharSequence & Serializable> implements Consumer<DoubleWildcard<T>> {
+	}
+
 
 
 	interface VariableNameSwitch<V, K> extends MultiValueMap<K, V> {
@@ -1687,10 +1905,10 @@ class ResolvableTypeTests {
 	}
 
 
-	class Foo<T extends Foo<T>> {
+	static class Foo<T extends Foo<T>> {
 	}
 
-	class Bar extends Foo<Bar> {
+	static class Bar extends Foo<Bar> {
 	}
 
 
@@ -1722,19 +1940,19 @@ class ResolvableTypeTests {
 	public interface IBase<BT extends IBase<BT>> {
 	}
 
-	public abstract class AbstractBase<BT extends IBase<BT>> implements IBase<BT> {
+	public abstract static class AbstractBase<BT extends IBase<BT>> implements IBase<BT> {
 	}
 
-	public class BaseImplementation extends AbstractBase<BaseImplementation> {
+	public static class BaseImplementation extends AbstractBase<BaseImplementation> {
 	}
 
-	public class BaseProvider<BT extends IBase<BT>> implements IProvider<IBase<BT>> {
+	public static class BaseProvider<BT extends IBase<BT>> implements IProvider<IBase<BT>> {
 
 		public Collection<IBase<BT>> stuff;
 	}
 
 
-	public abstract class UnresolvedWithGenerics {
+	public abstract static class UnresolvedWithGenerics {
 
 		Set<Integer> set;
 	}
@@ -1771,6 +1989,28 @@ class ResolvableTypeTests {
 		@Override
 		public void doA() {
 		}
+	}
+
+
+	@SuppressWarnings("serial")
+	static class RecursiveMap extends HashMap<String, RecursiveMap> {
+	}
+
+	@SuppressWarnings("serial")
+	static class RecursiveMapWithInterface extends HashMap<String, RecursiveMapWithInterface>
+			implements Map<String, RecursiveMapWithInterface> {
+	}
+
+
+	PaymentCreator<? extends Payment, PaymentCreatorParameter<? extends Payment>> paymentCreator;
+
+	static class PaymentCreator<T extends Payment, P extends PaymentCreatorParameter<T>> {
+	}
+
+	static class PaymentCreatorParameter<T extends Payment> {
+	}
+
+	abstract static class Payment {
 	}
 
 

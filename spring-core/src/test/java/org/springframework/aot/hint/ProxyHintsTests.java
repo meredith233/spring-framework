@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2022 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -78,6 +78,18 @@ class ProxyHintsTests {
 		this.proxyHints.registerJdkProxy(Function.class);
 		this.proxyHints.registerJdkProxy(TypeReference.of(Function.class.getName()));
 		assertThat(this.proxyHints.jdkProxyHints()).singleElement().satisfies(proxiedInterfaces(Function.class));
+	}
+
+	@Test
+	void registerJdkProxyWithJavaSerialization() {
+		this.proxyHints.registerJdkProxy(hint -> {
+			hint.proxiedInterfaces(TypeReference.of("com.example.Test"));
+			hint.withJavaSerialization(true);
+		});
+		assertThat(this.proxyHints.jdkProxyHints()).singleElement().satisfies(hint -> {
+			assertThat(hint.getProxiedInterfaces()).containsExactly(TypeReference.of("com.example.Test"));
+			assertThat(hint.hasJavaSerialization()).isTrue();
+		});
 	}
 
 

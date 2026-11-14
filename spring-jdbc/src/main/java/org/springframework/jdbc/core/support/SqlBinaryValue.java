@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,22 +23,29 @@ import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.sql.Types;
 
+import org.jspecify.annotations.Nullable;
+
 import org.springframework.core.io.InputStreamSource;
 import org.springframework.core.io.Resource;
 import org.springframework.jdbc.core.SqlTypeValue;
-import org.springframework.lang.Nullable;
 
 /**
- * Object to represent a binary parameter value for a SQL statement, e.g.
+ * Object to represent a binary parameter value for an SQL statement, for example,
  * a binary stream for a BLOB or a LONGVARBINARY or PostgreSQL BYTEA column.
  *
  * <p>Designed for use with {@link org.springframework.jdbc.core.JdbcTemplate}
  * as well as {@link org.springframework.jdbc.core.simple.JdbcClient}, to be
- * passed in as a parameter value wrapping the target content value. Can be
- * combined with {@link org.springframework.jdbc.core.SqlParameterValue} for
- * specifying a SQL type, e.g.
+ * passed in as a parameter value wrapping the target content value.
+ *
+ * <p>Can be combined with {@link org.springframework.jdbc.core.SqlParameterValue}
+ * for specifying an SQL type, for example,
  * {@code new SqlParameterValue(Types.BLOB, new SqlBinaryValue(myContent))}.
  * With most database drivers, the type hint is not actually necessary.
+ *
+ * <p>Note: Only specify {@code Types.BLOB} in case of an actual BLOB, preferring
+ * {@code Types.LONGVARBINARY} otherwise. With PostgreSQL, {@code Types.ARRAY}
+ * has to be specified for BYTEA columns, rather than {@code Types.BLOB}. This
+ * is in contrast to {@link SqlLobValue} where byte array handling was lenient.
  *
  * @author Juergen Hoeller
  * @since 6.1.4
@@ -64,7 +71,7 @@ public class SqlBinaryValue implements SqlTypeValue {
 	/**
 	 * Create a new {@code SqlBinaryValue} for the given content.
 	 * @param stream the content stream
-	 * @param length the length of the content
+	 * @param length the length of the content (or -1 if undetermined)
 	 */
 	public SqlBinaryValue(InputStream stream, long length) {
 		this.content = stream;
@@ -76,7 +83,7 @@ public class SqlBinaryValue implements SqlTypeValue {
 	 * <p>Consider specifying a {@link Resource} with content length support
 	 * when available: {@link SqlBinaryValue#SqlBinaryValue(Resource)}.
 	 * @param resource the resource to obtain a content stream from
-	 * @param length the length of the content
+	 * @param length the length of the content (or -1 if undetermined)
 	 */
 	public SqlBinaryValue(InputStreamSource resource, long length) {
 		this.content = resource;
@@ -140,10 +147,20 @@ public class SqlBinaryValue implements SqlTypeValue {
 			throws SQLException {
 
 		if (sqlType == Types.BLOB) {
-			ps.setBlob(paramIndex, is, length);
+			if (length >= 0) {
+				ps.setBlob(paramIndex, is, length);
+			}
+			else {
+				ps.setBlob(paramIndex, is);
+			}
 		}
 		else {
-			ps.setBinaryStream(paramIndex, is, length);
+			if (length >= 0) {
+				ps.setBinaryStream(paramIndex, is, length);
+			}
+			else {
+				ps.setBinaryStream(paramIndex, is);
+			}
 		}
 	}
 

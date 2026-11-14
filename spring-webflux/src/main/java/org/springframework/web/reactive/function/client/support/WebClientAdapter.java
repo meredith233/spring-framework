@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2023 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -98,50 +98,67 @@ public final class WebClientAdapter extends AbstractReactorHttpExchangeAdapter {
 		return newRequest(requestValues).retrieve().toEntityFlux(bodyType);
 	}
 
-	@SuppressWarnings("ReactiveStreamsUnusedPublisher")
-	private WebClient.RequestBodySpec newRequest(HttpRequestValues values) {
-
+	/**
+	 * Build a request from the given {@code HttpRequestValues}.
+	 * @param values the values to use
+	 * @return the request spec
+	 * @since 7.0.6
+	 */
+	public WebClient.RequestBodySpec newRequest(HttpRequestValues values) {
 		HttpMethod httpMethod = values.getHttpMethod();
 		Assert.notNull(httpMethod, "HttpMethod is required");
-
 		WebClient.RequestBodyUriSpec uriSpec = this.webClient.method(httpMethod);
+		WebClient.RequestBodySpec bodySpec = setUri(uriSpec, values);
+		bodySpec.headers(headers -> headers.putAll(values.getHeaders()));
+		bodySpec.cookies(cookies -> cookies.putAll(values.getCookies()));
+		if (values.getApiVersion() != null) {
+			bodySpec.apiVersion(values.getApiVersion());
+		}
+		bodySpec.attributes(attributes -> attributes.putAll(values.getAttributes()));
+		setBody(bodySpec, values);
+		return bodySpec;
+	}
 
-		WebClient.RequestBodySpec bodySpec;
+	private static WebClient.RequestBodySpec setUri(
+			WebClient.RequestBodyUriSpec spec, HttpRequestValues values) {
+
 		if (values.getUri() != null) {
-			bodySpec = uriSpec.uri(values.getUri());
+			return spec.uri(values.getUri());
 		}
 
-		else if (values.getUriTemplate() != null) {
+		if (values.getUriTemplate() != null) {
 			UriBuilderFactory uriBuilderFactory = values.getUriBuilderFactory();
 			if(uriBuilderFactory != null){
 				URI uri = uriBuilderFactory.expand(values.getUriTemplate(), values.getUriVariables());
-				bodySpec = uriSpec.uri(uri);
+				return spec.uri(uri);
 			}
 			else {
-				bodySpec = uriSpec.uri(values.getUriTemplate(), values.getUriVariables());
+				return spec.uri(values.getUriTemplate(), values.getUriVariables());
 			}
 		}
-		else {
-			throw new IllegalStateException("Neither full URL nor URI template");
-		}
 
-		bodySpec.headers(headers -> headers.putAll(values.getHeaders()));
-		bodySpec.cookies(cookies -> cookies.putAll(values.getCookies()));
-		bodySpec.attributes(attributes -> attributes.putAll(values.getAttributes()));
+		throw new IllegalStateException("Neither full URL nor URI template");
+	}
 
+	@SuppressWarnings({"ReactiveStreamsUnusedPublisher", "unchecked"})
+	private <B> void setBody(WebClient.RequestBodySpec spec, HttpRequestValues values) {
 		if (values.getBodyValue() != null) {
-			bodySpec.bodyValue(values.getBodyValue());
-		}
-		else if (values instanceof ReactiveHttpRequestValues reactiveRequestValues) {
-			Publisher<?> body = reactiveRequestValues.getBodyPublisher();
-			if (body != null) {
-				ParameterizedTypeReference<?> elementType = reactiveRequestValues.getBodyPublisherElementType();
-				Assert.notNull(elementType, "Publisher body element type is required");
-				bodySpec.body(body, elementType);
+			if (values.getBodyValueType() != null) {
+				B body = (B) values.getBodyValue();
+				spec.bodyValue(body, (ParameterizedTypeReference<B>) values.getBodyValueType());
+			}
+			else {
+				spec.bodyValue(values.getBodyValue());
 			}
 		}
-
-		return bodySpec;
+		else if (values instanceof ReactiveHttpRequestValues rhrv) {
+			Publisher<?> body = rhrv.getBodyPublisher();
+			if (body != null) {
+				ParameterizedTypeReference<?> elementType = rhrv.getBodyPublisherElementType();
+				Assert.notNull(elementType, "Publisher body element type is required");
+				spec.body(body, elementType);
+			}
+		}
 	}
 
 
@@ -152,18 +169,6 @@ public final class WebClientAdapter extends AbstractReactorHttpExchangeAdapter {
 	 * @since 6.1
 	 */
 	public static WebClientAdapter create(WebClient webClient) {
-		return new WebClientAdapter(webClient);
-	}
-
-	/**
-	 * Create a {@link WebClientAdapter} for the given {@code WebClient} instance.
-	 * @param webClient the client to use
-	 * @return the created adapter instance
-	 * @deprecated in favor of {@link #create(WebClient)} aligning with other adapter
-	 * implementations; to be removed in 6.2.
-	 */
-	@Deprecated(since = "6.1", forRemoval = true)
-	public static WebClientAdapter forClient(WebClient webClient) {
 		return new WebClientAdapter(webClient);
 	}
 

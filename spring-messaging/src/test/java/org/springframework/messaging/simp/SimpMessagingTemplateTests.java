@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -87,7 +87,7 @@ class SimpMessagingTemplateTests {
 	}
 
 	@Test // gh-23836
-	public void convertAndSendToUserWithInvalidSequence() {
+	void convertAndSendToUserWithInvalidSequence() {
 		assertThatIllegalArgumentException().isThrownBy(() ->
 				this.messagingTemplate.convertAndSendToUser("joe%2F", "/queue/foo", "data"));
 	}
@@ -163,8 +163,7 @@ class SimpMessagingTemplateTests {
 	void processHeadersToSend() {
 		Map<String, Object> map = this.messagingTemplate.processHeadersToSend(null);
 
-		assertThat(map).isNotNull();
-		assertThat(MessageHeaders.class.isAssignableFrom(map.getClass())).as("Actual: " + map.getClass()).isTrue();
+		assertThat(map).isInstanceOf(MessageHeaders.class);
 
 		SimpMessageHeaderAccessor headerAccessor =
 				MessageHeaderAccessor.getAccessor((MessageHeaders) map, SimpMessageHeaderAccessor.class);

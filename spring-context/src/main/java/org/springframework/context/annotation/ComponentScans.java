@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2015 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -26,9 +26,9 @@ import java.lang.annotation.Target;
  * Container annotation that aggregates several {@link ComponentScan} annotations.
  *
  * <p>Can be used natively, declaring several nested {@link ComponentScan} annotations.
- * Can also be used in conjunction with Java 8's support for repeatable annotations,
- * where {@link ComponentScan} can simply be declared several times on the same method,
- * implicitly generating this container annotation.
+ * Can also be used in conjunction with Java's support for repeatable annotations,
+ * where {@link ComponentScan @ComponentScan} can simply be declared several times
+ * on the same method, implicitly generating this container annotation.
  *
  * @author Juergen Hoeller
  * @since 4.3

@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -29,30 +29,32 @@ import javax.sql.DataSource;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import org.springframework.dao.InvalidDataAccessApiUsageException;
 import org.springframework.jdbc.core.SqlParameterValue;
 import org.springframework.jdbc.core.metadata.TableMetaDataContext;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 
 /**
- * Mock object based tests for TableMetaDataContext.
+ * Mock object based tests for {@link TableMetaDataContext}.
  *
  * @author Thomas Risberg
  */
 class TableMetaDataContextTests {
 
-	private DataSource dataSource = mock();
+	private final DataSource dataSource = mock();
 
-	private Connection connection = mock();
+	private final Connection connection = mock();
 
-	private DatabaseMetaData databaseMetaData = mock();
+	private final DatabaseMetaData databaseMetaData = mock();
 
-	private TableMetaDataContext context = new TableMetaDataContext();
+	private final TableMetaDataContext context = new TableMetaDataContext();
 
 
 	@BeforeEach
@@ -63,7 +65,7 @@ class TableMetaDataContextTests {
 
 
 	@Test
-	void testMatchInParametersAndSqlTypeInfoWrapping() throws Exception {
+	void matchInParametersAndSqlTypeInfoWrapping() throws Exception {
 		final String TABLE = "customers";
 		final String USER = "me";
 
@@ -104,14 +106,10 @@ class TableMetaDataContextTests {
 		List<Object> values = context.matchInParameterValuesWithInsertColumns(map);
 
 		assertThat(values.size()).as("wrong number of parameters: ").isEqualTo(4);
-		boolean condition3 = values.get(0) instanceof Number;
-		assertThat(condition3).as("id not wrapped with type info").isTrue();
-		boolean condition2 = values.get(1) instanceof String;
-		assertThat(condition2).as("name not wrapped with type info").isTrue();
-		boolean condition1 = values.get(2) instanceof SqlParameterValue;
-		assertThat(condition1).as("date wrapped with type info").isTrue();
-		boolean condition = values.get(3) instanceof SqlParameterValue;
-		assertThat(condition).as("version wrapped with type info").isTrue();
+		assertThat(values.get(0)).as("id not wrapped with type info").isInstanceOf(Number.class);
+		assertThat(values.get(1)).as("name not wrapped with type info").isInstanceOf(String.class);
+		assertThat(values.get(2)).as("date wrapped with type info").isInstanceOf(SqlParameterValue.class);
+		assertThat(values.get(3)).as("version wrapped with type info").isInstanceOf(SqlParameterValue.class);
 		verify(metaDataResultSet, atLeastOnce()).next();
 		verify(columnsResultSet, atLeastOnce()).next();
 		verify(metaDataResultSet).close();
@@ -119,7 +117,7 @@ class TableMetaDataContextTests {
 	}
 
 	@Test
-	void testTableWithSingleColumnGeneratedKey() throws Exception {
+	void tableWithSingleColumnGeneratedKey() throws Exception {
 		final String TABLE = "customers";
 		final String USER = "me";
 
@@ -143,7 +141,7 @@ class TableMetaDataContextTests {
 		given(databaseMetaData.getColumns(null, USER, TABLE, null)).willReturn(columnsResultSet);
 
 		MapSqlParameterSource map = new MapSqlParameterSource();
-		String[] keyCols = new String[] { "id" };
+		String[] keyCols = { "id" };
 		context.setTableName(TABLE);
 		context.processMetaData(dataSource, new ArrayList<>(), keyCols);
 		List<Object> values = context.matchInParameterValuesWithInsertColumns(map);
@@ -155,6 +153,63 @@ class TableMetaDataContextTests {
 		verify(columnsResultSet, atLeastOnce()).next();
 		verify(metaDataResultSet).close();
 		verify(columnsResultSet).close();
+	}
+
+	@Test  // gh-37014
+	void overlappingDeclaredAndGeneratedKeyColumnsAreRejected() throws Exception {
+		initializeTwoColumnCustomersTable();
+		context.setTableName("customers");
+
+		assertThatExceptionOfType(InvalidDataAccessApiUsageException.class)
+				.isThrownBy(() -> context.processMetaData(dataSource, List.of("id", "name"), new String[] { "id" }))
+				.withMessage("Declared columns [id] must not overlap with generated key columns");
+	}
+
+	@Test  // gh-37014
+	void overlappingDeclaredAndGeneratedKeyColumnsAreRejectedRegardlessOfCase() throws Exception {
+		initializeTwoColumnCustomersTable();
+		context.setTableName("customers");
+
+		assertThatExceptionOfType(InvalidDataAccessApiUsageException.class)
+				.isThrownBy(() -> context.processMetaData(dataSource, List.of("ID", "name"), new String[] { "id" }))
+				.withMessage("Declared columns [ID] must not overlap with generated key columns");
+	}
+
+	@Test  // gh-37014
+	void declaredColumnsWithoutOverlapAreUsedAsIs() throws Exception {
+		initializeTwoColumnCustomersTable();
+		MapSqlParameterSource map = new MapSqlParameterSource();
+		map.addValue("name", "Sven");
+		String[] keyCols = { "id" };
+		context.setTableName("customers");
+		context.processMetaData(dataSource, List.of("name"), keyCols);
+		List<Object> values = context.matchInParameterValuesWithInsertColumns(map);
+		String insertString = context.createInsertString(keyCols);
+
+		assertThat(insertString).isEqualTo("INSERT INTO customers (name) VALUES(?)");
+		assertThat(values).containsExactly("Sven");
+	}
+
+
+	private void initializeTwoColumnCustomersTable() throws Exception {
+		ResultSet metaDataResultSet = mock();
+		given(metaDataResultSet.next()).willReturn(true, false);
+		given(metaDataResultSet.getString("TABLE_SCHEM")).willReturn("me");
+		given(metaDataResultSet.getString("TABLE_NAME")).willReturn("customers");
+		given(metaDataResultSet.getString("TABLE_TYPE")).willReturn("TABLE");
+
+		ResultSet columnsResultSet = mock();
+		given(columnsResultSet.next()).willReturn(true, true, false);
+		given(columnsResultSet.getString("COLUMN_NAME")).willReturn("id", "name");
+		given(columnsResultSet.getInt("DATA_TYPE")).willReturn(Types.INTEGER, Types.VARCHAR);
+		given(columnsResultSet.getBoolean("NULLABLE")).willReturn(false, true);
+
+		given(databaseMetaData.getDatabaseProductName()).willReturn("MyDB");
+		given(databaseMetaData.getDatabaseProductVersion()).willReturn("1.0");
+		given(databaseMetaData.getUserName()).willReturn("me");
+		given(databaseMetaData.storesLowerCaseIdentifiers()).willReturn(true);
+		given(databaseMetaData.getTables(null, null, "customers", null)).willReturn(metaDataResultSet);
+		given(databaseMetaData.getColumns(null, "me", "customers", null)).willReturn(columnsResultSet);
 	}
 
 }

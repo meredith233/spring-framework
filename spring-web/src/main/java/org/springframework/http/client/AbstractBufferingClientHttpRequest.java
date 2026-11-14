@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2023 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,7 +20,9 @@ import java.io.IOException;
 import java.io.OutputStream;
 
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.StreamingHttpOutputMessage;
 import org.springframework.util.FastByteArrayOutputStream;
+import org.springframework.util.StreamUtils;
 
 /**
  * Base implementation of {@link ClientHttpRequest} that buffers output
@@ -29,18 +31,18 @@ import org.springframework.util.FastByteArrayOutputStream;
  * @author Arjen Poutsma
  * @since 3.0.6
  */
-abstract class AbstractBufferingClientHttpRequest extends AbstractClientHttpRequest {
+public abstract class AbstractBufferingClientHttpRequest extends AbstractClientHttpRequest {
 
 	private final FastByteArrayOutputStream bufferedOutput = new FastByteArrayOutputStream(1024);
 
 
 	@Override
-	protected OutputStream getBodyInternal(HttpHeaders headers) throws IOException {
+	protected final OutputStream getBodyInternal(HttpHeaders headers) {
 		return this.bufferedOutput;
 	}
 
 	@Override
-	protected ClientHttpResponse executeInternal(HttpHeaders headers) throws IOException {
+	protected final ClientHttpResponse executeInternal(HttpHeaders headers) throws IOException {
 		byte[] bytes = this.bufferedOutput.toByteArrayUnsafe();
 		if (headers.getContentLength() < 0) {
 			headers.setContentLength(bytes.length);
@@ -59,5 +61,33 @@ abstract class AbstractBufferingClientHttpRequest extends AbstractClientHttpRequ
 	protected abstract ClientHttpResponse executeInternal(HttpHeaders headers, byte[] bufferedOutput)
 			throws IOException;
 
+	/**
+	 * Execute with the given request and body.
+	 * @param request the request to execute with
+	 * @param bufferedOutput the body to write
+	 * @param bufferResponse whether to buffer the response
+	 * @return the resulting response
+	 * @throws IOException in case of I/O errors from execution
+	 * @since 7.0
+	 */
+	final ClientHttpResponse executeWithRequestAndBody(
+			ClientHttpRequest request, byte[] bufferedOutput, boolean bufferResponse) throws IOException {
+
+		if (bufferedOutput.length > 0) {
+			long contentLength = request.getHeaders().getContentLength();
+			if (contentLength > -1 && contentLength != bufferedOutput.length) {
+				request.getHeaders().setContentLength(bufferedOutput.length);
+			}
+			if (request instanceof StreamingHttpOutputMessage streamingOutputMessage) {
+				streamingOutputMessage.setBody(bufferedOutput);
+			}
+			else {
+				StreamUtils.copy(bufferedOutput, request.getBody());
+			}
+		}
+
+		ClientHttpResponse response = request.execute();
+		return (bufferResponse ? new BufferingClientHttpResponseWrapper(response) : response);
+	}
 
 }

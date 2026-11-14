@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2023 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,11 +22,11 @@ import java.io.InputStream;
 import org.apache.hc.core5.http.ClassicHttpResponse;
 import org.apache.hc.core5.http.HttpEntity;
 import org.apache.hc.core5.http.io.entity.EntityUtils;
+import org.jspecify.annotations.Nullable;
 
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.support.HttpComponentsHeadersAdapter;
-import org.springframework.lang.Nullable;
 import org.springframework.util.MultiValueMap;
 
 /**
@@ -44,8 +44,7 @@ final class HttpComponentsClientHttpResponse implements ClientHttpResponse {
 
 	private final ClassicHttpResponse httpResponse;
 
-	@Nullable
-	private HttpHeaders headers;
+	private @Nullable HttpHeaders headers;
 
 
 	HttpComponentsClientHttpResponse(ClassicHttpResponse httpResponse) {
@@ -67,6 +66,16 @@ final class HttpComponentsClientHttpResponse implements ClientHttpResponse {
 	public HttpHeaders getHeaders() {
 		if (this.headers == null) {
 			MultiValueMap<String, String> adapter = new HttpComponentsHeadersAdapter(this.httpResponse);
+			// update headers if response is decompressed
+			HttpEntity httpEntity = this.httpResponse.getEntity();
+			if (httpEntity != null) {
+				if (httpEntity.getContentLength() == -1) {
+					adapter.remove(HttpHeaders.CONTENT_LENGTH);
+				}
+				if (httpEntity.getContentEncoding() == null) {
+					adapter.remove(HttpHeaders.CONTENT_ENCODING);
+				}
+			}
 			this.headers = HttpHeaders.readOnlyHttpHeaders(adapter);
 		}
 		return this.headers;
@@ -90,8 +99,7 @@ final class HttpComponentsClientHttpResponse implements ClientHttpResponse {
 				this.httpResponse.close();
 			}
 		}
-		catch (IOException ex) {
-			// Ignore exception on close...
+		catch (IOException ignored) {
 		}
 	}
 

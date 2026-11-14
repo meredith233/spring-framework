@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,9 +18,9 @@ package org.springframework.test.util;
 
 import java.lang.reflect.Method;
 
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 
-import org.springframework.lang.Nullable;
 import org.springframework.util.ReflectionUtils;
 
 import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
@@ -65,7 +65,7 @@ class MethodAssertTests {
 	}
 
 	@Test
-	void haDeclaringClassWithWrongClass() {
+	void hasDeclaringClassWithWrongClass() {
 		Method method = ReflectionUtils.findMethod(TestData.class, "counter");
 		assertThatExceptionOfType(AssertionError.class)
 				.isThrownBy(() -> assertThat(method).hasDeclaringClass(Method.class))

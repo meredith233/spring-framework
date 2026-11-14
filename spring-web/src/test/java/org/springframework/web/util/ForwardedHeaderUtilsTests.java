@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,7 +16,10 @@
 
 package org.springframework.web.util;
 
+import java.net.InetSocketAddress;
 import java.net.URI;
+import java.util.Collections;
+import java.util.Map;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -48,7 +51,7 @@ class ForwardedHeaderUtilsTests {
 		request.setQueryString("a=1");
 
 		ServletServerHttpRequest httpRequest = new ServletServerHttpRequest(request);
-		UriComponents result = ForwardedHeaderUtils.adaptFromForwardedHeaders(httpRequest.getURI(), httpRequest.getHeaders()).build();
+		UriComponents result = adaptFromXForwardedHeaders(httpRequest.getURI(), httpRequest.getHeaders());
 		assertThat(result.getScheme()).isEqualTo("http");
 		assertThat(result.getHost()).isEqualTo("localhost");
 		assertThat(result.getPort()).isEqualTo(-1);
@@ -69,7 +72,7 @@ class ForwardedHeaderUtilsTests {
 		request.setRequestURI("/rest/mobile/users/1");
 
 		HttpRequest httpRequest = new ServletServerHttpRequest(request);
-		UriComponents result = ForwardedHeaderUtils.adaptFromForwardedHeaders(httpRequest.getURI(), httpRequest.getHeaders()).build();
+		UriComponents result = adaptFromXForwardedHeaders(httpRequest.getURI(), httpRequest.getHeaders());
 
 		assertThat(result.getScheme()).isEqualTo(protocol);
 		assertThat(result.getHost()).isEqualTo("84.198.58.199");
@@ -90,7 +93,7 @@ class ForwardedHeaderUtilsTests {
 		request.setRequestURI("/path");
 
 		HttpRequest httpRequest = new ServletServerHttpRequest(request);
-		UriComponents result = ForwardedHeaderUtils.adaptFromForwardedHeaders(httpRequest.getURI(), httpRequest.getHeaders()).build();
+		UriComponents result = adaptFromXForwardedHeaders(httpRequest.getURI(), httpRequest.getHeaders());
 
 		assertThat(result.getScheme()).isEqualTo(protocol);
 		assertThat(result.getHost()).isEqualTo("84.198.58.199");
@@ -108,7 +111,7 @@ class ForwardedHeaderUtilsTests {
 		request.addHeader("Forwarded", "host=192.168.0.1");
 
 		HttpRequest httpRequest = new ServletServerHttpRequest(request);
-		UriComponents result = ForwardedHeaderUtils.adaptFromForwardedHeaders(httpRequest.getURI(), httpRequest.getHeaders()).build();
+		UriComponents result = adaptFromForwardedHeader(httpRequest.getURI(), httpRequest.getHeaders());
 
 		assertThat(result.toString()).isEqualTo("https://192.168.0.1/mvc-showcase");
 	}
@@ -123,7 +126,7 @@ class ForwardedHeaderUtilsTests {
 		request.addHeader("Forwarded", "host=[1abc:2abc:3abc::5ABC:6abc]");
 
 		HttpRequest httpRequest = new ServletServerHttpRequest(request);
-		UriComponents result = ForwardedHeaderUtils.adaptFromForwardedHeaders(httpRequest.getURI(), httpRequest.getHeaders()).build();
+		UriComponents result = adaptFromForwardedHeader(httpRequest.getURI(), httpRequest.getHeaders());
 
 		assertThat(result.toString()).isEqualTo("http://[1abc:2abc:3abc::5ABC:6abc]/mvc-showcase");
 	}
@@ -138,7 +141,7 @@ class ForwardedHeaderUtilsTests {
 		request.addHeader("X-Forwarded-Host", "[1abc:2abc:3abc::5ABC:6abc]");
 
 		HttpRequest httpRequest = new ServletServerHttpRequest(request);
-		UriComponents result = ForwardedHeaderUtils.adaptFromForwardedHeaders(httpRequest.getURI(), httpRequest.getHeaders()).build();
+		UriComponents result = adaptFromXForwardedHeaders(httpRequest.getURI(), httpRequest.getHeaders());
 
 		assertThat(result.toString()).isEqualTo("http://[1abc:2abc:3abc::5ABC:6abc]/mvc-showcase");
 	}
@@ -153,7 +156,7 @@ class ForwardedHeaderUtilsTests {
 		request.addHeader("X-Forwarded-Host", "[1abc:2abc:3abc::5ABC:6abc]:8080");
 
 		HttpRequest httpRequest = new ServletServerHttpRequest(request);
-		UriComponents result = ForwardedHeaderUtils.adaptFromForwardedHeaders(httpRequest.getURI(), httpRequest.getHeaders()).build();
+		UriComponents result = adaptFromXForwardedHeaders(httpRequest.getURI(), httpRequest.getHeaders());
 
 		assertThat(result.toString()).isEqualTo("http://[1abc:2abc:3abc::5ABC:6abc]:8080/mvc-showcase");
 	}
@@ -169,8 +172,7 @@ class ForwardedHeaderUtilsTests {
 
 		HttpRequest httpRequest = new ServletServerHttpRequest(request);
 
-		assertThatThrownBy(() ->
-				ForwardedHeaderUtils.adaptFromForwardedHeaders(httpRequest.getURI(), httpRequest.getHeaders()).build())
+		assertThatThrownBy(() -> adaptFromXForwardedHeaders(httpRequest.getURI(), httpRequest.getHeaders()))
 				.isInstanceOf(IllegalArgumentException.class);
 	}
 
@@ -184,7 +186,7 @@ class ForwardedHeaderUtilsTests {
 		request.addHeader("X-Forwarded-Host", "anotherHost");
 
 		HttpRequest httpRequest = new ServletServerHttpRequest(request);
-		UriComponents result = ForwardedHeaderUtils.adaptFromForwardedHeaders(httpRequest.getURI(), httpRequest.getHeaders()).build();
+		UriComponents result = adaptFromXForwardedHeaders(httpRequest.getURI(), httpRequest.getHeaders());
 
 		assertThat(result.toString()).isEqualTo("https://anotherHost/mvc-showcase");
 	}
@@ -199,7 +201,7 @@ class ForwardedHeaderUtilsTests {
 		request.addHeader("X-Forwarded-Host", "webtest.foo.bar.com:443");
 
 		HttpRequest httpRequest = new ServletServerHttpRequest(request);
-		UriComponents result = ForwardedHeaderUtils.adaptFromForwardedHeaders(httpRequest.getURI(), httpRequest.getHeaders()).build();
+		UriComponents result = adaptFromXForwardedHeaders(httpRequest.getURI(), httpRequest.getHeaders());
 
 		assertThat(result.getHost()).isEqualTo("webtest.foo.bar.com");
 		assertThat(result.getPort()).isEqualTo(443);
@@ -214,7 +216,7 @@ class ForwardedHeaderUtilsTests {
 		request.addHeader("X-Forwarded-Host", "a.example.org, b.example.org, c.example.org");
 
 		HttpRequest httpRequest = new ServletServerHttpRequest(request);
-		UriComponents result = ForwardedHeaderUtils.adaptFromForwardedHeaders(httpRequest.getURI(), httpRequest.getHeaders()).build();
+		UriComponents result = adaptFromXForwardedHeaders(httpRequest.getURI(), httpRequest.getHeaders());
 
 		assertThat(result.getHost()).isEqualTo("a.example.org");
 		assertThat(result.getPort()).isEqualTo(-1);
@@ -230,7 +232,7 @@ class ForwardedHeaderUtilsTests {
 		request.addHeader("X-Forwarded-Port", "9090");
 
 		HttpRequest httpRequest = new ServletServerHttpRequest(request);
-		UriComponents result = ForwardedHeaderUtils.adaptFromForwardedHeaders(httpRequest.getURI(), httpRequest.getHeaders()).build();
+		UriComponents result = adaptFromXForwardedHeaders(httpRequest.getURI(), httpRequest.getHeaders());
 
 		assertThat(result.getHost()).isEqualTo("foobarhost");
 		assertThat(result.getPort()).isEqualTo(9090);
@@ -245,7 +247,7 @@ class ForwardedHeaderUtilsTests {
 		request.addHeader("X-Forwarded-Host", "example.org");
 
 		HttpRequest httpRequest = new ServletServerHttpRequest(request);
-		UriComponents result = ForwardedHeaderUtils.adaptFromForwardedHeaders(httpRequest.getURI(), httpRequest.getHeaders()).build();
+		UriComponents result = adaptFromXForwardedHeaders(httpRequest.getURI(), httpRequest.getHeaders());
 
 		assertThat(result.getHost()).isEqualTo("example.org");
 		assertThat(result.getPort()).isEqualTo(-1);
@@ -260,7 +262,7 @@ class ForwardedHeaderUtilsTests {
 		request.addHeader("X-Forwarded-Proto", "https");
 
 		HttpRequest httpRequest = new ServletServerHttpRequest(request);
-		UriComponents result = ForwardedHeaderUtils.adaptFromForwardedHeaders(httpRequest.getURI(), httpRequest.getHeaders()).build();
+		UriComponents result = adaptFromXForwardedHeaders(httpRequest.getURI(), httpRequest.getHeaders());
 
 		assertThat(result.getScheme()).isEqualTo("https");
 		assertThat(result.getHost()).isEqualTo("example.org");
@@ -276,7 +278,7 @@ class ForwardedHeaderUtilsTests {
 		request.addHeader("X-Forwarded-Ssl", "on");
 
 		HttpRequest httpRequest = new ServletServerHttpRequest(request);
-		UriComponents result = ForwardedHeaderUtils.adaptFromForwardedHeaders(httpRequest.getURI(), httpRequest.getHeaders()).build();
+		UriComponents result = adaptFromXForwardedHeaders(httpRequest.getURI(), httpRequest.getHeaders());
 
 		assertThat(result.getScheme()).isEqualTo("https");
 		assertThat(result.getHost()).isEqualTo("example.org");
@@ -293,7 +295,7 @@ class ForwardedHeaderUtilsTests {
 		request.addHeader("X-Forwarded-Proto", "https");
 
 		HttpRequest httpRequest = new ServletServerHttpRequest(request);
-		UriComponents result = ForwardedHeaderUtils.adaptFromForwardedHeaders(httpRequest.getURI(), httpRequest.getHeaders()).build();
+		UriComponents result = adaptFromXForwardedHeaders(httpRequest.getURI(), httpRequest.getHeaders());
 
 		assertThat(result.getHost()).isEqualTo("example.org");
 		assertThat(result.getScheme()).isEqualTo("https");
@@ -312,7 +314,7 @@ class ForwardedHeaderUtilsTests {
 		request.addHeader("X-Forwarded-Port", "443");
 
 		HttpRequest httpRequest = new ServletServerHttpRequest(request);
-		UriComponents result = ForwardedHeaderUtils.adaptFromForwardedHeaders(httpRequest.getURI(), httpRequest.getHeaders()).build();
+		UriComponents result = adaptFromXForwardedHeaders(httpRequest.getURI(), httpRequest.getHeaders());
 
 		assertThat(result.toString()).isEqualTo("https://84.198.58.199/mvc-showcase");
 	}
@@ -328,7 +330,7 @@ class ForwardedHeaderUtilsTests {
 		request.addHeader("X-Forwarded-Port", "80,52022");
 
 		HttpRequest httpRequest = new ServletServerHttpRequest(request);
-		UriComponents result = ForwardedHeaderUtils.adaptFromForwardedHeaders(httpRequest.getURI(), httpRequest.getHeaders()).build();
+		UriComponents result = adaptFromXForwardedHeaders(httpRequest.getURI(), httpRequest.getHeaders());
 
 		assertThat(result.toString()).isEqualTo("http://a.example.org/mvc-showcase");
 	}
@@ -345,7 +347,7 @@ class ForwardedHeaderUtilsTests {
 		request.addHeader("X-Forwarded-Proto", "https,https");
 
 		HttpRequest httpRequest = new ServletServerHttpRequest(request);
-		UriComponents result = ForwardedHeaderUtils.adaptFromForwardedHeaders(httpRequest.getURI(), httpRequest.getHeaders()).build();
+		UriComponents result = adaptFromXForwardedHeaders(httpRequest.getURI(), httpRequest.getHeaders());
 
 		assertThat(result.toString()).isEqualTo("https://a.example.org/mvc-showcase");
 	}
@@ -364,11 +366,16 @@ class ForwardedHeaderUtilsTests {
 			}
 
 			@Override
+			public Map<String, Object> getAttributes() {
+				return Collections.emptyMap();
+			}
+
+			@Override
 			public HttpHeaders getHeaders() {
 				return new HttpHeaders();
 			}
 		};
-		UriComponents result = ForwardedHeaderUtils.adaptFromForwardedHeaders(request.getURI(), request.getHeaders()).build();
+		UriComponents result = adaptFromXForwardedHeaders(request.getURI(), request.getHeaders());
 
 		assertThat(result.toString()).isEqualTo("/");
 	}
@@ -382,7 +389,7 @@ class ForwardedHeaderUtilsTests {
 		request.setRequestURI("/rest/mobile/users/1");
 
 		HttpRequest httpRequest = new ServletServerHttpRequest(request);
-		UriComponents result = ForwardedHeaderUtils.adaptFromForwardedHeaders(httpRequest.getURI(), httpRequest.getHeaders()).build();
+		UriComponents result = adaptFromForwardedHeader(httpRequest.getURI(), httpRequest.getHeaders());
 
 		assertThat(result.getScheme()).isEqualTo("https");
 		assertThat(result.getHost()).isEqualTo("84.198.58.199");
@@ -398,7 +405,7 @@ class ForwardedHeaderUtilsTests {
 		request.setRequestURI("/rest/mobile/users/1");
 
 		HttpRequest httpRequest = new ServletServerHttpRequest(request);
-		UriComponents result = ForwardedHeaderUtils.adaptFromForwardedHeaders(httpRequest.getURI(), httpRequest.getHeaders()).build();
+		UriComponents result = adaptFromForwardedHeader(httpRequest.getURI(), httpRequest.getHeaders());
 
 		assertThat(result.getScheme()).isEqualTo("https");
 		assertThat(result.getHost()).isEqualTo("84.198.58.199");
@@ -415,7 +422,7 @@ class ForwardedHeaderUtilsTests {
 		request.setRequestURI("/rest/mobile/users/1");
 
 		HttpRequest httpRequest = new ServletServerHttpRequest(request);
-		UriComponents result = ForwardedHeaderUtils.adaptFromForwardedHeaders(httpRequest.getURI(), httpRequest.getHeaders()).build();
+		UriComponents result = adaptFromForwardedHeader(httpRequest.getURI(), httpRequest.getHeaders());
 
 		assertThat(result.getScheme()).isEqualTo("https");
 		assertThat(result.getHost()).isEqualTo("84.198.58.199");
@@ -431,7 +438,7 @@ class ForwardedHeaderUtilsTests {
 		request.setRequestURI("/rest/mobile/users/1");
 
 		HttpRequest httpRequest = new ServletServerHttpRequest(request);
-		UriComponents result = ForwardedHeaderUtils.adaptFromForwardedHeaders(httpRequest.getURI(), httpRequest.getHeaders()).build();
+		UriComponents result = adaptFromForwardedHeader(httpRequest.getURI(), httpRequest.getHeaders());
 
 		assertThat(result.getScheme()).isEqualTo("https");
 		assertThat(result.getHost()).isEqualTo("84.198.58.199");
@@ -447,7 +454,7 @@ class ForwardedHeaderUtilsTests {
 		request.setRequestURI("/rest/mobile/users/1");
 
 		HttpRequest httpRequest = new ServletServerHttpRequest(request);
-		UriComponents result = ForwardedHeaderUtils.adaptFromForwardedHeaders(httpRequest.getURI(), httpRequest.getHeaders()).build();
+		UriComponents result = adaptFromForwardedHeader(httpRequest.getURI(), httpRequest.getHeaders());
 
 		assertThat(result.getScheme()).isEqualTo("https");
 		assertThat(result.getHost()).isEqualTo("84.198.58.199");
@@ -466,7 +473,7 @@ class ForwardedHeaderUtilsTests {
 		request.setRequestURI("/rest/mobile/users/1");
 
 		HttpRequest httpRequest = new ServletServerHttpRequest(request);
-		UriComponents result = ForwardedHeaderUtils.adaptFromForwardedHeaders(httpRequest.getURI(), httpRequest.getHeaders()).build();
+		UriComponents result = adaptFromForwardedHeader(httpRequest.getURI(), httpRequest.getHeaders());
 
 		assertThat(result.getScheme()).isEqualTo("https");
 		assertThat(result.getHost()).isEqualTo("84.198.58.199");
@@ -485,7 +492,7 @@ class ForwardedHeaderUtilsTests {
 		request.setRequestURI("/rest/mobile/users/1");
 
 		HttpRequest httpRequest = new ServletServerHttpRequest(request);
-		UriComponents result = ForwardedHeaderUtils.adaptFromForwardedHeaders(httpRequest.getURI(), httpRequest.getHeaders()).build();
+		UriComponents result = adaptFromForwardedHeader(httpRequest.getURI(), httpRequest.getHeaders());
 
 		assertThat(result.getScheme()).isEqualTo("https");
 		assertThat(result.getHost()).isEqualTo("84.198.58.199");
@@ -504,7 +511,7 @@ class ForwardedHeaderUtilsTests {
 		request.setRequestURI("/rest/mobile/users/1");
 
 		HttpRequest httpRequest = new ServletServerHttpRequest(request);
-		UriComponents result = ForwardedHeaderUtils.adaptFromForwardedHeaders(httpRequest.getURI(), httpRequest.getHeaders()).build();
+		UriComponents result = adaptFromForwardedHeader(httpRequest.getURI(), httpRequest.getHeaders());
 
 		assertThat(result.getScheme()).isEqualTo("https");
 		assertThat(result.getHost()).isEqualTo("example.com");
@@ -523,13 +530,123 @@ class ForwardedHeaderUtilsTests {
 		request.setRequestURI("/rest/mobile/users/1");
 
 		HttpRequest httpRequest = new ServletServerHttpRequest(request);
-		UriComponents result = ForwardedHeaderUtils.adaptFromForwardedHeaders(httpRequest.getURI(), httpRequest.getHeaders()).build();
+		ForwardedHeaderUtils.ForwardedInfo info =
+				ForwardedHeaderUtils.parseStandardHeader(httpRequest.getURI(), httpRequest.getHeaders());
 
-		assertThat(result.getScheme()).isEqualTo("https");
-		assertThat(result.getHost()).isEqualTo("192.0.2.3");
+		assertThat(info.forAddress()).isNotNull();
+		assertThat(info.forAddress().getHostString()).isEqualTo("192.0.2.0");
+
+		UriComponents result = info.uriComponentsBuilder().build();
+		assertThat(result.getScheme()).isEqualTo("http");
+		assertThat(result.getHost()).isEqualTo("example.com");
 		assertThat(result.getPath()).isEqualTo("/rest/mobile/users/1");
-		assertThat(result.getPort()).isEqualTo(9090);
-		assertThat(result.toUriString()).isEqualTo("https://192.0.2.3:9090/rest/mobile/users/1");
+		assertThat(result.getPort()).isEqualTo(8080);
+	}
+
+	@Test  // gh-34253
+	void fromHttpRequestXForwardedHeaderForIpv6Formatting() {
+		HttpHeaders headers = new HttpHeaders();
+		headers.add("X-Forwarded-For", "fd00:fefe:1::4, 192.168.0.1");
+
+		InetSocketAddress address = ForwardedHeaderUtils.parseXForwardedHeaders(
+				URI.create("https://example.com"), headers).forAddress();
+
+		assertThat(address.getHostName()).isEqualTo("[fd00:fefe:1::4]");
+	}
+
+	@Test
+	void parseForwardedByHeader() {
+		HttpHeaders headers = new HttpHeaders();
+		headers.add("Forwarded", "by=[fd00:fefe:1::4], 192.168.0.1");
+
+		InetSocketAddress address = ForwardedHeaderUtils.parseStandardHeader(
+				URI.create("https://example.com"), headers).byAddress();
+
+		assertThat(address.getHostName()).isEqualTo("[fd00:fefe:1::4]");
+	}
+
+	@Test  // gh-37114
+	void parseForwardedForAndByWithoutPort() {
+		HttpHeaders headers = new HttpHeaders();
+		headers.add("Forwarded", "for=192.0.2.0;by=203.0.113.43");
+
+		ForwardedHeaderUtils.ForwardedInfo info =
+				ForwardedHeaderUtils.parseStandardHeader(URI.create("https://example.com"), headers);
+
+		assertThat(info.forAddress()).isNotNull();
+		assertThat(info.forAddress().getHostString()).isEqualTo("192.0.2.0");
+		assertThat(info.forAddress().getPort()).isEqualTo(0);
+		assertThat(info.byAddress()).isNotNull();
+		assertThat(info.byAddress().getHostString()).isEqualTo("203.0.113.43");
+		assertThat(info.byAddress().getPort()).isEqualTo(0);
+	}
+
+	@Test  // gh-37114
+	void parseForwardedForAndByWithPort() {
+		HttpHeaders headers = new HttpHeaders();
+		headers.add("Forwarded", "for=\"192.0.2.0:4711\";by=\"[2001:db8:cafe::17]:4712\"");
+
+		ForwardedHeaderUtils.ForwardedInfo info =
+				ForwardedHeaderUtils.parseStandardHeader(URI.create("https://example.com"), headers);
+
+		assertThat(info.forAddress()).isNotNull();
+		assertThat(info.forAddress().getPort()).isEqualTo(4711);
+		assertThat(info.byAddress()).isNotNull();
+		assertThat(info.byAddress().getPort()).isEqualTo(4712);
+	}
+
+	@Test  // gh-37114
+	void parseXForwardedForWithoutPort() {
+		HttpHeaders headers = new HttpHeaders();
+		headers.add("X-Forwarded-For", "192.0.2.0");
+
+		InetSocketAddress address = ForwardedHeaderUtils.parseXForwardedHeaders(
+				URI.create("https://example.com"), headers).forAddress();
+
+		assertThat(address).isNotNull();
+		assertThat(address.getHostString()).isEqualTo("192.0.2.0");
+		assertThat(address.getPort()).isEqualTo(0);
+	}
+
+	@Test  // gh-37114
+	@SuppressWarnings("removal")
+	void parseWithDeprecatedMethodsUsesFallbackPort() {
+		URI uri = URI.create("https://example.com");
+		InetSocketAddress remoteAddress = new InetSocketAddress("example.client", 47011);
+		InetSocketAddress localAddress = new InetSocketAddress("example.server", 47012);
+
+		HttpHeaders headers = new HttpHeaders();
+		headers.add("Forwarded", "for=192.0.2.0;by=203.0.113.43");
+
+		ForwardedHeaderUtils.ForwardedInfo info =
+				ForwardedHeaderUtils.parseStandardHeader(uri, headers, remoteAddress, localAddress);
+
+		assertThat(info.forAddress()).isNotNull();
+		assertThat(info.forAddress().getPort()).isEqualTo(47011);
+		assertThat(info.byAddress()).isNotNull();
+		assertThat(info.byAddress().getPort()).isEqualTo(47012);
+
+		info = ForwardedHeaderUtils.parseStandardHeader(uri, headers, null, null);
+		assertThat(info.forAddress()).isNotNull();
+		assertThat(info.forAddress().getPort()).isEqualTo(443);
+
+		headers = new HttpHeaders();
+		headers.add("X-Forwarded-For", "192.0.2.0");
+
+		info = ForwardedHeaderUtils.parseXForwardedHeaders(uri, headers, remoteAddress, null);
+		assertThat(info.forAddress()).isNotNull();
+		assertThat(info.forAddress().getPort()).isEqualTo(47011);
+	}
+
+
+	private static UriComponents adaptFromForwardedHeader(URI uri, HttpHeaders headers) {
+		return ForwardedHeaderUtils.parseStandardHeader(uri, headers)
+				.uriComponentsBuilder().build();
+	}
+
+	private static UriComponents adaptFromXForwardedHeaders(URI uri, HttpHeaders headers) {
+		return ForwardedHeaderUtils.parseXForwardedHeaders(uri, headers)
+				.uriComponentsBuilder().build();
 	}
 
 }

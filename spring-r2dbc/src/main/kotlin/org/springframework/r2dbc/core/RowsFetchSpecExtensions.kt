@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2023 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -28,7 +28,7 @@ import reactor.core.publisher.Mono
  * @author Sebastien Deleuze
  */
 @Suppress("DEPRECATION")
-suspend fun <T> RowsFetchSpec<T>.awaitOne(): T {
+suspend fun <T : Any> RowsFetchSpec<T>.awaitOne(): T {
 	return one().awaitSingleOrNull() ?: throw EmptyResultDataAccessException(1)
 }
 
@@ -38,7 +38,7 @@ suspend fun <T> RowsFetchSpec<T>.awaitOne(): T {
  * @author Sebastien Deleuze
  */
 @Suppress("DEPRECATION")
-suspend fun <T> RowsFetchSpec<T>.awaitOneOrNull(): T? =
+suspend fun <T : Any> RowsFetchSpec<T>.awaitOneOrNull(): T? =
 		one().awaitSingleOrNull()
 
 /**
@@ -48,7 +48,7 @@ suspend fun <T> RowsFetchSpec<T>.awaitOneOrNull(): T? =
  * @author Sebastien Deleuze
  */
 @Suppress("DEPRECATION")
-suspend fun <T> RowsFetchSpec<T>.awaitSingle(): T {
+suspend fun <T : Any> RowsFetchSpec<T>.awaitSingle(): T {
 	return first().awaitSingleOrNull() ?: throw EmptyResultDataAccessException(1)
 }
 
@@ -58,7 +58,7 @@ suspend fun <T> RowsFetchSpec<T>.awaitSingle(): T {
  * @author Sebastien Deleuze
  */
 @Suppress("DEPRECATION")
-suspend fun <T> RowsFetchSpec<T>.awaitSingleOrNull(): T? =
+suspend fun <T : Any> RowsFetchSpec<T>.awaitSingleOrNull(): T? =
 		first().awaitSingleOrNull()
 
 /**

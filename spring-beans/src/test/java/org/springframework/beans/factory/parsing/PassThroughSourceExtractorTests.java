@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -29,7 +29,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class PassThroughSourceExtractorTests {
 
 	@Test
-	void testPassThroughContract() {
+	void passThroughContract() {
 		Object source = new Object();
 		Object extractedSource = new PassThroughSourceExtractor().extractSource(source, null);
 		assertThat(extractedSource).as("The contract of PassThroughSourceExtractor states that the supplied " +
@@ -37,7 +37,7 @@ class PassThroughSourceExtractorTests {
 	}
 
 	@Test
-	void testPassThroughContractEvenWithNull() {
+	void passThroughContractEvenWithNull() {
 		Object extractedSource = new PassThroughSourceExtractor().extractSource(null, null);
 		assertThat(extractedSource).as("The contract of PassThroughSourceExtractor states that the supplied " +
 				"source object *must* be returned as-is (even if null)").isNull();

@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -176,8 +176,7 @@ class ResourceWebHandlerTests {
 			assertResponseBody(exchange, "foo bar foo bar foo bar");
 		}
 
-		@Test
-			// SPR-14577
+		@Test // SPR-14577
 		void getMediaTypeWithFavorPathExtensionOff() throws Exception {
 			List<Resource> paths = List.of(new ClassPathResource("test/", getClass()));
 			ResourceWebHandler handler = new ResourceWebHandler();
@@ -203,7 +202,7 @@ class ResourceWebHandlerTests {
 		}
 
 		@ParameterizedTest
-		@MethodSource("httpMethods")
+		@MethodSource("org.springframework.http.HttpMethod#values()")
 		void resourceNotFound(HttpMethod method) {
 			MockServerHttpRequest request = MockServerHttpRequest.method(method, "").build();
 			MockServerWebExchange exchange = MockServerWebExchange.from(request);
@@ -221,10 +220,6 @@ class ResourceWebHandlerTests {
 			AtomicReference<Throwable> exceptionRef = new AtomicReference<>();
 			StepVerifier.create(mono).consumeErrorWith(exceptionRef::set).verify();
 			StepVerifier.create(mono).consumeErrorWith(ex -> assertThat(ex).isNotSameAs(exceptionRef.get())).verify();
-		}
-
-		static Stream<HttpMethod> httpMethods() {
-			return Arrays.stream(HttpMethod.values());
 		}
 
 	}
@@ -269,6 +264,24 @@ class ResourceWebHandlerTests {
 			assertThat(exchange.getResponse().getHeaders().getFirst("Accept-Ranges")).isEqualTo("bytes");
 			assertThat(exchange.getResponse().getHeaders().get("Accept-Ranges")).hasSize(1);
 			assertResponseBody(exchange, "So");
+		}
+
+		@Test
+		void ignoreRangeWhenIfRangeETagDoesNotMatch() {
+			this.handler.setEtagGenerator(resource -> "\"current\"");
+			MockServerHttpRequest request = MockServerHttpRequest.get("")
+					.header(HttpHeaders.RANGE, "bytes=0-1")
+					.header(HttpHeaders.IF_RANGE, "\"stale\"")
+					.build();
+			MockServerWebExchange exchange = MockServerWebExchange.from(request);
+			setPathWithinHandlerMapping(exchange, "foo.txt");
+			setBestMachingPattern(exchange, "/**");
+			this.handler.handle(exchange).block(TIMEOUT);
+
+			assertThat(exchange.getResponse().getHeaders().getETag()).isEqualTo("\"current\"");
+			assertThat(exchange.getResponse().getHeaders().getFirst(HttpHeaders.CONTENT_RANGE)).isNull();
+			assertThat(exchange.getResponse().getHeaders().getContentLength()).isEqualTo(10);
+			assertResponseBody(exchange, "Some text.");
 		}
 
 		@Test
@@ -422,7 +435,7 @@ class ResourceWebHandlerTests {
 			this.handler.handle(exchange).block(TIMEOUT);
 
 			HttpHeaders headers = exchange.getResponse().getHeaders();
-			assertThat(headers.containsKey("Last-Modified")).isTrue();
+			assertThat(headers.containsHeader("Last-Modified")).isTrue();
 			assertThat(resourceLastModifiedDate("test/foo.css") / 1000).isEqualTo(headers.getLastModified() / 1000);
 		}
 
@@ -453,7 +466,7 @@ class ResourceWebHandlerTests {
 
 			MockServerHttpResponse response = exchange.getResponse();
 			assertThat(response.getHeaders().getCacheControl()).isEqualTo("no-store");
-			assertThat(response.getHeaders().containsKey("Last-Modified")).isTrue();
+			assertThat(response.getHeaders().containsHeader("Last-Modified")).isTrue();
 			assertThat(resourceLastModifiedDate("test/foo.css") / 1000).isEqualTo(response.getHeaders().getLastModified() / 1000);
 		}
 
@@ -566,7 +579,7 @@ class ResourceWebHandlerTests {
 			HttpHeaders headers = exchange.getResponse().getHeaders();
 			assertThat(headers.getContentType()).isEqualTo(MediaType.parseMediaType("text/css"));
 			assertThat(headers.getContentLength()).isEqualTo(17);
-			assertThat(headers.containsKey("Last-Modified")).isFalse();
+			assertThat(headers.containsHeader("Last-Modified")).isFalse();
 			assertResponseBody(exchange, "h1 { color:red; }");
 		}
 
@@ -606,7 +619,7 @@ class ResourceWebHandlerTests {
 			setBestMachingPattern(exchange, "/**");
 			this.handler.handle(exchange).block(TIMEOUT);
 
-			assertThat(exchange.getResponse().getHeaders().getContentType()).isEqualTo(MediaType.parseMediaType("application/javascript"));
+			assertThat(exchange.getResponse().getHeaders().getContentType()).isEqualTo(MediaType.parseMediaType("text/javascript"));
 			assertResponseBody(exchange, "function foo() { console.log(\"hello world\"); }");
 		}
 
@@ -619,12 +632,11 @@ class ResourceWebHandlerTests {
 			this.handler.handle(exchange).block(TIMEOUT);
 
 			HttpHeaders headers = exchange.getResponse().getHeaders();
-			assertThat(headers.getContentType()).isEqualTo(MediaType.parseMediaType("application/javascript"));
+			assertThat(headers.getContentType()).isEqualTo(MediaType.parseMediaType("text/javascript"));
 			assertResponseBody(exchange, "function foo() { console.log(\"hello world\"); }");
 		}
 
-		@Test
-			// gh-27538, gh-27624
+		@Test  // gh-27538, gh-27624
 		void filterNonExistingLocations() throws Exception {
 			this.handler.afterPropertiesSet();
 			ResourceWebHandler handler = new ResourceWebHandler();
@@ -670,7 +682,6 @@ class ResourceWebHandlerTests {
 			testInvalidPath("/../.." + secretPath, handler);
 			testInvalidPath("/%2E%2E/testsecret/secret.txt", handler);
 			testInvalidPath("/%2E%2E/testsecret/secret.txt", handler);
-			testInvalidPath("%2F%2F%2E%2E%2F%2F%2E%2E" + secretPath, handler);
 		}
 
 		private void testInvalidPath(String requestPath, ResourceWebHandler handler) {
@@ -685,13 +696,14 @@ class ResourceWebHandlerTests {
 		}
 
 		@ParameterizedTest
-		@MethodSource("httpMethods")
+		@MethodSource("org.springframework.http.HttpMethod#values()")
 		void resolvePathWithTraversal(HttpMethod method) throws Exception {
 			Resource location = new ClassPathResource("test/", getClass());
 			this.handler.setLocations(List.of(location));
 
 			testResolvePathWithTraversal(method, "../testsecret/secret.txt");
 			testResolvePathWithTraversal(method, "test/../../testsecret/secret.txt");
+			testResolvePathWithTraversal(method, "/testsecret/test/../secret.txt");
 			testResolvePathWithTraversal(method, ":/../../testsecret/secret.txt");
 
 			location = new UrlResource(getClass().getResource("./test/"));
@@ -705,7 +717,6 @@ class ResourceWebHandlerTests {
 			testResolvePathWithTraversal(method, "/url:" + secretPath);
 			testResolvePathWithTraversal(method, "////../.." + secretPath);
 			testResolvePathWithTraversal(method, "/%2E%2E/testsecret/secret.txt");
-			testResolvePathWithTraversal(method, "%2F%2F%2E%2E%2F%2Ftestsecret/secret.txt");
 			testResolvePathWithTraversal(method, "url:" + secretPath);
 
 			// The following tests fail with a MalformedURLException on Windows

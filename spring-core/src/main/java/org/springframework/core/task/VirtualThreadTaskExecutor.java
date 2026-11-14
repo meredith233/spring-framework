@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2023 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -43,8 +43,8 @@ public class VirtualThreadTaskExecutor implements AsyncTaskExecutor {
 
 	/**
 	 * Create a new {@code VirtualThreadTaskExecutor} with thread names based
-	 * on the given thread name prefix followed by a counter (e.g. "test-0").
-	 * @param threadNamePrefix the prefix for thread names (e.g. "test-")
+	 * on the given thread name prefix followed by a counter (for example, "test-0").
+	 * @param threadNamePrefix the prefix for thread names (for example, "test-")
 	 */
 	public VirtualThreadTaskExecutor(String threadNamePrefix) {
 		this.virtualThreadFactory = new VirtualThreadDelegate().virtualThreadFactory(threadNamePrefix);

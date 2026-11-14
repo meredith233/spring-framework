@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,7 +17,7 @@
 package org.springframework.test.web.servlet.htmlunit;
 
 import java.net.MalformedURLException;
-import java.net.URL;
+import java.net.URI;
 
 import org.htmlunit.WebRequest;
 
@@ -32,11 +32,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 abstract class AbstractWebRequestMatcherTests {
 
 	protected void assertMatches(WebRequestMatcher matcher, String url) throws MalformedURLException {
-		assertThat(matcher.matches(new WebRequest(new URL(url)))).isTrue();
+		assertThat(matcher.matches(new WebRequest(URI.create(url).toURL()))).isTrue();
 	}
 
 	protected void assertDoesNotMatch(WebRequestMatcher matcher, String url) throws MalformedURLException {
-		assertThat(matcher.matches(new WebRequest(new URL(url)))).isFalse();
+		assertThat(matcher.matches(new WebRequest(URI.create(url).toURL()))).isFalse();
 	}
 
 }

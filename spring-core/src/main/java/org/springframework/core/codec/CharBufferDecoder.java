@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2023 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,9 +21,10 @@ import java.nio.CharBuffer;
 import java.nio.charset.Charset;
 import java.util.List;
 
+import org.jspecify.annotations.Nullable;
+
 import org.springframework.core.ResolvableType;
 import org.springframework.core.io.buffer.DataBuffer;
-import org.springframework.lang.Nullable;
 import org.springframework.util.MimeType;
 import org.springframework.util.MimeTypeUtils;
 
@@ -73,8 +74,8 @@ public final class CharBufferDecoder extends AbstractCharSequenceDecoder<CharBuf
 	 * @param stripDelimiter whether to remove delimiters from the resulting input strings
 	 */
 	public static CharBufferDecoder textPlainOnly(List<String> delimiters, boolean stripDelimiter) {
-		var textPlain = new MimeType("text", "plain", DEFAULT_CHARSET);
-		return new CharBufferDecoder(delimiters, stripDelimiter, textPlain);
+		MimeType mimeType = new MimeType("text", "plain", DEFAULT_CHARSET);
+		return new CharBufferDecoder(delimiters, stripDelimiter, mimeType);
 	}
 
 	/**
@@ -90,8 +91,8 @@ public final class CharBufferDecoder extends AbstractCharSequenceDecoder<CharBuf
 	 * @param stripDelimiter whether to remove delimiters from the resulting input strings
 	 */
 	public static CharBufferDecoder allMimeTypes(List<String> delimiters, boolean stripDelimiter) {
-		var textPlain = new MimeType("text", "plain", DEFAULT_CHARSET);
-		return new CharBufferDecoder(delimiters, stripDelimiter, textPlain, MimeTypeUtils.ALL);
+		MimeType mimeType = new MimeType("text", "plain", DEFAULT_CHARSET);
+		return new CharBufferDecoder(delimiters, stripDelimiter, mimeType, MimeTypeUtils.ALL);
 	}
 
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -302,6 +302,11 @@ class CorsConfigurationTests {
 
 		// comma-delimited origins list
 		config.setAllowedOrigins(Collections.singletonList("https://a1.com,https://a2.com"));
+		assertThat(config.checkOrigin("https://a1.com")).isEqualTo("https://a1.com");
+		assertThat(config.checkOrigin("https://a2.com/")).isEqualTo("https://a2.com/");
+
+		// comma-delimited origins list with space
+		config.setAllowedOrigins(Collections.singletonList("https://a1.com, https://a2.com"));
 		assertThat(config.checkOrigin("https://a1.com")).isEqualTo("https://a1.com");
 		assertThat(config.checkOrigin("https://a2.com/")).isEqualTo("https://a2.com/");
 

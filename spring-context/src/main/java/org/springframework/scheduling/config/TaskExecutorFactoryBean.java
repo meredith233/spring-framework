@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2021 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,12 +18,13 @@ package org.springframework.scheduling.config;
 
 import java.util.concurrent.RejectedExecutionHandler;
 
+import org.jspecify.annotations.Nullable;
+
 import org.springframework.beans.factory.BeanNameAware;
 import org.springframework.beans.factory.DisposableBean;
 import org.springframework.beans.factory.FactoryBean;
 import org.springframework.beans.factory.InitializingBean;
 import org.springframework.core.task.TaskExecutor;
-import org.springframework.lang.Nullable;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.util.StringUtils;
 
@@ -38,23 +39,17 @@ import org.springframework.util.StringUtils;
 public class TaskExecutorFactoryBean implements
 		FactoryBean<TaskExecutor>, BeanNameAware, InitializingBean, DisposableBean {
 
-	@Nullable
-	private String poolSize;
+	private @Nullable String poolSize;
 
-	@Nullable
-	private Integer queueCapacity;
+	private @Nullable Integer queueCapacity;
 
-	@Nullable
-	private RejectedExecutionHandler rejectedExecutionHandler;
+	private @Nullable RejectedExecutionHandler rejectedExecutionHandler;
 
-	@Nullable
-	private Integer keepAliveSeconds;
+	private @Nullable Integer keepAliveSeconds;
 
-	@Nullable
-	private String beanName;
+	private @Nullable String beanName;
 
-	@Nullable
-	private ThreadPoolTaskExecutor target;
+	private @Nullable ThreadPoolTaskExecutor target;
 
 
 	public void setPoolSize(String poolSize) {
@@ -137,15 +132,14 @@ public class TaskExecutorFactoryBean implements
 			}
 			catch (NumberFormatException ex) {
 				throw new IllegalArgumentException("Invalid pool-size value [" + this.poolSize + "]: only single " +
-						"maximum integer (e.g. \"5\") and minimum-maximum range (e.g. \"3-5\") are supported", ex);
+						"maximum integer (for example, \"5\") and minimum-maximum range (for example, \"3-5\") are supported", ex);
 			}
 		}
 	}
 
 
 	@Override
-	@Nullable
-	public TaskExecutor getObject() {
+	public @Nullable TaskExecutor getObject() {
 		return this.target;
 	}
 

@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -51,24 +51,21 @@ class JeeNamespaceHandlerEventTests {
 
 
 	@Test
-	void testJndiLookupComponentEventReceived() {
+	void jndiLookupComponentEventReceived() {
 		ComponentDefinition component = this.eventListener.getComponentDefinition("simple");
-		boolean condition = component instanceof BeanComponentDefinition;
-		assertThat(condition).isTrue();
+		assertThat(component).isInstanceOf(BeanComponentDefinition.class);
 	}
 
 	@Test
-	void testLocalSlsbComponentEventReceived() {
+	void localSlsbComponentEventReceived() {
 		ComponentDefinition component = this.eventListener.getComponentDefinition("simpleLocalEjb");
-		boolean condition = component instanceof BeanComponentDefinition;
-		assertThat(condition).isTrue();
+		assertThat(component).isInstanceOf(BeanComponentDefinition.class);
 	}
 
 	@Test
-	void testRemoteSlsbComponentEventReceived() {
+	void remoteSlsbComponentEventReceived() {
 		ComponentDefinition component = this.eventListener.getComponentDefinition("simpleRemoteEjb");
-		boolean condition = component instanceof BeanComponentDefinition;
-		assertThat(condition).isTrue();
+		assertThat(component).isInstanceOf(BeanComponentDefinition.class);
 	}
 
 }

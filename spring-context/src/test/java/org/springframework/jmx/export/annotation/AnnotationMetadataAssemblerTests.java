@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,13 +16,14 @@
 
 package org.springframework.jmx.export.annotation;
 
+import javax.management.MBeanNotificationInfo;
 import javax.management.modelmbean.ModelMBeanAttributeInfo;
 import javax.management.modelmbean.ModelMBeanInfo;
 import javax.management.modelmbean.ModelMBeanOperationInfo;
 
 import org.junit.jupiter.api.Test;
 
-import org.springframework.jmx.IJmxTestBean;
+import org.springframework.jmx.ITestBean;
 import org.springframework.jmx.export.assembler.AbstractMetadataAssemblerTests;
 import org.springframework.jmx.export.metadata.JmxAttributeSource;
 
@@ -36,9 +37,20 @@ class AnnotationMetadataAssemblerTests extends AbstractMetadataAssemblerTests {
 
 	private static final String OBJECT_NAME = "bean:name=testBean4";
 
+	@Test
+	@Override
+	protected void notificationMetadata() throws Exception {
+		ModelMBeanInfo info = (ModelMBeanInfo) getMBeanInfo();
+		MBeanNotificationInfo[] notifications = info.getNotifications();
+		assertThat(notifications).as("Incorrect number of notifications").hasSize(2);
+		assertThat(notifications[0].getName()).as("Incorrect notification name").isEqualTo("My Notification 1");
+		assertThat(notifications[0].getNotifTypes()).as("notification types").containsExactly("type.foo", "type.bar");
+		assertThat(notifications[1].getName()).as("Incorrect notification name").isEqualTo("My Notification 2");
+		assertThat(notifications[1].getNotifTypes()).as("notification types").containsExactly("type.enigma");
+	}
 
 	@Test
-	void testAttributeFromInterface() throws Exception {
+	void attributeFromInterface() throws Exception {
 		ModelMBeanInfo inf = getMBeanInfoFromAssembler();
 		ModelMBeanAttributeInfo attr = inf.getAttribute("Colour");
 		assertThat(attr.isWritable()).as("The name attribute should be writable").isTrue();
@@ -46,21 +58,21 @@ class AnnotationMetadataAssemblerTests extends AbstractMetadataAssemblerTests {
 	}
 
 	@Test
-	void testOperationFromInterface() throws Exception {
+	void operationFromInterface() throws Exception {
 		ModelMBeanInfo inf = getMBeanInfoFromAssembler();
 		ModelMBeanOperationInfo op = inf.getOperation("fromInterface");
 		assertThat(op).isNotNull();
 	}
 
 	@Test
-	void testOperationOnGetter() throws Exception {
+	void operationOnGetter() throws Exception {
 		ModelMBeanInfo inf = getMBeanInfoFromAssembler();
 		ModelMBeanOperationInfo op = inf.getOperation("getExpensiveToCalculate");
 		assertThat(op).isNotNull();
 	}
 
 	@Test
-	void testRegistrationOnInterface() throws Exception {
+	void registrationOnInterface() throws Exception {
 		Object bean = getContext().getBean("testInterfaceBean");
 		ModelMBeanInfo inf = getAssembler().getMBeanInfo(bean, "bean:name=interfaceTestBean");
 		assertThat(inf).isNotNull();
@@ -93,7 +105,7 @@ class AnnotationMetadataAssemblerTests extends AbstractMetadataAssemblerTests {
 	}
 
 	@Override
-	protected IJmxTestBean createJmxTestBean() {
+	protected ITestBean createJmxTestBean() {
 		return new AnnotationTestSubBean();
 	}
 
@@ -111,4 +123,5 @@ class AnnotationMetadataAssemblerTests extends AbstractMetadataAssemblerTests {
 	protected int getExpectedOperationCount() {
 		return super.getExpectedOperationCount() + 4;
 	}
+
 }

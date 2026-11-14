@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -55,8 +55,7 @@ class ContextLoaderInitializerTests {
 	void register() throws ServletException {
 		initializer.onStartup(servletContext);
 
-		boolean condition1 = eventListener instanceof ContextLoaderListener;
-		assertThat(condition1).isTrue();
+		assertThat(eventListener).isInstanceOf(ContextLoaderListener.class);
 		ContextLoaderListener cll = (ContextLoaderListener) eventListener;
 		cll.contextInitialized(new ServletContextEvent(servletContext));
 
@@ -64,8 +63,7 @@ class ContextLoaderInitializerTests {
 				.getRequiredWebApplicationContext(servletContext);
 
 		assertThat(applicationContext.containsBean(BEAN_NAME)).isTrue();
-		boolean condition = applicationContext.getBean(BEAN_NAME) instanceof MyBean;
-		assertThat(condition).isTrue();
+		assertThat(applicationContext.getBean(BEAN_NAME)).isInstanceOf(MyBean.class);
 	}
 
 	private class MyMockServletContext extends MockServletContext {

@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2022 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -65,10 +65,10 @@ public class ErrorsMethodArgumentResolver extends HandlerMethodArgumentResolverS
 		// This is done to enable early argument resolution here. When the Mono actually
 		// completes it is replaced in the model with the actual value.
 
-		if (Mono.class.isAssignableFrom(errors.getClass())) {
+		if (errors instanceof Mono) {
 			return ((Mono<?>) errors).cast(Object.class);
 		}
-		else if (Errors.class.isAssignableFrom(errors.getClass())) {
+		else if (errors instanceof Errors) {
 			return Mono.just(errors);
 		}
 		else {

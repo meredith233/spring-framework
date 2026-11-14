@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -34,7 +34,7 @@ class ManagedPropertiesTests {
 
 	@Test
 	@SuppressWarnings("unchecked")
-	public void mergeSunnyDay() {
+	void mergeSunnyDay() {
 		ManagedProperties parent = new ManagedProperties();
 		parent.setProperty("one", "one");
 		parent.setProperty("two", "two");
@@ -69,7 +69,7 @@ class ManagedPropertiesTests {
 
 	@Test
 	@SuppressWarnings("unchecked")
-	public void mergeEmptyChild() {
+	void mergeEmptyChild() {
 		ManagedProperties parent = new ManagedProperties();
 		parent.setProperty("one", "one");
 		parent.setProperty("two", "two");
@@ -81,7 +81,7 @@ class ManagedPropertiesTests {
 
 	@Test
 	@SuppressWarnings("unchecked")
-	public void mergeChildValuesOverrideTheParents() {
+	void mergeChildValuesOverrideTheParents() {
 		ManagedProperties parent = new ManagedProperties();
 		parent.setProperty("one", "one");
 		parent.setProperty("two", "two");

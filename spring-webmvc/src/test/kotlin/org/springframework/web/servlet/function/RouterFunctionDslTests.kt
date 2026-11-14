@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -38,7 +38,7 @@ class RouterFunctionDslTests {
 		val servletRequest = PathPatternsTestUtils.initRequest("GET", "", true)
 		servletRequest.addHeader("bar", "bar")
 		val request = DefaultServerRequest(servletRequest, emptyList())
-		assertThat(sampleRouter().route(request).isPresent).isTrue()
+		assertThat(sampleRouter().route(request)).isPresent()
 	}
 
 	@Test
@@ -46,7 +46,7 @@ class RouterFunctionDslTests {
 		val servletRequest = PathPatternsTestUtils.initRequest("GET", "/content", true)
 		servletRequest.addHeader(ACCEPT, APPLICATION_ATOM_XML_VALUE)
 		val request = DefaultServerRequest(servletRequest, emptyList())
-		assertThat(sampleRouter().route(request).isPresent).isTrue()
+		assertThat(sampleRouter().route(request)).isPresent()
 	}
 
 	@Test
@@ -54,7 +54,7 @@ class RouterFunctionDslTests {
 		val servletRequest = PathPatternsTestUtils.initRequest("POST", "/api/foo/", true)
 		servletRequest.addHeader(ACCEPT, APPLICATION_JSON_VALUE)
 		val request = DefaultServerRequest(servletRequest, emptyList())
-		assertThat(sampleRouter().route(request).isPresent).isTrue()
+		assertThat(sampleRouter().route(request)).isPresent()
 	}
 
 	@Test
@@ -63,7 +63,7 @@ class RouterFunctionDslTests {
 		servletRequest.addHeader(ACCEPT, APPLICATION_JSON_VALUE)
 		servletRequest.addHeader(CONTENT_TYPE, APPLICATION_JSON_VALUE)
 		val request = DefaultServerRequest(servletRequest, emptyList())
-		assertThat(sampleRouter().route(request).isPresent).isTrue()
+		assertThat(sampleRouter().route(request)).isPresent()
 	}
 
 	@Test
@@ -71,49 +71,49 @@ class RouterFunctionDslTests {
 		val servletRequest = PathPatternsTestUtils.initRequest("GET", "/content", true)
 		servletRequest.addHeader(CONTENT_TYPE, APPLICATION_OCTET_STREAM_VALUE)
 		val request = DefaultServerRequest(servletRequest, emptyList())
-		assertThat(sampleRouter().route(request).isPresent).isTrue()
+		assertThat(sampleRouter().route(request)).isPresent()
 	}
 
 	@Test
 	fun method() {
 		val servletRequest = PathPatternsTestUtils.initRequest("PATCH", "/", true)
 		val request = DefaultServerRequest(servletRequest, emptyList())
-		assertThat(sampleRouter().route(request).isPresent).isTrue()
+		assertThat(sampleRouter().route(request)).isPresent()
 	}
 
 	@Test
 	fun path() {
 		val servletRequest = PathPatternsTestUtils.initRequest("GET", "/baz", true)
 		val request = DefaultServerRequest(servletRequest, emptyList())
-		assertThat(sampleRouter().route(request).isPresent).isTrue()
+		assertThat(sampleRouter().route(request)).isPresent()
 	}
 
 	@Test
 	fun pathExtension() {
 		val servletRequest = PathPatternsTestUtils.initRequest("GET", "/test.properties", true)
 		val request = DefaultServerRequest(servletRequest, emptyList())
-		assertThat(sampleRouter().route(request).isPresent).isTrue()
+		assertThat(sampleRouter().route(request)).isPresent()
 	}
 
 	@Test
 	fun resource() {
 		val servletRequest = PathPatternsTestUtils.initRequest("GET","/response2.txt", true)
 		val request = DefaultServerRequest(servletRequest, emptyList())
-		assertThat(sampleRouter().route(request).isPresent).isTrue()
+		assertThat(sampleRouter().route(request)).isPresent()
 	}
 
 	@Test
 	fun resources() {
 		val servletRequest = PathPatternsTestUtils.initRequest("GET", "/resources/response.txt", true)
 		val request = DefaultServerRequest(servletRequest, emptyList())
-		assertThat(sampleRouter().route(request).isPresent).isTrue()
+		assertThat(sampleRouter().route(request)).isPresent()
 	}
 
 	@Test
 	fun resourcesLookupFunction() {
 		val servletRequest = PathPatternsTestUtils.initRequest("GET", "/response.txt", true)
 		val request = DefaultServerRequest(servletRequest, emptyList())
-		assertThat(sampleRouter().route(request).isPresent).isTrue()
+		assertThat(sampleRouter().route(request)).isPresent()
 	}
 
 	@Test
@@ -123,7 +123,7 @@ class RouterFunctionDslTests {
 		servletRequest.addHeader(ACCEPT, APPLICATION_PDF_VALUE)
 		servletRequest.addHeader(CONTENT_TYPE, APPLICATION_PDF_VALUE)
 		val request = DefaultServerRequest(servletRequest, emptyList())
-		assertThat(sampleRouter().route(request).isPresent).isFalse()
+		assertThat(sampleRouter().route(request)).isNotPresent()
 	}
 
 	@Test
@@ -192,6 +192,7 @@ class RouterFunctionDslTests {
 				null
 			}
 		}
+		@Suppress("DEPRECATION")
 		GET(pathExtension { it == "properties" }) {
 			ok().body("foo=bar")
 		}

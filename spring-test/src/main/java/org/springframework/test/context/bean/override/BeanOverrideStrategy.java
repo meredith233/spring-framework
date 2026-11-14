@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,31 +21,30 @@ package org.springframework.test.context.bean.override;
  *
  * @author Simon Baslé
  * @author Stephane Nicoll
+ * @author Sam Brannen
  * @since 6.2
  */
 public enum BeanOverrideStrategy {
 
 	/**
-	 * Replace a given bean definition, immediately preparing a singleton instance.
-	 * <p>Fails if the original bean definition exists. To create a new bean
-	 * definition in such a case, use {@link #REPLACE_OR_CREATE_DEFINITION}.
+	 * Replace a given bean, immediately preparing a singleton instance.
+	 * <p>Fails if the original bean does not exist. To create a new bean
+	 * in such a case, use {@link #REPLACE_OR_CREATE} instead.
 	 */
-	REPLACE_DEFINITION,
+	REPLACE,
 
 	/**
-	 * Replace or create a given bean definition, immediately preparing a
-	 * singleton instance.
-	 * <p>Contrary to {@link #REPLACE_DEFINITION} this create a new bean
-	 * definition if the target bean definition does not exist rather than
-	 * failing.
+	 * Replace or create a given bean, immediately preparing a singleton instance.
+	 * <p>Contrary to {@link #REPLACE}, this strategy creates a new bean if the
+	 * target bean does not exist rather than failing.
 	 */
-	REPLACE_OR_CREATE_DEFINITION,
+	REPLACE_OR_CREATE,
 
 	/**
-	 * Intercept and process an early bean reference rather than a bean
-	 * definition, allowing variants of bean overriding to wrap the instance.
-	 * For instance, to delegate to actual methods in the context of a mocking "spy".
+	 * Intercept and process an early bean reference, allowing variants of bean
+	 * overriding to wrap the original bean instance &mdash; for example, to
+	 * delegate to actual methods in the context of a mocking "spy".
 	 */
-	WRAP_BEAN
+	WRAP
 
 }

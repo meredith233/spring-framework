@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2022 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -37,11 +37,10 @@ import static org.assertj.core.api.Assertions.assertThat;
  * Test scenarios involving a mock server.
  * @author Rossen Stoyanchev
  */
-public class MockServerTests {
-
+class MockServerTests {
 
 	@Test // SPR-15674 (in comments)
-	public void mutateDoesNotCreateNewSession() {
+	void mutateDoesNotCreateNewSession() {
 
 		WebTestClient client = WebTestClient
 				.bindToWebHandler(exchange -> {
@@ -76,7 +75,7 @@ public class MockServerTests {
 	}
 
 	@Test // SPR-16059
-	public void mutateDoesCopy() {
+	void mutateDoesCopy() {
 
 		WebTestClient.Builder builder = WebTestClient
 				.bindToWebHandler(exchange -> exchange.getResponse().setComplete())
@@ -100,20 +99,53 @@ public class MockServerTests {
 		WebTestClient clientFromMutatedBuilder = mutatedBuilder.build();
 
 		client1.mutate().filters(filters -> assertThat(filters).hasSize(1));
-		client1.mutate().defaultHeaders(headers -> assertThat(headers).hasSize(1));
+		client1.mutate().defaultHeaders(headers -> assertThat(headers.size()).isOne());
 		client1.mutate().defaultCookies(cookies -> assertThat(cookies).hasSize(1));
 
 		client2.mutate().filters(filters -> assertThat(filters).hasSize(2));
-		client2.mutate().defaultHeaders(headers -> assertThat(headers).hasSize(2));
+		client2.mutate().defaultHeaders(headers -> assertThat(headers.size()).isEqualTo(2));
 		client2.mutate().defaultCookies(cookies -> assertThat(cookies).hasSize(2));
 
 		clientFromMutatedBuilder.mutate().filters(filters -> assertThat(filters).hasSize(2));
-		clientFromMutatedBuilder.mutate().defaultHeaders(headers -> assertThat(headers).hasSize(2));
+		clientFromMutatedBuilder.mutate().defaultHeaders(headers -> assertThat(headers.size()).isEqualTo(2));
 		clientFromMutatedBuilder.mutate().defaultCookies(cookies -> assertThat(cookies).hasSize(2));
 	}
 
+	@Test
+	void mutateDoesNotShareDefaultHeaderAndCookieValues() {
+		WebTestClient client = WebTestClient
+				.bindToWebHandler(exchange -> exchange.getResponse().setComplete())
+				.configureClient()
+				.defaultHeaders(headers -> headers.add("foo", "bar"))
+				.defaultCookie("foo", "bar")
+				.build();
+
+		client.mutate()
+				.defaultHeaders(headers -> headers.add("foo", "baz"))
+				.defaultCookie("foo", "baz")
+				.build();
+
+		assertDefaultHeaderAndCookie(client, "bar");
+		assertDefaultHeaderAndCookie(client.mutate().build(), "bar");
+	}
+
+	@Test
+	void buildDoesNotShareDefaultHeaderAndCookieValues() {
+		WebTestClient.Builder builder = WebTestClient
+				.bindToWebHandler(exchange -> exchange.getResponse().setComplete())
+				.configureClient()
+				.defaultHeader("foo", "bar")
+				.defaultCookie("foo", "bar");
+		WebTestClient client = builder.build();
+
+		builder.defaultHeader("foo", "baz");
+		builder.defaultCookie("foo", "baz");
+
+		assertDefaultHeaderAndCookie(client, "bar");
+	}
+
 	@Test // SPR-16124
-	public void exchangeResultHasCookieHeaders() {
+	void exchangeResultHasCookieHeaders() {
 
 		ExchangeResult result = WebTestClient
 				.bindToWebHandler(exchange -> {
@@ -138,7 +170,7 @@ public class MockServerTests {
 	}
 
 	@Test
-	public void responseBodyContentWithFluxExchangeResult() {
+	void responseBodyContentWithFluxExchangeResult() {
 
 		FluxExchangeResult<String> result = WebTestClient
 				.bindToWebHandler(exchange -> {
@@ -159,6 +191,12 @@ public class MockServerTests {
 		assertThat(new String(bytes, UTF_8)).isEqualTo("body");
 	}
 
+
+	private void assertDefaultHeaderAndCookie(WebTestClient client, String value) {
+		ExchangeResult result = client.get().uri("/").exchange().expectBody().isEmpty();
+		assertThat(result.getRequestHeaders().get("foo")).containsExactly(value);
+		assertThat(result.getRequestHeaders().get(HttpHeaders.COOKIE)).containsExactly("foo=" + value);
+	}
 
 	private DataBuffer toDataBuffer(String value) {
 		byte[] bytes = value.getBytes(UTF_8);

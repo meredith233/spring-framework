@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,12 +19,15 @@ package org.springframework.messaging.simp.annotation.support;
 import java.lang.annotation.Annotation;
 import java.security.Principal;
 import java.util.Collections;
+import java.util.List;
 import java.util.Map;
+import java.util.function.Predicate;
+
+import org.jspecify.annotations.Nullable;
 
 import org.springframework.core.MethodParameter;
 import org.springframework.core.annotation.AnnotatedElementUtils;
 import org.springframework.core.annotation.AnnotationUtils;
-import org.springframework.lang.Nullable;
 import org.springframework.messaging.Message;
 import org.springframework.messaging.MessageChannel;
 import org.springframework.messaging.MessageHeaders;
@@ -39,6 +42,7 @@ import org.springframework.messaging.simp.SimpMessageType;
 import org.springframework.messaging.simp.annotation.SendToUser;
 import org.springframework.messaging.simp.user.DestinationUserNameProvider;
 import org.springframework.messaging.support.MessageHeaderInitializer;
+import org.springframework.messaging.support.NativeMessageHeaderAccessor;
 import org.springframework.util.Assert;
 import org.springframework.util.ObjectUtils;
 import org.springframework.util.PropertyPlaceholderHelper;
@@ -70,8 +74,9 @@ public class SendToMethodReturnValueHandler implements HandlerMethodReturnValueH
 
 	private final PropertyPlaceholderHelper placeholderHelper = new PropertyPlaceholderHelper("{", "}", null, null, false);
 
-	@Nullable
-	private MessageHeaderInitializer headerInitializer;
+	private @Nullable MessageHeaderInitializer headerInitializer;
+
+	private @Nullable Predicate<String> headerFilter;
 
 
 	public SendToMethodReturnValueHandler(SimpMessageSendingOperations messagingTemplate, boolean annotationRequired) {
@@ -129,9 +134,29 @@ public class SendToMethodReturnValueHandler implements HandlerMethodReturnValueH
 	/**
 	 * Return the configured header initializer.
 	 */
-	@Nullable
-	public MessageHeaderInitializer getHeaderInitializer() {
+	public @Nullable MessageHeaderInitializer getHeaderInitializer() {
 		return this.headerInitializer;
+	}
+
+	/**
+	 * Add a filter to determine which headers from the input message should be
+	 * propagated to the output message. The filter is applied to the "native
+	 * headers" submap. Multiple filters are combined with
+	 * {@link Predicate#or(Predicate)}.
+	 * <p>By default, no headers are propagated if this is not set.
+	 * @since 7.0.4
+	 */
+	public void addHeaderFilter(Predicate<String> filter) {
+		Assert.notNull(filter, "'headerFilter' predicate must not be null");
+		this.headerFilter = (this.headerFilter != null ? this.headerFilter.or(filter) : filter);
+	}
+
+	/**
+	 * Return the configured header filter.
+	 * @since 7.0.4
+	 */
+	public @Nullable Predicate<String> getHeaderFilter() {
+		return this.headerFilter;
 	}
 
 
@@ -172,11 +197,11 @@ public class SendToMethodReturnValueHandler implements HandlerMethodReturnValueH
 				destination = destinationHelper.expandTemplateVars(destination);
 				if (broadcast) {
 					this.messagingTemplate.convertAndSendToUser(
-							user, destination, returnValue, createHeaders(null, returnType));
+							user, destination, returnValue, createHeaders(null, returnType, message));
 				}
 				else {
 					this.messagingTemplate.convertAndSendToUser(
-							user, destination, returnValue, createHeaders(sessionId, returnType));
+							user, destination, returnValue, createHeaders(sessionId, returnType, message));
 				}
 			}
 		}
@@ -186,7 +211,7 @@ public class SendToMethodReturnValueHandler implements HandlerMethodReturnValueH
 			String[] destinations = getTargetDestinations(sendTo, message, this.defaultDestinationPrefix);
 			for (String destination : destinations) {
 				destination = destinationHelper.expandTemplateVars(destination);
-				this.messagingTemplate.convertAndSend(destination, returnValue, createHeaders(sessionId, returnType));
+				this.messagingTemplate.convertAndSend(destination, returnValue, createHeaders(sessionId, returnType, message));
 			}
 		}
 	}
@@ -208,8 +233,7 @@ public class SendToMethodReturnValueHandler implements HandlerMethodReturnValueH
 				new DestinationHelper(headers, m1, m2) : new DestinationHelper(headers, c1, c2));
 	}
 
-	@Nullable
-	protected String getUserName(Message<?> message, MessageHeaders headers) {
+	protected @Nullable String getUserName(Message<?> message, MessageHeaders headers) {
 		Principal principal = SimpMessageHeaderAccessor.getUser(headers);
 		if (principal != null) {
 			return (principal instanceof DestinationUserNameProvider provider ?
@@ -236,10 +260,19 @@ public class SendToMethodReturnValueHandler implements HandlerMethodReturnValueH
 				new String[] {defaultPrefix + destination} : new String[] {defaultPrefix + '/' + destination});
 	}
 
-	private MessageHeaders createHeaders(@Nullable String sessionId, MethodParameter returnType) {
+	private MessageHeaders createHeaders(
+			@Nullable String sessionId, MethodParameter returnType, @Nullable Message<?> inputMessage) {
+
 		SimpMessageHeaderAccessor headerAccessor = SimpMessageHeaderAccessor.create(SimpMessageType.MESSAGE);
 		if (getHeaderInitializer() != null) {
 			getHeaderInitializer().initHeaders(headerAccessor);
+		}
+		if (inputMessage != null && this.headerFilter != null) {
+			getNativeHeaders(inputMessage).forEach((name, values) -> {
+				if (this.headerFilter.test(name)) {
+					headerAccessor.setNativeHeaderValues(name, values);
+				}
+			});
 		}
 		if (sessionId != null) {
 			headerAccessor.setSessionId(sessionId);
@@ -247,6 +280,12 @@ public class SendToMethodReturnValueHandler implements HandlerMethodReturnValueH
 		headerAccessor.setHeader(AbstractMessageSendingTemplate.CONVERSION_HINT_HEADER, returnType);
 		headerAccessor.setLeaveMutable(true);
 		return headerAccessor.getMessageHeaders();
+	}
+
+	@SuppressWarnings("unchecked")
+	private static Map<String, List<String>> getNativeHeaders(Message<?> message) {
+		Object value = message.getHeaders().get(NativeMessageHeaderAccessor.NATIVE_HEADERS);
+		return (value != null ? (Map<String, List<String>>) value : Collections.emptyMap());
 	}
 
 
@@ -260,11 +299,9 @@ public class SendToMethodReturnValueHandler implements HandlerMethodReturnValueH
 
 		private final PlaceholderResolver placeholderResolver;
 
-		@Nullable
-		private final SendTo sendTo;
+		private final @Nullable SendTo sendTo;
 
-		@Nullable
-		private final SendToUser sendToUser;
+		private final @Nullable SendToUser sendToUser;
 
 
 		public DestinationHelper(MessageHeaders headers, @Nullable SendToUser sendToUser, @Nullable SendTo sendTo) {
@@ -280,13 +317,11 @@ public class SendToMethodReturnValueHandler implements HandlerMethodReturnValueH
 			return (Map<String, String>) headers.getOrDefault(name, Collections.emptyMap());
 		}
 
-		@Nullable
-		public SendTo getSendTo() {
+		public @Nullable SendTo getSendTo() {
 			return this.sendTo;
 		}
 
-		@Nullable
-		public SendToUser getSendToUser() {
+		public @Nullable SendToUser getSendToUser() {
 			return this.sendToUser;
 		}
 

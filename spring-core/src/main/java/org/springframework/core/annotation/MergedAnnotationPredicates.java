@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2022 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,7 +23,8 @@ import java.util.Set;
 import java.util.function.Function;
 import java.util.function.Predicate;
 
-import org.springframework.lang.Nullable;
+import org.jspecify.annotations.Nullable;
+
 import org.springframework.util.Assert;
 import org.springframework.util.ObjectUtils;
 
@@ -125,8 +126,7 @@ public abstract class MergedAnnotationPredicates {
 
 		private boolean hasLastValue;
 
-		@Nullable
-		private Object lastValue;
+		private @Nullable Object lastValue;
 
 		FirstRunOfPredicate(Function<? super MergedAnnotation<A>, ?> valueExtractor) {
 			Assert.notNull(valueExtractor, "Value extractor must not be null");
@@ -134,7 +134,7 @@ public abstract class MergedAnnotationPredicates {
 		}
 
 		@Override
-		public boolean test(@Nullable MergedAnnotation<A> annotation) {
+		public boolean test(MergedAnnotation<A> annotation) {
 			if (!this.hasLastValue) {
 				this.hasLastValue = true;
 				this.lastValue = this.valueExtractor.apply(annotation);
@@ -162,7 +162,7 @@ public abstract class MergedAnnotationPredicates {
 		}
 
 		@Override
-		public boolean test(@Nullable MergedAnnotation<A> annotation) {
+		public boolean test(MergedAnnotation<A> annotation) {
 			K key = this.keyExtractor.apply(annotation);
 			return this.seen.add(key);
 		}

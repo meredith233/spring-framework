@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -33,7 +33,7 @@ import org.springframework.core.MethodParameter;
 import org.springframework.messaging.Message;
 import org.springframework.messaging.MessageChannel;
 import org.springframework.messaging.MessageHeaders;
-import org.springframework.messaging.converter.MappingJackson2MessageConverter;
+import org.springframework.messaging.converter.JacksonJsonMessageConverter;
 import org.springframework.messaging.converter.StringMessageConverter;
 import org.springframework.messaging.core.MessageSendingOperations;
 import org.springframework.messaging.handler.annotation.MessageMapping;
@@ -59,9 +59,9 @@ import static org.mockito.Mockito.verify;
  * @author Sebastien Deleuze
  */
 @ExtendWith(MockitoExtension.class)
-public class SubscriptionMethodReturnValueHandlerTests {
+class SubscriptionMethodReturnValueHandlerTests {
 
-	public static final MimeType MIME_TYPE = new MimeType("text", "plain", StandardCharsets.UTF_8);
+	private static final MimeType MIME_TYPE = new MimeType("text", "plain", StandardCharsets.UTF_8);
 
 	private static final String PAYLOAD = "payload";
 
@@ -92,19 +92,19 @@ public class SubscriptionMethodReturnValueHandlerTests {
 		this.handler = new SubscriptionMethodReturnValueHandler(messagingTemplate);
 
 		SimpMessagingTemplate jsonMessagingTemplate = new SimpMessagingTemplate(this.messageChannel);
-		jsonMessagingTemplate.setMessageConverter(new MappingJackson2MessageConverter());
+		jsonMessagingTemplate.setMessageConverter(new JacksonJsonMessageConverter());
 		this.jsonHandler = new SubscriptionMethodReturnValueHandler(jsonMessagingTemplate);
 
-		Method method = this.getClass().getDeclaredMethod("getData");
+		Method method = getClass().getDeclaredMethod("getData");
 		this.subscribeEventReturnType = new MethodParameter(method, -1);
 
-		method = this.getClass().getDeclaredMethod("getDataAndSendTo");
+		method = getClass().getDeclaredMethod("getDataAndSendTo");
 		this.subscribeEventSendToReturnType = new MethodParameter(method, -1);
 
-		method = this.getClass().getDeclaredMethod("handle");
+		method = getClass().getDeclaredMethod("handle");
 		this.messageMappingReturnType = new MethodParameter(method, -1);
 
-		method = this.getClass().getDeclaredMethod("getJsonView");
+		method = getClass().getDeclaredMethod("getJsonView");
 		this.subscribeEventJsonViewReturnType = new MethodParameter(method, -1);
 	}
 
@@ -117,7 +117,7 @@ public class SubscriptionMethodReturnValueHandlerTests {
 	}
 
 	@Test
-	void testMessageSentToChannel() throws Exception {
+	void messageSentToChannel() throws Exception {
 		given(this.messageChannel.send(any(Message.class))).willReturn(true);
 
 		String sessionId = "sess1";
@@ -144,7 +144,7 @@ public class SubscriptionMethodReturnValueHandlerTests {
 
 	@Test
 	@SuppressWarnings({ "unchecked", "rawtypes" })
-	public void testHeadersPassedToMessagingTemplate() throws Exception {
+	void headersPassedToMessagingTemplate() throws Exception {
 		String sessionId = "sess1";
 		String subscriptionId = "subs1";
 		String destination = "/dest";
@@ -169,7 +169,7 @@ public class SubscriptionMethodReturnValueHandlerTests {
 	}
 
 	@Test
-	void testJsonView() throws Exception {
+	void jsonView() throws Exception {
 		given(this.messageChannel.send(any(Message.class))).willReturn(true);
 
 		String sessionId = "sess1";
@@ -186,6 +186,68 @@ public class SubscriptionMethodReturnValueHandlerTests {
 		assertThat(new String((byte[]) message.getPayload(), StandardCharsets.UTF_8)).isEqualTo("{\"withView1\":\"with\"}");
 	}
 
+	@Test
+	@SuppressWarnings({ "rawtypes", "unchecked" })
+	void headerFilterSinglePredicate() throws Exception {
+		String sessionId = "sess1";
+		String subscriptionId = "subs1";
+		String destination = "/dest";
+		String headerName = "x-custom-header";
+		String headerValue = "custom-value";
+
+		SimpMessageHeaderAccessor accessor = SimpMessageHeaderAccessor.create();
+		accessor.setSessionId(sessionId);
+		accessor.setSubscriptionId(subscriptionId);
+		accessor.setDestination(destination);
+		accessor.setNativeHeader(headerName, headerValue);
+		Message<?> inputMessage = MessageBuilder.createMessage(PAYLOAD, accessor.getMessageHeaders());
+
+		MessageSendingOperations template = mock();
+		SubscriptionMethodReturnValueHandler handler = new SubscriptionMethodReturnValueHandler(template);
+		handler.addHeaderFilter(name -> name.equals(headerName));
+
+		handler.handleReturnValue(PAYLOAD, this.subscribeEventReturnType, inputMessage);
+
+		ArgumentCaptor<MessageHeaders> captor = ArgumentCaptor.forClass(MessageHeaders.class);
+		verify(template).convertAndSend(eq(destination), eq(PAYLOAD), captor.capture());
+
+		accessor = MessageHeaderAccessor.getAccessor(captor.getValue(), SimpMessageHeaderAccessor.class);
+		assertThat(accessor).isNotNull();
+		assertThat(accessor.getFirstNativeHeader(headerName)).isEqualTo(headerValue);
+	}
+
+	@Test
+	@SuppressWarnings({ "rawtypes", "unchecked" })
+	void headerFilterMultiplePredicates() throws Exception {
+		String sessionId = "sess1";
+		String subscriptionId = "subs1";
+		String destination = "/dest";
+		String headerA = "x-header-a";
+		String headerB = "x-header-b";
+
+		SimpMessageHeaderAccessor accessor = SimpMessageHeaderAccessor.create();
+		accessor.setSessionId(sessionId);
+		accessor.setSubscriptionId(subscriptionId);
+		accessor.setDestination(destination);
+		accessor.setNativeHeader(headerA, "A-value");
+		accessor.setNativeHeader(headerB, "B-value");
+		Message<?> inputMessage = MessageBuilder.createMessage(PAYLOAD, accessor.getMessageHeaders());
+
+		MessageSendingOperations template = mock();
+		SubscriptionMethodReturnValueHandler handler = new SubscriptionMethodReturnValueHandler(template);
+		handler.addHeaderFilter(name -> name.equals(headerA));
+		handler.addHeaderFilter(name -> name.equals(headerB));
+
+		handler.handleReturnValue(PAYLOAD, this.subscribeEventReturnType, inputMessage);
+
+		ArgumentCaptor<MessageHeaders> captor = ArgumentCaptor.forClass(MessageHeaders.class);
+		verify(template).convertAndSend(eq(destination), eq(PAYLOAD), captor.capture());
+
+		accessor = MessageHeaderAccessor.getAccessor(captor.getValue(), SimpMessageHeaderAccessor.class);
+		assertThat(accessor).isNotNull();
+		assertThat(accessor.getFirstNativeHeader(headerA)).isEqualTo("A-value");
+		assertThat(accessor.getFirstNativeHeader(headerB)).isEqualTo("B-value");
+	}
 
 	private Message<?> createInputMessage(String sessId, String subsId, String dest, Principal principal) {
 		SimpMessageHeaderAccessor headers = SimpMessageHeaderAccessor.create();

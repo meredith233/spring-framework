@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,10 +22,10 @@ import io.micrometer.observation.ObservationRegistry;
 import io.micrometer.observation.contextpropagation.ObservationThreadLocalAccessor;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.jspecify.annotations.Nullable;
 
 import org.springframework.context.ApplicationContext;
 import org.springframework.core.Conventions;
-import org.springframework.lang.Nullable;
 import org.springframework.test.context.TestContext;
 import org.springframework.test.context.support.AbstractTestExecutionListener;
 import org.springframework.util.ReflectionUtils;
@@ -36,13 +36,20 @@ import org.springframework.util.ReflectionUtils;
  *
  * <p>This listener updates the {@link ObservationThreadLocalAccessor} with the
  * {@code ObservationRegistry} obtained from the test's {@link ApplicationContext},
- * if present.
+ * if the {@code ApplicationContext} is available and contains an
+ * {@code ObservationRegistry} bean.
  *
  * @author Marcin Grzejszczak
  * @author Sam Brannen
  * @since 6.0.10
  */
 class MicrometerObservationRegistryTestExecutionListener extends AbstractTestExecutionListener {
+
+	/**
+	 * The {@link #getOrder() order} value for this listener: {@value}.
+	 * @since 6.2.3
+	 */
+	public static final int ORDER = 2500;
 
 	private static final Log logger = LogFactory.getLog(MicrometerObservationRegistryTestExecutionListener.class);
 
@@ -68,8 +75,7 @@ class MicrometerObservationRegistryTestExecutionListener extends AbstractTestExe
 	static final String OBSERVATION_THREAD_LOCAL_ACCESSOR_CLASS_NAME =
 			"io.micrometer.observation.contextpropagation.ObservationThreadLocalAccessor";
 
-	@Nullable
-	private static final String ERROR_MESSAGE;
+	private static final @Nullable String ERROR_MESSAGE;
 
 	static {
 		// Trigger eager resolution of Micrometer Observation types to ensure that
@@ -107,17 +113,23 @@ class MicrometerObservationRegistryTestExecutionListener extends AbstractTestExe
 
 
 	/**
-	 * Returns {@code 2500}.
+	 * Returns {@value #ORDER}, which ensures that the
+	 * {@code MicrometerObservationRegistryTestExecutionListener} is ordered after the
+	 * {@link org.springframework.test.context.support.DependencyInjectionTestExecutionListener
+	 * DependencyInjectionTestExecutionListener} and before the
+	 * {@link org.springframework.test.context.support.DirtiesContextTestExecutionListener
+	 * DirtiesContextTestExecutionListener}.
 	 */
 	@Override
 	public final int getOrder() {
-		return 2500;
+		return ORDER;
 	}
 
 	/**
-	 * If the test's {@link ApplicationContext} contains an {@link ObservationRegistry}
-	 * bean, this method retrieves the {@code ObservationRegistry} currently stored
-	 * in {@link ObservationThreadLocalAccessor}, saves a reference to the original
+	 * If the test's {@link ApplicationContext} is available and contains an
+	 * {@link ObservationRegistry} bean, this method retrieves the
+	 * {@code ObservationRegistry} currently stored in
+	 * {@link ObservationThreadLocalAccessor}, saves a reference to the original
 	 * registry as a {@link TestContext} attribute (to be restored in
 	 * {@link #afterTestMethod(TestContext)}), and sets the registry from the test's
 	 * {@code ApplicationContext} in {@link ObservationThreadLocalAccessor}.
@@ -126,6 +138,9 @@ class MicrometerObservationRegistryTestExecutionListener extends AbstractTestExe
 	 */
 	@Override
 	public void beforeTestMethod(TestContext testContext) {
+		if (!testContext.hasApplicationContext()) {
+			return;
+		}
 		testContext.getApplicationContext().getBeanProvider(ObservationRegistry.class)
 				.ifAvailable(registry -> {
 					if (logger.isDebugEnabled()) {

@@ -13,7 +13,7 @@ You can apply the `@Autowired` annotation to constructors, as the following exam
 ======
 Java::
 +
-[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+[source,java,indent=0,subs="verbatim,quotes"]
 ----
 	public class MovieRecommender {
 
@@ -30,31 +30,31 @@ Java::
 
 Kotlin::
 +
-[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+[source,kotlin,indent=0,subs="verbatim,quotes"]
 ----
 	class MovieRecommender @Autowired constructor(
 		private val customerPreferenceDao: CustomerPreferenceDao)
 ----
 ======
 
-[NOTE]
+[TIP]
 ====
-As of Spring Framework 4.3, an `@Autowired` annotation on such a constructor is no longer
-necessary if the target bean defines only one constructor to begin with. However, if
-several constructors are available and there is no primary/default constructor, at least
-one of the constructors must be annotated with `@Autowired` in order to instruct the
-container which one to use. See the discussion on
-xref:core/beans/annotation-config/autowired.adoc#beans-autowired-annotation-constructor-resolution[constructor resolution] for details.
+An `@Autowired` annotation on such a constructor is not necessary if the target bean
+defines only one constructor. However, if several constructors are available and there is
+no primary or default constructor, at least one of the constructors must be annotated
+with `@Autowired` in order to instruct the container which one to use. See the discussion
+on <<beans-autowired-annotation-constructor-resolution,constructor resolution>>
+for details.
 ====
 
-You can also apply the `@Autowired` annotation to _traditional_ setter methods,
-as the following example shows:
+You can apply the `@Autowired` annotation to _traditional_ setter methods, as the
+following example shows:
 
 [tabs]
 ======
 Java::
 +
-[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+[source,java,indent=0,subs="verbatim,quotes"]
 ----
 	public class SimpleMovieLister {
 
@@ -71,7 +71,7 @@ Java::
 
 Kotlin::
 +
-[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+[source,kotlin,indent=0,subs="verbatim,quotes"]
 ----
 	class SimpleMovieLister {
 
@@ -84,14 +84,14 @@ Kotlin::
 ----
 ======
 
-You can also apply the annotation to methods with arbitrary names and multiple
-arguments, as the following example shows:
+You can apply `@Autowired` to methods with arbitrary names and multiple arguments, as the
+following example shows:
 
 [tabs]
 ======
 Java::
 +
-[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+[source,java,indent=0,subs="verbatim,quotes"]
 ----
 	public class MovieRecommender {
 
@@ -112,7 +112,7 @@ Java::
 
 Kotlin::
 +
-[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+[source,kotlin,indent=0,subs="verbatim,quotes"]
 ----
 	class MovieRecommender {
 
@@ -139,7 +139,7 @@ following example shows:
 ======
 Java::
 +
-[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+[source,java,indent=0,subs="verbatim,quotes"]
 ----
 	public class MovieRecommender {
 
@@ -159,7 +159,7 @@ Java::
 
 Kotlin::
 +
-[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+[source,kotlin,indent=0,subs="verbatim,quotes"]
 ----
 	class MovieRecommender @Autowired constructor(
 		private val customerPreferenceDao: CustomerPreferenceDao) {
@@ -176,15 +176,48 @@ Kotlin::
 ====
 Make sure that your target components (for example, `MovieCatalog` or `CustomerPreferenceDao`)
 are consistently declared by the type that you use for your `@Autowired`-annotated
-injection points. Otherwise, injection may fail due to a "no type match found" error at runtime.
+injection points. Otherwise, injection may fail due to a "no type match found" error at
+runtime.
 
 For XML-defined beans or component classes found via classpath scanning, the container
 usually knows the concrete type up front. However, for `@Bean` factory methods, you need
 to make sure that the declared return type is sufficiently expressive. For components
 that implement several interfaces or for components potentially referred to by their
-implementation type, consider declaring the most specific return type on your factory
-method (at least as specific as required by the injection points referring to your bean).
+implementation type, declare the most specific return type on your factory method (at
+least as specific as required by the injection points referring to your bean).
 ====
+
+.[[beans-autowired-annotation-self-injection]]Self Injection
+****
+`@Autowired` also considers self references for injection (that is, references back to
+the bean that is currently injected).
+
+Note, however, that self injection is a fallback mechanism. Regular dependencies on other
+components always have precedence. In that sense, self references do not participate in
+regular autowiring candidate selection and are therefore in particular never primary. On
+the contrary, they always end up as lowest precedence.
+
+In practice, you should use self references as a last resort only – for example, for
+calling other methods on the same instance through the bean's transactional proxy. As an
+alternative, consider factoring out the affected methods to a separate delegate bean in
+such a scenario.
+
+Another alternative is to use `@Resource`, which may obtain a proxy back to the current
+bean by its unique name.
+
+======
+[NOTE]
+====
+Trying to inject the results from `@Bean` methods in the same `@Configuration` class is
+effectively a self-reference scenario as well. Either lazily resolve such references
+in the method signature where it is actually needed (as opposed to an autowired field
+in the configuration class) or declare the affected `@Bean` methods as `static`,
+decoupling them from the containing configuration class instance and its lifecycle.
+Otherwise, such beans are only considered in the fallback phase, with matching beans
+on other configuration classes selected as primary candidates instead (if available).
+====
+======
+****
 
 You can also instruct Spring to provide all beans of a particular type from the
 `ApplicationContext` by adding the `@Autowired` annotation to a field or method that
@@ -194,7 +227,7 @@ expects an array of that type, as the following example shows:
 ======
 Java::
 +
-[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+[source,java,indent=0,subs="verbatim,quotes"]
 ----
 	public class MovieRecommender {
 
@@ -207,7 +240,7 @@ Java::
 
 Kotlin::
 +
-[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+[source,kotlin,indent=0,subs="verbatim,quotes"]
 ----
 	class MovieRecommender {
 
@@ -225,7 +258,7 @@ The same applies for typed collections, as the following example shows:
 ======
 Java::
 +
-[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+[source,java,indent=0,subs="verbatim,quotes"]
 ----
 	public class MovieRecommender {
 
@@ -242,7 +275,7 @@ Java::
 
 Kotlin::
 +
-[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+[source,kotlin,indent=0,subs="verbatim,quotes"]
 ----
 	class MovieRecommender {
 
@@ -268,20 +301,27 @@ use the same bean class). `@Order` values may influence priorities at injection 
 but be aware that they do not influence singleton startup order, which is an
 orthogonal concern determined by dependency relationships and `@DependsOn` declarations.
 
+Note that `@Order` annotations on configuration classes just influence the evaluation
+order within the overall set of configuration classes on startup. Such configuration-level
+order values do not affect the contained `@Bean` methods at all. For bean-level ordering,
+each `@Bean` method needs to have its own `@Order` annotation which applies within a
+set of multiple matches for the specific bean type (as returned by the factory method).
+
 Note that the standard `jakarta.annotation.Priority` annotation is not available at the
 `@Bean` level, since it cannot be declared on methods. Its semantics can be modeled
-through `@Order` values in combination with `@Primary` on a single bean for each type.
+through `@Order` values in combination with `@Primary` or `@Fallback` on a single bean
+for each type.
 ====
 
 Even typed `Map` instances can be autowired as long as the expected key type is `String`.
-The map values contain all beans of the expected type, and the keys contain the
-corresponding bean names, as the following example shows:
+The map values are all beans of the expected type, and the keys are the corresponding
+bean names, as the following example shows:
 
 [tabs]
 ======
 Java::
 +
-[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+[source,java,indent=0,subs="verbatim,quotes"]
 ----
 	public class MovieRecommender {
 
@@ -298,7 +338,7 @@ Java::
 
 Kotlin::
 +
-[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+[source,kotlin,indent=0,subs="verbatim,quotes"]
 ----
 	class MovieRecommender {
 
@@ -323,7 +363,7 @@ non-required (i.e., by setting the `required` attribute in `@Autowired` to `fals
 ======
 Java::
 +
-[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+[source,java,indent=0,subs="verbatim,quotes"]
 ----
 	public class SimpleMovieLister {
 
@@ -340,7 +380,7 @@ Java::
 
 Kotlin::
 +
-[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+[source,kotlin,indent=0,subs="verbatim,quotes"]
 ----
 	class SimpleMovieLister {
 
@@ -393,7 +433,7 @@ annotated constructor does not have to be public.
 ====
 
 Alternatively, you can express the non-required nature of a particular dependency
-through Java 8's `java.util.Optional`, as the following example shows:
+through Java's `java.util.Optional`, as the following example shows:
 
 [source,java,indent=0,subs="verbatim,quotes"]
 ----
@@ -406,15 +446,15 @@ through Java 8's `java.util.Optional`, as the following example shows:
 	}
 ----
 
-As of Spring Framework 5.0, you can also use a `@Nullable` annotation (of any kind
-in any package -- for example, `javax.annotation.Nullable` from JSR-305) or just leverage
-Kotlin built-in null-safety support:
+You can also use a parameter-level `@Nullable` annotation (of any kind in any package --
+for example, `org.jspecify.annotations.Nullable` from JSpecify) or just leverage Kotlin's
+built-in null-safety support:
 
 [tabs]
 ======
 Java::
 +
-[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+[source,java,indent=0,subs="verbatim,quotes"]
 ----
 	public class SimpleMovieLister {
 
@@ -427,7 +467,7 @@ Java::
 
 Kotlin::
 +
-[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+[source,kotlin,indent=0,subs="verbatim,quotes"]
 ----
 	class SimpleMovieLister {
 
@@ -450,7 +490,7 @@ an `ApplicationContext` object:
 ======
 Java::
 +
-[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+[source,java,indent=0,subs="verbatim,quotes"]
 ----
 	public class MovieRecommender {
 
@@ -466,7 +506,7 @@ Java::
 
 Kotlin::
 +
-[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+[source,kotlin,indent=0,subs="verbatim,quotes"]
 ----
 class MovieRecommender {
 
@@ -483,8 +523,6 @@ class MovieRecommender {
 The `@Autowired`, `@Inject`, `@Value`, and `@Resource` annotations are handled by Spring
 `BeanPostProcessor` implementations. This means that you cannot apply these annotations
 within your own `BeanPostProcessor` or `BeanFactoryPostProcessor` types (if any).
+
 These types must be 'wired up' explicitly by using XML or a Spring `@Bean` method.
 ====
-
-
-

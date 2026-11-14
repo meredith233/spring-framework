@@ -4,7 +4,9 @@
 `@Configuration` is a class-level annotation indicating that an object is a source of
 bean definitions. `@Configuration` classes declare beans through `@Bean`-annotated
 methods. Calls to `@Bean` methods on `@Configuration` classes can also be used to define
-inter-bean dependencies. See xref:core/beans/java/basic-concepts.adoc[Basic Concepts: `@Bean` and `@Configuration`] for a general introduction.
+inter-bean dependencies. See
+xref:core/beans/java/basic-concepts.adoc[Basic Concepts: `@Bean` and `@Configuration`]
+for a general introduction.
 
 
 [[beans-java-injecting-dependencies]]
@@ -17,7 +19,7 @@ as having one bean method call another, as the following example shows:
 ======
 Java::
 +
-[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+[source,java,indent=0,subs="verbatim,quotes"]
 ----
 	@Configuration
 	public class AppConfig {
@@ -36,7 +38,7 @@ Java::
 
 Kotlin::
 +
-[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+[source,kotlin,indent=0,subs="verbatim,quotes"]
 ----
 	@Configuration
 	class AppConfig {
@@ -58,7 +60,6 @@ is declared within a `@Configuration` class. You cannot declare inter-bean depen
 by using plain `@Component` classes.
 
 
-
 [[beans-java-method-injection]]
 == Lookup Method Injection
 
@@ -72,7 +73,7 @@ following example shows how to use lookup method injection:
 ======
 Java::
 +
-[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+[source,java,indent=0,subs="verbatim,quotes"]
 ----
 	public abstract class CommandManager {
 		public Object process(Object commandState) {
@@ -90,7 +91,7 @@ Java::
 
 Kotlin::
 +
-[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+[source,kotlin,indent=0,subs="verbatim,quotes"]
 ----
 	abstract class CommandManager {
 		fun process(commandState: Any): Any {
@@ -115,7 +116,7 @@ the abstract `createCommand()` method is overridden in such a way that it looks 
 ======
 Java::
 +
-[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+[source,java,indent=0,subs="verbatim,quotes"]
 ----
 	@Bean
 	@Scope("prototype")
@@ -133,13 +134,13 @@ Java::
 			protected Command createCommand() {
 				return asyncCommand();
 			}
-		}
+		};
 	}
 ----
 
 Kotlin::
 +
-[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+[source,kotlin,indent=0,subs="verbatim,quotes"]
 ----
 	@Bean
 	@Scope("prototype")
@@ -172,7 +173,7 @@ Consider the following example, which shows a `@Bean` annotated method being cal
 ======
 Java::
 +
-[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+[source,java,indent=0,subs="verbatim,quotes"]
 ----
 	@Configuration
 	public class AppConfig {
@@ -200,7 +201,7 @@ Java::
 
 Kotlin::
 +
-[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+[source,kotlin,indent=0,subs="verbatim,quotes"]
 ----
 	@Configuration
 	class AppConfig {
@@ -259,6 +260,3 @@ instead) or by annotating your configuration class with
 are then not intercepted, so you have to exclusively rely on dependency injection at the
 constructor or method level there.
 ====
-
-
-

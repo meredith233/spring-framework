@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -24,6 +24,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.StringJoiner;
 
+import org.jspecify.annotations.Nullable;
+
 import org.springframework.asm.MethodVisitor;
 import org.springframework.core.convert.TypeDescriptor;
 import org.springframework.expression.AccessException;
@@ -39,7 +41,6 @@ import org.springframework.expression.spel.ExpressionState;
 import org.springframework.expression.spel.SpelEvaluationException;
 import org.springframework.expression.spel.SpelMessage;
 import org.springframework.expression.spel.support.ReflectiveConstructorExecutor;
-import org.springframework.lang.Nullable;
 import org.springframework.util.Assert;
 
 /**
@@ -66,19 +67,19 @@ public class ConstructorReference extends SpelNodeImpl {
 
 	/**
 	 * Maximum number of elements permitted in an array declaration, applying
-	 * to one-dimensional as well as multi-dimensional arrays.
+	 * to one-dimensional as well as multi-dimensional arrays. For the latter,
+	 * this also bounds the total number of array objects allocated across all
+	 * nesting levels, not just the product of the dimension sizes.
 	 * @since 5.3.17
 	 */
 	private static final int MAX_ARRAY_ELEMENTS = 256 * 1024; // 256K
 
 	private final boolean isArrayConstructor;
 
-	@Nullable
-	private final SpelNodeImpl[] dimensions;
+	private final SpelNodeImpl @Nullable [] dimensions;
 
 	/** The cached executor that may be reused on subsequent evaluations. */
-	@Nullable
-	private volatile ConstructorExecutor cachedExecutor;
+	private volatile @Nullable ConstructorExecutor cachedExecutor;
 
 
 	/**
@@ -110,6 +111,7 @@ public class ConstructorReference extends SpelNodeImpl {
 	 */
 	@Override
 	public TypedValue getValueInternal(ExpressionState state) throws EvaluationException {
+		state.trackOperation();
 		if (this.isArrayConstructor) {
 			return createArray(state);
 		}
@@ -125,7 +127,7 @@ public class ConstructorReference extends SpelNodeImpl {
 	 * @throws EvaluationException if there is a problem creating the object
 	 */
 	private TypedValue createNewInstance(ExpressionState state) throws EvaluationException {
-		Object[] arguments = new Object[getChildCount() - 1];
+		@Nullable Object[] arguments = new Object[getChildCount() - 1];
 		List<TypeDescriptor> argumentTypes = new ArrayList<>(getChildCount() - 1);
 		for (int i = 0; i < arguments.length; i++) {
 			TypedValue childValue = this.children[i + 1].getValueInternal(state);
@@ -136,36 +138,43 @@ public class ConstructorReference extends SpelNodeImpl {
 
 		ConstructorExecutor executorToUse = this.cachedExecutor;
 		if (executorToUse != null) {
-			try {
-				return executorToUse.execute(state.getEvaluationContext(), arguments);
-			}
-			catch (AccessException ex) {
-				// Two reasons this can occur:
-				// 1. the constructor invoked actually threw a real exception
-				// 2. the constructor invoked was not passed the arguments it expected and has become 'stale'
-
-				// In the first case we should not retry, in the second case we should see if there is a
-				// better suited constructor.
-
-				// To determine which situation it is, the AccessException will contain a cause.
-				// If the cause is an InvocationTargetException, a user exception was thrown inside the constructor.
-				// Otherwise, the constructor could not be invoked.
-				if (ex.getCause() instanceof InvocationTargetException cause) {
-					// User exception was the root cause - exit now
-					Throwable rootCause = cause.getCause();
-					if (rootCause instanceof RuntimeException runtimeException) {
-						throw runtimeException;
-					}
-					else {
-						String typeName = (String) this.children[0].getValueInternal(state).getValue();
-						throw new SpelEvaluationException(getStartPosition(), rootCause,
-								SpelMessage.CONSTRUCTOR_INVOCATION_PROBLEM, typeName,
-								FormatHelper.formatMethodForMessage("", argumentTypes));
-					}
-				}
-
-				// At this point we know it wasn't a user problem so worth a retry if a better candidate can be found
+			if (state.getEvaluationContext().getConstructorResolvers().isEmpty()) {
+				// Constructor resolution is not supported in the current context,
+				// so we discard the cached executor.
 				this.cachedExecutor = null;
+			}
+			else {
+				try {
+					return executorToUse.execute(state.getEvaluationContext(), arguments);
+				}
+				catch (AccessException ex) {
+					// Two reasons this can occur:
+					// 1. the constructor invoked actually threw a real exception
+					// 2. the constructor invoked was not passed the arguments it expected and has become 'stale'
+
+					// In the first case we should not retry, in the second case we should see if there is a
+					// better suited constructor.
+
+					// To determine which situation it is, the AccessException will contain a cause.
+					// If the cause is an InvocationTargetException, a user exception was thrown inside the constructor.
+					// Otherwise, the constructor could not be invoked.
+					if (ex.getCause() instanceof InvocationTargetException cause) {
+						// User exception was the root cause - exit now
+						Throwable rootCause = cause.getCause();
+						if (rootCause instanceof RuntimeException runtimeException) {
+							throw runtimeException;
+						}
+						else {
+							String typeName = (String) this.children[0].getValueInternal(state).getValue();
+							throw new SpelEvaluationException(getStartPosition(), rootCause,
+									SpelMessage.CONSTRUCTOR_INVOCATION_PROBLEM, typeName,
+									FormatHelper.formatMethodForMessage("", argumentTypes));
+						}
+					}
+
+					// At this point we know it wasn't a user problem so worth a retry if a better candidate can be found
+					this.cachedExecutor = null;
+				}
 			}
 		}
 
@@ -305,12 +314,18 @@ public class ConstructorReference extends SpelNodeImpl {
 					// Multidimensional - hold onto your hat!
 					int[] dims = new int[this.dimensions.length];
 					long numElements = 1;
+					// Java allocates a distinct array object at every nesting level, so we
+					// also have to cap the total number of array objects created, not just
+					// the product of all dimension sizes (the number of leaf elements).
+					long totalArrayObjects = 0;
 					for (int d = 0; d < this.dimensions.length; d++) {
 						TypedValue o = this.dimensions[d].getTypedValue(state);
 						int arraySize = ExpressionUtils.toInt(typeConverter, o);
 						dims[d] = arraySize;
+						totalArrayObjects += numElements;
 						numElements *= arraySize;
 						checkNumElements(numElements);
+						checkNumElements(totalArrayObjects);
 					}
 					newArray = Array.newInstance(componentType, dims);
 				}
@@ -320,7 +335,7 @@ public class ConstructorReference extends SpelNodeImpl {
 			// There is an initializer
 			if (this.dimensions == null || this.dimensions.length > 1) {
 				// There is an initializer, but this is a multidimensional array
-				// (e.g. new int[][]{{1,2},{3,4}}), which is not supported.
+				// (for example, new int[][]{{1,2},{3,4}}), which is not supported.
 				throw new SpelEvaluationException(getStartPosition(),
 						SpelMessage.MULTIDIM_ARRAY_INITIALIZER_NOT_SUPPORTED);
 			}
@@ -360,7 +375,7 @@ public class ConstructorReference extends SpelNodeImpl {
 	private Object createReferenceTypeArray(ExpressionState state, TypeConverter typeConverter, SpelNodeImpl[] children,
 			Class<?> componentType) {
 
-		Object[] array = (Object[]) Array.newInstance(componentType, children.length);
+		@Nullable Object[] array = (Object[]) Array.newInstance(componentType, children.length);
 		TypeDescriptor targetType = TypeDescriptor.valueOf(componentType);
 		for (int i = 0; i < array.length; i++) {
 			Object value = children[i].getValue(state);

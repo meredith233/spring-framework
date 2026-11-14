@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2022 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,18 +16,19 @@
 
 package org.springframework.scheduling.quartz;
 
+import org.jspecify.annotations.Nullable;
+
 import org.springframework.aot.hint.MemberCategory;
 import org.springframework.aot.hint.RuntimeHints;
 import org.springframework.aot.hint.RuntimeHintsRegistrar;
 import org.springframework.aot.hint.TypeHint.Builder;
 import org.springframework.aot.hint.TypeReference;
 import org.springframework.aot.hint.annotation.ReflectiveRuntimeHintsRegistrar;
-import org.springframework.lang.Nullable;
 import org.springframework.util.ClassUtils;
 
 /**
  * {@link RuntimeHintsRegistrar} implementation that makes sure {@link SchedulerFactoryBean}
- * reflection entries are registered.
+ * reflection hints are registered.
  *
  * @author Sebastien Deleuze
  * @author Stephane Nicoll
@@ -37,7 +38,7 @@ class SchedulerFactoryBeanRuntimeHints implements RuntimeHintsRegistrar {
 
 	private static final String SCHEDULER_FACTORY_CLASS_NAME = "org.quartz.impl.StdSchedulerFactory";
 
-	private final ReflectiveRuntimeHintsRegistrar reflectiveRegistrar = new ReflectiveRuntimeHintsRegistrar();
+	private static final ReflectiveRuntimeHintsRegistrar registrar = new ReflectiveRuntimeHintsRegistrar();
 
 
 	@Override
@@ -49,7 +50,7 @@ class SchedulerFactoryBeanRuntimeHints implements RuntimeHintsRegistrar {
 				.registerType(TypeReference.of(SCHEDULER_FACTORY_CLASS_NAME), this::typeHint)
 				.registerTypes(TypeReference.listOf(ResourceLoaderClassLoadHelper.class,
 						LocalTaskExecutorThreadPool.class, LocalDataSourceJobStore.class), this::typeHint);
-		this.reflectiveRegistrar.registerRuntimeHints(hints, LocalTaskExecutorThreadPool.class);
+		registrar.registerRuntimeHints(hints, LocalTaskExecutorThreadPool.class);
 	}
 
 	private void typeHint(Builder typeHint) {

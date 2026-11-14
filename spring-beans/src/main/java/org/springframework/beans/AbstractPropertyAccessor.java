@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2022 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,15 +21,19 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 
-import org.springframework.lang.Nullable;
+import org.jspecify.annotations.Nullable;
+
+import org.springframework.util.Assert;
 
 /**
  * Abstract implementation of the {@link PropertyAccessor} interface.
- * Provides base implementations of all convenience methods, with the
+ *
+ * <p>Provides base implementations of all convenience methods, with the
  * implementation of actual property access left to subclasses.
  *
  * @author Juergen Hoeller
  * @author Stephane Nicoll
+ * @author Sam Brannen
  * @since 2.0
  * @see #getPropertyValue
  * @see #setPropertyValue
@@ -39,6 +43,10 @@ public abstract class AbstractPropertyAccessor extends TypeConverterSupport impl
 	private boolean extractOldValueForEditor = false;
 
 	private boolean autoGrowNestedPaths = false;
+
+	private int autoGrowCollectionLimit = Integer.MAX_VALUE;
+
+	private int maxNestedPathDepth = DEFAULT_MAX_NESTED_PATH_DEPTH;
 
 	boolean suppressNotWritablePropertyException = false;
 
@@ -61,6 +69,27 @@ public abstract class AbstractPropertyAccessor extends TypeConverterSupport impl
 	@Override
 	public boolean isAutoGrowNestedPaths() {
 		return this.autoGrowNestedPaths;
+	}
+
+	@Override
+	public void setAutoGrowCollectionLimit(int autoGrowCollectionLimit) {
+		this.autoGrowCollectionLimit = autoGrowCollectionLimit;
+	}
+
+	@Override
+	public int getAutoGrowCollectionLimit() {
+		return this.autoGrowCollectionLimit;
+	}
+
+	@Override
+	public void setMaxNestedPathDepth(int maxNestedPathDepth) {
+		Assert.isTrue(maxNestedPathDepth >= 0, "'maxNestedPathDepth' must not be negative");
+		this.maxNestedPathDepth = maxNestedPathDepth;
+	}
+
+	@Override
+	public int getMaxNestedPathDepth() {
+		return this.maxNestedPathDepth;
 	}
 
 
@@ -139,8 +168,7 @@ public abstract class AbstractPropertyAccessor extends TypeConverterSupport impl
 
 	// Redefined with public visibility.
 	@Override
-	@Nullable
-	public Class<?> getPropertyType(String propertyPath) {
+	public @Nullable Class<?> getPropertyType(String propertyPath) {
 		return null;
 	}
 
@@ -154,8 +182,7 @@ public abstract class AbstractPropertyAccessor extends TypeConverterSupport impl
 	 * accessor method failed
 	 */
 	@Override
-	@Nullable
-	public abstract Object getPropertyValue(String propertyName) throws BeansException;
+	public abstract @Nullable Object getPropertyValue(String propertyName) throws BeansException;
 
 	/**
 	 * Actually set a property value.

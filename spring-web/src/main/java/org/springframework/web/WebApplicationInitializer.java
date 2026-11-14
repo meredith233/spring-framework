@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2021 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -87,7 +87,7 @@ import jakarta.servlet.ServletException;
  * <p>Most major Spring Web components have been updated to support this style of
  * registration.  You'll find that {@code DispatcherServlet}, {@code FrameworkServlet},
  * {@code ContextLoaderListener} and {@code DelegatingFilterProxy} all now support
- * constructor arguments. Even if a component (e.g. non-Spring, other third party) has not
+ * constructor arguments. Even if a component (for example, non-Spring, other third party) has not
  * been specifically updated for use within {@code WebApplicationInitializers}, they still
  * may be used in any case. The {@code ServletContext} API allows for setting init-params,
  * context-params, etc programmatically.

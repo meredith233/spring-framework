@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2023 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,8 +17,11 @@
 package org.springframework.orm.jpa;
 
 import jakarta.persistence.EntityManagerFactory;
+import jakarta.persistence.Query;
 import org.hibernate.Session;
 import org.hibernate.SessionFactory;
+import org.hibernate.StatelessSession;
+import org.hibernate.jpa.boot.internal.PersistenceUnitInfoDescriptor;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -42,8 +45,7 @@ class EntityManagerRuntimeHintsTests {
 	@BeforeEach
 	void setup() {
 		AotServices.factories().load(RuntimeHintsRegistrar.class)
-				.forEach(registrar -> registrar.registerHints(this.hints,
-						ClassUtils.getDefaultClassLoader()));
+				.forEach(registrar -> registrar.registerHints(this.hints, ClassUtils.getDefaultClassLoader()));
 	}
 
 	@Test
@@ -56,11 +58,24 @@ class EntityManagerRuntimeHintsTests {
 	void entityManagerProxyHasHibernateHints() {
 		assertThat(RuntimeHintsPredicates.proxies().forInterfaces(Session.class, EntityManagerProxy.class))
 				.accepts(this.hints);
+		assertThat(RuntimeHintsPredicates.proxies().forInterfaces(StatelessSession.class)).accepts(this.hints);
+	}
+
+	@Test
+	void entityManagerFactoryHasFallbackQueryProxyHints() {
+		assertThat(RuntimeHintsPredicates.proxies().forInterfaces(Query.class)).accepts(this.hints);
 	}
 
 	@Test
 	void entityManagerFactoryHasReflectionHints() {
-		assertThat(RuntimeHintsPredicates.reflection().onMethod(EntityManagerFactory.class, "getCriteriaBuilder")).accepts(this.hints);
-		assertThat(RuntimeHintsPredicates.reflection().onMethod(EntityManagerFactory.class, "getMetamodel")).accepts(this.hints);
+		assertThat(RuntimeHintsPredicates.reflection().onMethodInvocation(EntityManagerFactory.class, "getCriteriaBuilder")).accepts(this.hints);
+		assertThat(RuntimeHintsPredicates.reflection().onMethodInvocation(EntityManagerFactory.class, "getMetamodel")).accepts(this.hints);
 	}
+
+	@Test
+	void persistenceUnitInfoDescriptorHasReflectionHints() {
+		assertThat(RuntimeHintsPredicates.reflection().onMethodInvocation(PersistenceUnitInfoDescriptor.class, "getName"))
+				.accepts(this.hints);
+	}
+
 }

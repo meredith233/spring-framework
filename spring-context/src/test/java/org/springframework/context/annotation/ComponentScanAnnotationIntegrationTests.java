@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -26,6 +26,7 @@ import example.scannable.CustomComponent;
 import example.scannable.CustomStereotype;
 import example.scannable.DefaultNamedComponent;
 import example.scannable.FooService;
+import example.scannable.FooServiceImpl;
 import example.scannable.MessageBean;
 import example.scannable.ScopedProxyTestBean;
 import example.scannable_implicitbasepackage.ComponentScanAnnotatedConfigWithImplicitBasePackage;
@@ -43,6 +44,7 @@ import org.springframework.beans.factory.annotation.CustomAutowireConfigurer;
 import org.springframework.beans.factory.config.BeanDefinition;
 import org.springframework.beans.factory.support.BeanDefinitionRegistry;
 import org.springframework.beans.factory.support.DefaultListableBeanFactory;
+import org.springframework.beans.factory.support.RootBeanDefinition;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.EnvironmentAware;
 import org.springframework.context.ResourceLoaderAware;
@@ -81,6 +83,17 @@ class ComponentScanAnnotationIntegrationTests {
 		ctx.scan(example.scannable.PackageMarker.class.getPackage().getName());
 		ctx.refresh();
 
+		assertContextContainsBean(ctx, "fooServiceImpl");
+	}
+
+	@Test
+	void controlScanWithExplicitRegistration() {
+		AnnotationConfigApplicationContext ctx = new AnnotationConfigApplicationContext();
+		ctx.registerBeanDefinition("myFooService", new RootBeanDefinition(FooServiceImpl.class));
+		ctx.scan(example.scannable.PackageMarker.class.getPackage().getName());
+		ctx.refresh();
+
+		assertContextContainsBean(ctx, "myFooService");
 		assertContextContainsBean(ctx, "fooServiceImpl");
 	}
 

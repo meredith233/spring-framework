@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2023 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -89,23 +89,23 @@ class ExceptionDepthComparatorTests {
 	}
 
 	@SuppressWarnings("serial")
-	public class HighestDepthException extends Throwable {
+	public static class HighestDepthException extends Throwable {
 	}
 
 	@SuppressWarnings("serial")
-	public class LowestDepthException extends HighestDepthException {
+	public static class LowestDepthException extends HighestDepthException {
 	}
 
 	@SuppressWarnings("serial")
-	public class TargetException extends LowestDepthException {
+	public static class TargetException extends LowestDepthException {
 	}
 
 	@SuppressWarnings("serial")
-	public class SameDepthException extends LowestDepthException {
+	public static class SameDepthException extends LowestDepthException {
 	}
 
 	@SuppressWarnings("serial")
-	public class NoDepthException extends TargetException {
+	public static class NoDepthException extends TargetException {
 	}
 
 }

@@ -8,7 +8,7 @@ danger of undue coupling, because code that is meant to be used transactionally 
 almost always deployed that way anyway.
 
 NOTE: The standard `jakarta.transaction.Transactional` annotation is also supported as
-a drop-in replacement to Spring's own annotation. Please refer to the JTA documentation
+a drop-in replacement for Spring's own annotation. Please refer to the JTA documentation
 for more details.
 
 The ease-of-use afforded by the use of the `@Transactional` annotation is best
@@ -19,7 +19,7 @@ Consider the following class definition:
 ======
 Java::
 +
-[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+[source,java,indent=0,subs="verbatim,quotes"]
 ----
 	// the service class that we want to make transactional
 	@Transactional
@@ -49,7 +49,7 @@ Java::
 
 Kotlin::
 +
-[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+[source,kotlin,indent=0,subs="verbatim,quotes"]
 ----
 	// the service class that we want to make transactional
 	@Transactional
@@ -74,10 +74,11 @@ Kotlin::
 ----
 ======
 
-Used at the class level as above, the annotation indicates a default for all methods of
-the declaring class (as well as its subclasses). Alternatively, each method can be
-annotated individually. See xref:data-access/transaction/declarative/annotations.adoc#transaction-declarative-annotations-method-visibility[method visibility] for
-further details on which methods Spring considers transactional. Note that a class-level
+Used at the class level as above, the annotation indicates a default for all methods
+of the declaring class (as well as its subclasses). Alternatively, each method can be
+annotated individually. See
+<<transaction-declarative-annotations-method-visibility,method visibility>>
+for further details on which methods Spring considers transactional. Note that a class-level
 annotation does not apply to ancestor classes up the class hierarchy; in such a scenario,
 inherited methods need to be locally redeclared in order to participate in a
 subclass-level annotation.
@@ -88,47 +89,16 @@ annotation in a `@Configuration` class. See the
 {spring-framework-api}/transaction/annotation/EnableTransactionManagement.html[javadoc]
 for full details.
 
-In XML configuration, the `<tx:annotation-driven/>` tag provides similar convenience:
+The following example shows the configuration needed to enable annotation-driven transaction management:
 
-[source,xml,indent=0,subs="verbatim,quotes"]
-----
-	<!-- from the file 'context.xml' -->
-	<?xml version="1.0" encoding="UTF-8"?>
-	<beans xmlns="http://www.springframework.org/schema/beans"
-		xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-		xmlns:aop="http://www.springframework.org/schema/aop"
-		xmlns:tx="http://www.springframework.org/schema/tx"
-		xsi:schemaLocation="
-			http://www.springframework.org/schema/beans
-			https://www.springframework.org/schema/beans/spring-beans.xsd
-			http://www.springframework.org/schema/tx
-			https://www.springframework.org/schema/tx/spring-tx.xsd
-			http://www.springframework.org/schema/aop
-			https://www.springframework.org/schema/aop/spring-aop.xsd">
+include-code::./AppConfig[tag=snippet,indent=0]
 
-		<!-- this is the service object that we want to make transactional -->
-		<bean id="fooService" class="x.y.service.DefaultFooService"/>
-
-		<!-- enable the configuration of transactional behavior based on annotations -->
-		<!-- a TransactionManager is still required -->
-		<tx:annotation-driven transaction-manager="txManager"/> <1>
-
-		<bean id="txManager" class="org.springframework.jdbc.datasource.DataSourceTransactionManager">
-			<!-- (this dependency is defined somewhere else) -->
-			<property name="dataSource" ref="dataSource"/>
-		</bean>
-
-		<!-- other <bean/> definitions here -->
-
-	</beans>
-----
-<1> The line that makes the bean instance transactional.
-
-TIP: You can omit the `transaction-manager` attribute in the `<tx:annotation-driven/>`
-tag if the bean name of the `TransactionManager` that you want to wire in has the name
-`transactionManager`. If the `TransactionManager` bean that you want to dependency-inject
-has any other name, you have to use the `transaction-manager` attribute, as in the
-preceding example.
+TIP: In programmatic configuration, the `@EnableTransactionManagement` annotation uses any
+`TransactionManager` bean in the context. In XML configuration, you can omit
+the `transaction-manager` attribute in the `<tx:annotation-driven/>` tag if the bean
+name of the `TransactionManager` that you want to wire in has the name `transactionManager`.
+If the `TransactionManager` bean has any other name, you have to use the
+`transaction-manager` attribute explicitly, as in the preceding example.
 
 Reactive transactional methods use reactive return types in contrast to imperative
 programming arrangements as the following listing shows:
@@ -137,7 +107,7 @@ programming arrangements as the following listing shows:
 ======
 Java::
 +
-[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+[source,java,indent=0,subs="verbatim,quotes"]
 ----
 	// the reactive service class that we want to make transactional
 	@Transactional
@@ -167,7 +137,7 @@ Java::
 
 Kotlin::
 +
-[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+[source,kotlin,indent=0,subs="verbatim,quotes"]
 ----
 	// the reactive service class that we want to make transactional
 	@Transactional
@@ -196,6 +166,11 @@ Note that there are special considerations for the returned `Publisher` with reg
 Reactive Streams cancellation signals. See the
 xref:data-access/transaction/programmatic.adoc#tx-prog-operator-cancel[Cancel Signals]
 section under "Using the TransactionalOperator" for more details.
+
+TIP: When `@Transactional` is combined with `@Retryable`, the retry advice is applied
+outermost, so each retry attempt runs in its own transaction. See
+xref:core/resilience.adoc#resilience-annotations-retryable-combining-transactional[Combining `@Retryable` with `@Transactional`]
+for details.
 
 [[transaction-declarative-annotations-method-visibility]]
 .Method visibility and `@Transactional` in proxy mode
@@ -233,8 +208,10 @@ on an interface, a class definition, or a method on a class. However, the mere p
 of the `@Transactional` annotation is not enough to activate the transactional behavior.
 The `@Transactional` annotation is merely metadata that can be consumed by corresponding
 runtime infrastructure which uses that metadata to configure the appropriate beans with
-transactional behavior. In the preceding example, the `<tx:annotation-driven/>` element
-switches on actual transaction management at runtime.
+transactional behavior. In the preceding examples that use programmatic configuration,
+the `@EnableTransactionManagement` annotation switches on actual transaction management
+at runtime. Whereas, in the preceding example that uses XML configuration, the
+`<tx:annotation-driven/>` element switches on actual transaction management at runtime.
 
 TIP: The Spring team recommends that you annotate methods of concrete classes with the
 `@Transactional` annotation, rather than relying on annotated methods in interfaces,
@@ -249,7 +226,7 @@ the proxy are intercepted. This means that self-invocation (in effect, a method 
 the target object calling another method of the target object) does not lead to an actual
 transaction at runtime even if the invoked method is marked with `@Transactional`. Also,
 the proxy must be fully initialized to provide the expected behavior, so you should not
-rely on this feature in your initialization code -- e.g. in a `@PostConstruct` method.
+rely on this feature in your initialization code -- for example, in a `@PostConstruct` method.
 
 Consider using AspectJ mode (see the `mode` attribute in the following table) if you
 expect self-invocations to be wrapped with transactions as well. In this case, there is
@@ -326,7 +303,7 @@ precedence over the transactional settings defined at the class level.
 ======
 Java::
 +
-[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+[source,java,indent=0,subs="verbatim,quotes"]
 ----
 	@Transactional(readOnly = true)
 	public class DefaultFooService implements FooService {
@@ -345,7 +322,7 @@ Java::
 
 Kotlin::
 +
-[source,kotlin,indent=0,subs="verbatim",role="secondary"]
+[source,kotlin,indent=0,subs="verbatim"]
 ----
 	@Transactional(readOnly = true)
 	class DefaultFooService : FooService {
@@ -362,6 +339,7 @@ Kotlin::
 	}
 ----
 ======
+
 
 [[transaction-declarative-attransactional-settings]]
 == `@Transactional` Settings
@@ -387,7 +365,7 @@ properties of the `@Transactional` annotation:
 |===
 | Property| Type| Description
 
-| xref:data-access/transaction/declarative/annotations.adoc#tx-multiple-tx-mgrs-with-attransactional[value]
+| <<tx-multiple-tx-mgrs-with-attransactional,value>>
 | `String`
 | Optional qualifier that specifies the transaction manager to be used.
 
@@ -436,7 +414,8 @@ properties of the `@Transactional` annotation:
 | Optional array of exception name patterns that must not cause rollback.
 |===
 
-TIP: See xref:data-access/transaction/declarative/rolling-back.adoc#transaction-declarative-rollback-rules[Rollback rules]
+TIP: See
+xref:data-access/transaction/declarative/rolling-back.adoc#transaction-declarative-rollback-rules[Rollback rules]
 for further details on rollback rule semantics, patterns, and warnings
 regarding possible unintentional matches for pattern-based rollback rules.
 
@@ -467,6 +446,7 @@ name of the transactionally advised class + `.` + the method name. For example, 
 `handlePayment(..)` method of the `BusinessService` class started a transaction, the
 name of the transaction would be `com.example.BusinessService.handlePayment`.
 
+
 [[tx-multiple-tx-mgrs-with-attransactional]]
 == Multiple Transaction Managers with `@Transactional`
 
@@ -483,7 +463,7 @@ in the application context:
 ======
 Java::
 +
-[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+[source,java,indent=0,subs="verbatim,quotes"]
 ----
 	public class TransactionalService {
 
@@ -500,7 +480,7 @@ Java::
 
 Kotlin::
 +
-[source,kotlin,indent=0,subs="verbatim",role="secondary"]
+[source,kotlin,indent=0,subs="verbatim"]
 ----
 	class TransactionalService {
 
@@ -562,12 +542,13 @@ transaction definitions from a base class as well. This effectively overrides
 the default transaction manager choice for any unqualified base class methods.
 
 Last but not least, such a type-level bean qualifier can serve multiple purposes,
-e.g. with a value of "order" it can be used for autowiring purposes (identifying
+for example, with a value of "order" it can be used for autowiring purposes (identifying
 the order repository) as well as transaction manager selection, as long as the
 target beans for autowiring as well as the associated transaction manager
 definitions declare the same qualifier value. Such a qualifier value only needs
 to be unique within a set of type-matching beans, not having to serve as an ID.
 ====
+
 
 [[tx-custom-attributes]]
 == Custom Composed Annotations
@@ -581,7 +562,7 @@ following annotation definitions:
 ======
 Java::
 +
-[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+[source,java,indent=0,subs="verbatim,quotes"]
 ----
 	@Target({ElementType.METHOD, ElementType.TYPE})
 	@Retention(RetentionPolicy.RUNTIME)
@@ -598,7 +579,7 @@ Java::
 
 Kotlin::
 +
-[source,kotlin,indent=0,subs="verbatim",role="secondary"]
+[source,kotlin,indent=0,subs="verbatim"]
 ----
 	@Target(AnnotationTarget.FUNCTION, AnnotationTarget.TYPE)
 	@Retention(AnnotationRetention.RUNTIME)
@@ -618,7 +599,7 @@ The preceding annotations let us write the example from the previous section as 
 ======
 Java::
 +
-[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+[source,java,indent=0,subs="verbatim,quotes"]
 ----
 	public class TransactionalService {
 
@@ -636,7 +617,7 @@ Java::
 
 Kotlin::
 +
-[source,kotlin,indent=0,subs="verbatim",role="secondary"]
+[source,kotlin,indent=0,subs="verbatim"]
 ----
 	class TransactionalService {
 
@@ -656,5 +637,3 @@ Kotlin::
 In the preceding example, we used the syntax to define the transaction manager qualifier
 and transactional labels, but we could also have included propagation behavior,
 rollback rules, timeouts, and other features.
-
-

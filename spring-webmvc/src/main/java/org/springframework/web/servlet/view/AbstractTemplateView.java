@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2023 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -47,7 +47,7 @@ public abstract class AbstractTemplateView extends AbstractUrlBasedView {
 
 	/**
 	 * Variable name of the RequestContext instance in the template model,
-	 * available to Spring's macros: e.g. for creating BindStatus objects.
+	 * available to Spring's macros: for example, for creating BindStatus objects.
 	 */
 	public static final String SPRING_MACRO_REQUEST_CONTEXT_ATTRIBUTE = "springMacroRequestContext";
 
@@ -67,7 +67,7 @@ public abstract class AbstractTemplateView extends AbstractUrlBasedView {
 	 * Set whether all request attributes should be added to the
 	 * model prior to merging with the template. Default is "false".
 	 * <p>Note that some templates may make request attributes visible
-	 * on their own, e.g. FreeMarker, without exposure in the MVC model.
+	 * on their own, for example, FreeMarker, without exposure in the MVC model.
 	 */
 	public void setExposeRequestAttributes(boolean exposeRequestAttributes) {
 		this.exposeRequestAttributes = exposeRequestAttributes;
@@ -127,7 +127,7 @@ public abstract class AbstractTemplateView extends AbstractUrlBasedView {
 							"' because of an existing model object of the same name");
 				}
 				Object attributeValue = request.getAttribute(attribute);
-				if (logger.isDebugEnabled()) {
+				if (logger.isTraceEnabled()) {
 					exposed = (exposed != null ? exposed : new LinkedHashMap<>());
 					exposed.put(attribute, attributeValue);
 				}
@@ -149,7 +149,7 @@ public abstract class AbstractTemplateView extends AbstractUrlBasedView {
 								"' because of an existing model object of the same name");
 					}
 					Object attributeValue = session.getAttribute(attribute);
-					if (logger.isDebugEnabled()) {
+					if (logger.isTraceEnabled()) {
 						exposed = (exposed != null ? exposed : new LinkedHashMap<>());
 						exposed.put(attribute, attributeValue);
 					}

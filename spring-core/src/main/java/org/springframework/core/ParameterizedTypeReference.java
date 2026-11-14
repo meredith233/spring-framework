@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2023 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,7 +19,8 @@ package org.springframework.core;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 
-import org.springframework.lang.Nullable;
+import org.jspecify.annotations.Nullable;
+
 import org.springframework.util.Assert;
 
 /**
@@ -41,7 +42,7 @@ import org.springframework.util.Assert;
  * @param <T> the referenced type
  * @see <a href="https://gafter.blogspot.nl/2006/12/super-type-tokens.html">Neal Gafter on Super Type Tokens</a>
  */
-public abstract class ParameterizedTypeReference<T> {
+public abstract class ParameterizedTypeReference<T extends @Nullable Object> {
 
 	private final Type type;
 
@@ -84,7 +85,7 @@ public abstract class ParameterizedTypeReference<T> {
 	/**
 	 * Build a {@code ParameterizedTypeReference} wrapping the given type.
 	 * @param type a generic type (possibly obtained via reflection,
-	 * e.g. from {@link java.lang.reflect.Method#getGenericReturnType()})
+	 * for example, from {@link java.lang.reflect.Method#getGenericReturnType()})
 	 * @return a corresponding reference which may be passed into
 	 * {@code ParameterizedTypeReference}-accepting methods
 	 * @since 4.3.12

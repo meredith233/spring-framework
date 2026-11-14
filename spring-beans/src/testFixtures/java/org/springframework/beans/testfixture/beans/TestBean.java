@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2023 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -27,10 +27,11 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
 
+import org.jspecify.annotations.Nullable;
+
 import org.springframework.beans.factory.BeanFactory;
 import org.springframework.beans.factory.BeanFactoryAware;
 import org.springframework.beans.factory.BeanNameAware;
-import org.springframework.lang.Nullable;
 import org.springframework.util.ObjectUtils;
 
 /**
@@ -58,6 +59,8 @@ public class TestBean implements BeanNameAware, BeanFactoryAware, ITestBean, IOt
 	private int age;
 
 	private boolean jedi;
+
+	private String favoriteCafé;
 
 	private ITestBean spouse;
 
@@ -97,11 +100,11 @@ public class TestBean implements BeanNameAware, BeanFactoryAware, ITestBean, IOt
 
 	private Number someNumber;
 
-	private Colour favouriteColour;
+	private Color favoriteColor;
 
 	private Boolean someBoolean;
 
-	private List<?> otherColours;
+	private List<?> otherColors;
 
 	private List<?> pets;
 
@@ -207,6 +210,14 @@ public class TestBean implements BeanNameAware, BeanFactoryAware, ITestBean, IOt
 
 	public void setJedi(boolean jedi) {
 		this.jedi = jedi;
+	}
+
+	public String getFavoriteCafé() {
+		return this.favoriteCafé;
+	}
+
+	public void setFavoriteCafé(String favoriteCafé) {
+		this.favoriteCafé = favoriteCafé;
 	}
 
 	@Override
@@ -378,12 +389,12 @@ public class TestBean implements BeanNameAware, BeanFactoryAware, ITestBean, IOt
 		this.someNumber = someNumber;
 	}
 
-	public Colour getFavouriteColour() {
-		return favouriteColour;
+	public Color getFavoriteColor() {
+		return favoriteColor;
 	}
 
-	public void setFavouriteColour(Colour favouriteColour) {
-		this.favouriteColour = favouriteColour;
+	public void setFavouriteColor(Color favoriteColor) {
+		this.favoriteColor = favoriteColor;
 	}
 
 	public Boolean getSomeBoolean() {
@@ -403,12 +414,12 @@ public class TestBean implements BeanNameAware, BeanFactoryAware, ITestBean, IOt
 		this.nestedIndexedBean = nestedIndexedBean;
 	}
 
-	public List<?> getOtherColours() {
-		return otherColours;
+	public List<?> getOtherColors() {
+		return otherColors;
 	}
 
-	public void setOtherColours(List<?> otherColours) {
-		this.otherColours = otherColours;
+	public void setOtherColors(List<?> otherColors) {
+		this.otherColors = otherColors;
 	}
 
 	public List<?> getPets() {

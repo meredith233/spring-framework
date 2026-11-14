@@ -35,7 +35,7 @@ JDBC, the `JdbcTemplate` class mentioned in a xref:data-access/jdbc/core.adoc#jd
 provides connection handling and proper conversion of `SQLException` to the
 `DataAccessException` hierarchy, including translation of database-specific SQL error
 codes to meaningful exception classes. For ORM technologies, see the
-xref:data-access/orm/general.adoc#orm-exception-translation[next section] for how to get the same exception
+<<orm-exception-translation,next section>> for how to get the same exception
 translation benefits.
 
 When it comes to transaction management, the `JdbcTemplate` class hooks in to the Spring
@@ -65,7 +65,7 @@ examples (one for Java configuration and one for XML configuration) show how to 
 ======
 Java::
 +
-[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+[source,java,indent=0,subs="verbatim,quotes"]
 ----
 	@Repository
 	public class ProductDaoImpl implements ProductDao {
@@ -77,7 +77,7 @@ Java::
 
 Kotlin::
 +
-[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+[source,kotlin,indent=0,subs="verbatim,quotes"]
 ----
 	@Repository
 	class ProductDaoImpl : ProductDao {
@@ -109,6 +109,3 @@ In summary, you can implement DAOs based on the plain persistence technology's A
 annotations while still benefiting from Spring-managed transactions, dependency
 injection, and transparent exception conversion (if desired) to Spring's custom
 exception hierarchies.
-
-
-

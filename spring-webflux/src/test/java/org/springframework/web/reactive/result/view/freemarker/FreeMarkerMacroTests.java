@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -28,8 +28,6 @@ import java.util.Map;
 import freemarker.template.Configuration;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.condition.DisabledForJreRange;
-import org.junit.jupiter.api.condition.JRE;
 import reactor.core.publisher.Mono;
 import reactor.test.StepVerifier;
 
@@ -37,8 +35,6 @@ import org.springframework.beans.testfixture.beans.TestBean;
 import org.springframework.context.support.GenericApplicationContext;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.http.MediaType;
-import org.springframework.ui.ExtendedModelMap;
-import org.springframework.ui.ModelMap;
 import org.springframework.util.FileCopyUtils;
 import org.springframework.util.StringUtils;
 import org.springframework.web.reactive.result.view.BindStatus;
@@ -125,12 +121,6 @@ class FreeMarkerMacroTests {
 				.assertNext(list -> assertThat(list).containsExactly(contents))
 				.verifyComplete();
 
-	}
-
-	@Test
-	@DisabledForJreRange(min = JRE.JAVA_21)
-	public void age() throws Exception {
-		testMacroOutput("AGE", "99");
 	}
 
 	@Test
@@ -322,7 +312,7 @@ class FreeMarkerMacroTests {
 		names.put("Fred", "Fred Bloggs");
 		names.put("Rob&Harrop", "Rob Harrop");
 
-		ModelMap model = new ExtendedModelMap();
+		Map<String, Object> model = new HashMap<>();
 		DummyMacroRequestContext rc = new DummyMacroRequestContext(this.exchange, model,
 				this.applicationContext);
 		rc.setMessageMap(msgMap);

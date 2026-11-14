@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -35,25 +35,25 @@ class DefaultScopedObjectTests {
 
 
 	@Test
-	void testCtorWithNullBeanFactory() {
+	void ctorWithNullBeanFactory() {
 		assertThatIllegalArgumentException().isThrownBy(() ->
 			new DefaultScopedObject(null, GOOD_BEAN_NAME));
 	}
 
 	@Test
-	void testCtorWithNullTargetBeanName() {
+	void ctorWithNullTargetBeanName() {
 		assertThatIllegalArgumentException().isThrownBy(() ->
 				testBadTargetBeanName(null));
 	}
 
 	@Test
-	void testCtorWithEmptyTargetBeanName() {
+	void ctorWithEmptyTargetBeanName() {
 		assertThatIllegalArgumentException().isThrownBy(() ->
 				testBadTargetBeanName(""));
 	}
 
 	@Test
-	void testCtorWithJustWhitespacedTargetBeanName() {
+	void ctorWithJustWhitespacedTargetBeanName() {
 		assertThatIllegalArgumentException().isThrownBy(() ->
 				testBadTargetBeanName("   "));
 	}

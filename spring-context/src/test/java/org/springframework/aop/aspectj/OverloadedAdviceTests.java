@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2022 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -28,22 +28,19 @@ import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
  *
  * @author Adrian Colyer
  * @author Chris Beams
+ * @author Juergen Hoeller
  */
 class OverloadedAdviceTests {
 
 	@Test
 	@SuppressWarnings("resource")
-	void testExceptionOnConfigParsingWithMismatchedAdviceMethod() {
-		assertThatExceptionOfType(BeanCreationException.class)
-			.isThrownBy(() -> new ClassPathXmlApplicationContext(getClass().getSimpleName() + ".xml", getClass()))
-			.havingRootCause()
-				.isInstanceOf(IllegalArgumentException.class)
-				.as("invalidAbsoluteTypeName should be detected by AJ").withMessageContaining("invalidAbsoluteTypeName");
+	void configParsingWithMismatchedAdviceMethod() {
+		new ClassPathXmlApplicationContext(getClass().getSimpleName() + ".xml", getClass());
 	}
 
 	@Test
 	@SuppressWarnings("resource")
-	void testExceptionOnConfigParsingWithAmbiguousAdviceMethod() {
+	void exceptionOnConfigParsingWithAmbiguousAdviceMethod() {
 		assertThatExceptionOfType(BeanCreationException.class)
 			.isThrownBy(() -> new ClassPathXmlApplicationContext(getClass().getSimpleName() + "-ambiguous.xml", getClass()))
 			.havingRootCause()

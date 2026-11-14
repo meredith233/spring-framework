@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -73,13 +73,13 @@ class ConcurrentMapCacheTests extends AbstractValueAdaptingCacheTests<Concurrent
 
 
 	@Test
-	void testIsStoreByReferenceByDefault() {
+	void isStoreByReferenceByDefault() {
 		assertThat(this.cache.isStoreByValue()).isFalse();
 	}
 
 	@SuppressWarnings("unchecked")
 	@Test
-	void testSerializer() {
+	void serializer() {
 		ConcurrentMapCache serializeCache = createCacheWithStoreByValue();
 		assertThat(serializeCache.isStoreByValue()).isTrue();
 
@@ -93,7 +93,7 @@ class ConcurrentMapCacheTests extends AbstractValueAdaptingCacheTests<Concurrent
 	}
 
 	@Test
-	void testNonSerializableContent() {
+	void nonSerializableContent() {
 		ConcurrentMapCache serializeCache = createCacheWithStoreByValue();
 
 		assertThatIllegalArgumentException().isThrownBy(() ->
@@ -104,7 +104,7 @@ class ConcurrentMapCacheTests extends AbstractValueAdaptingCacheTests<Concurrent
 	}
 
 	@Test
-	void testInvalidSerializedContent() {
+	void invalidSerializedContent() {
 		ConcurrentMapCache serializeCache = createCacheWithStoreByValue();
 
 		String key = createRandomKey();

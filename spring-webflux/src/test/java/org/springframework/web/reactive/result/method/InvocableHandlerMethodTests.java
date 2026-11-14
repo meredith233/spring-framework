@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,6 +23,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
@@ -34,7 +35,6 @@ import org.springframework.core.io.buffer.DataBuffer;
 import org.springframework.core.io.buffer.DefaultDataBufferFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.server.reactive.ServerHttpResponse;
-import org.springframework.lang.Nullable;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.reactive.BindingContext;
 import org.springframework.web.reactive.HandlerResult;
@@ -117,8 +117,8 @@ class InvocableHandlerMethodTests {
 		Mono<HandlerResult> mono = invoke(new TestController(), method);
 
 		assertThatIllegalStateException()
-			.isThrownBy(mono::block)
-			.withMessage("Could not resolve parameter [0] in %s: No suitable resolver", method.toGenericString());
+				.isThrownBy(mono::block)
+				.withMessage("Could not resolve parameter [0] in %s: No suitable resolver", method.toGenericString());
 	}
 
 	@Test
@@ -145,8 +145,8 @@ class InvocableHandlerMethodTests {
 		Mono<HandlerResult> mono = invoke(new TestController(), method);
 
 		assertThatExceptionOfType(UnsupportedMediaTypeStatusException.class)
-			.isThrownBy(mono::block)
-			.withMessage("415 UNSUPPORTED_MEDIA_TYPE \"boo\"");
+				.isThrownBy(mono::block)
+				.withMessage("415 UNSUPPORTED_MEDIA_TYPE \"boo\"");
 	}
 
 	@Test
@@ -156,12 +156,11 @@ class InvocableHandlerMethodTests {
 		Mono<HandlerResult> mono = invoke(new TestController(), method);
 
 		assertThatIllegalStateException()
-			.isThrownBy(mono::block)
-			.withCauseInstanceOf(IllegalArgumentException.class)
-			.withMessageContaining("Controller [")
-			.withMessageContaining("Method [")
-			.withMessageContaining("with argument values:")
-			.withMessageContaining("[0] [type=java.lang.Integer] [value=1]");
+				.isThrownBy(mono::block)
+				.withCauseInstanceOf(IllegalArgumentException.class)
+				.withMessageContaining("[" + TestController.class.getName() + "]")
+				.withMessageContaining(TestController.class.getName() + ".singleArg")
+				.withMessageContaining("[0] [type=java.lang.Integer] [value=1]");
 	}
 
 	@Test
@@ -170,8 +169,8 @@ class InvocableHandlerMethodTests {
 		Mono<HandlerResult> mono = invoke(new TestController(), method);
 
 		assertThatIllegalStateException()
-			.isThrownBy(mono::block)
-			.withMessage("boo");
+				.isThrownBy(mono::block)
+				.withMessage("boo");
 	}
 
 	@Test
@@ -237,8 +236,7 @@ class InvocableHandlerMethodTests {
 	}
 
 
-	@Nullable
-	private HandlerResult invokeForResult(Object handler, Method method, Object... providedArgs) {
+	private @Nullable HandlerResult invokeForResult(Object handler, Method method, Object... providedArgs) {
 		return invoke(handler, method, providedArgs).block(Duration.ofSeconds(5));
 	}
 
@@ -331,8 +329,7 @@ class InvocableHandlerMethodTests {
 					.thenEmpty(Mono.defer(() -> exchange.getResponse().writeWith(getBody("body"))));
 		}
 
-		@Nullable
-		String notModified(ServerWebExchange exchange) {
+		@Nullable String notModified(ServerWebExchange exchange) {
 			if (exchange.checkNotModified(Instant.ofEpochMilli(1000 * 1000))) {
 				return null;
 			}

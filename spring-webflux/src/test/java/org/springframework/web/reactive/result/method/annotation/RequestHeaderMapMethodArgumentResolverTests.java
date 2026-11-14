@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -90,14 +90,13 @@ class RequestHeaderMapMethodArgumentResolverTests {
 		Mono<Object> mono = resolver.resolveArgument(paramMap, null, exchange);
 		Object result = mono.block();
 
-		boolean condition = result instanceof Map;
-		assertThat(condition).isTrue();
+		assertThat(result).isInstanceOf(Map.class);
 		assertThat(result).as("Invalid result").isEqualTo(expected);
 	}
 
 	@Test
 	@SuppressWarnings("unchecked")
-	public void resolveMultiValueMapArgument() {
+	void resolveMultiValueMapArgument() {
 		String name = "foo";
 		String value1 = "bar";
 		String value2 = "baz";
@@ -130,8 +129,7 @@ class RequestHeaderMapMethodArgumentResolverTests {
 		Mono<Object> mono = resolver.resolveArgument(paramHttpHeaders, null, exchange);
 		Object result = mono.block();
 
-		boolean condition = result instanceof HttpHeaders;
-		assertThat(condition).isTrue();
+		assertThat(result).isInstanceOf(HttpHeaders.class);
 		assertThat(result).as("Invalid result").isEqualTo(expected);
 	}
 

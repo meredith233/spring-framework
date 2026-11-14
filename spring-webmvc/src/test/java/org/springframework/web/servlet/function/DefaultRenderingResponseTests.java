@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -55,7 +55,7 @@ class DefaultRenderingResponseTests {
 
 	@Test
 	void status() throws Exception {
-		HttpStatus status = HttpStatus.I_AM_A_TEAPOT;
+		HttpStatus status = HttpStatus.ALREADY_REPORTED;
 		RenderingResponse result = RenderingResponse.create("foo").status(status).build();
 
 		MockHttpServletRequest request = new MockHttpServletRequest();
@@ -179,5 +179,27 @@ class DefaultRenderingResponseTests {
 		assertThat(response.getStatus()).isEqualTo(HttpStatus.NOT_MODIFIED.value());
 	}
 
+	@Test  // gh-37378
+	void from() throws Exception {
+		Cookie cookie = new Cookie("currency", "USD");
+		RenderingResponse other = RenderingResponse.create("foo")
+				.status(HttpStatus.CREATED)
+				.header("foo", "bar")
+				.cookie(cookie)
+				.modelAttribute("model", "value")
+				.build();
+		RenderingResponse result = RenderingResponse.from(other).build();
+
+		MockHttpServletRequest request = new MockHttpServletRequest();
+		MockHttpServletResponse response = new MockHttpServletResponse();
+
+		ModelAndView mav = result.writeTo(request, response, EMPTY_CONTEXT);
+		assertThat(mav).isNotNull();
+		assertThat(mav.getViewName()).isEqualTo("foo");
+		assertThat(mav.getModel()).containsEntry("model", "value");
+		assertThat(response.getStatus()).isEqualTo(HttpStatus.CREATED.value());
+		assertThat(response.getHeader("foo")).isEqualTo("bar");
+		assertThat(response.getCookies()).containsExactly(cookie);
+	}
 
 }

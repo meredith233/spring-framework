@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,6 +21,7 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.Iterator;
 
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 
 import org.springframework.beans.factory.BeanFactory;
@@ -36,7 +37,6 @@ import org.springframework.context.support.StaticApplicationContext;
 import org.springframework.expression.EvaluationContext;
 import org.springframework.expression.spel.standard.SpelExpressionParser;
 import org.springframework.expression.spel.support.StandardEvaluationContext;
-import org.springframework.lang.Nullable;
 import org.springframework.util.ReflectionUtils;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -60,14 +60,8 @@ class CacheOperationExpressionEvaluatorTests {
 	private final AnnotationCacheOperationSource source = new AnnotationCacheOperationSource();
 
 
-	private Collection<CacheOperation> getOps(String name) {
-		Method method = ReflectionUtils.findMethod(AnnotatedClass.class, name, Object.class, Object.class);
-		return this.source.getCacheOperations(method, AnnotatedClass.class);
-	}
-
-
 	@Test
-	void testMultipleCachingSource() {
+	void multipleCachingSource() {
 		Collection<CacheOperation> ops = getOps("multipleCaching");
 		assertThat(ops).hasSize(2);
 		Iterator<CacheOperation> it = ops.iterator();
@@ -82,11 +76,11 @@ class CacheOperationExpressionEvaluatorTests {
 	}
 
 	@Test
-	void testMultipleCachingEval() {
+	void multipleCachingEval() {
 		AnnotatedClass target = new AnnotatedClass();
 		Method method = ReflectionUtils.findMethod(
 				AnnotatedClass.class, "multipleCaching", Object.class, Object.class);
-		Object[] args = new Object[] {new Object(), new Object()};
+		Object[] args = {"arg1", "arg2"};
 		Collection<ConcurrentMapCache> caches = Collections.singleton(new ConcurrentMapCache("test"));
 
 		EvaluationContext evalCtx = this.eval.createEvaluationContext(caches, method, args,
@@ -144,6 +138,12 @@ class CacheOperationExpressionEvaluatorTests {
 		assertThat(value).isEqualTo(String.class.getName());
 	}
 
+
+	private Collection<CacheOperation> getOps(String name) {
+		Method method = ReflectionUtils.findMethod(AnnotatedClass.class, name, Object.class, Object.class);
+		return this.source.getCacheOperations(method, AnnotatedClass.class);
+	}
+
 	private EvaluationContext createEvaluationContext(Object result) {
 		return createEvaluationContext(result, null);
 	}
@@ -155,7 +155,7 @@ class CacheOperationExpressionEvaluatorTests {
 		AnnotatedClass target = new AnnotatedClass();
 		Method method = ReflectionUtils.findMethod(
 				AnnotatedClass.class, "multipleCaching", Object.class, Object.class);
-		Object[] args = new Object[] {new Object(), new Object()};
+		Object[] args = new Object[] {"arg1", "arg2"};
 		Collection<ConcurrentMapCache> caches = Collections.singleton(new ConcurrentMapCache("test"));
 		return this.eval.createEvaluationContext(
 				caches, method, args, target, target.getClass(), method, result);

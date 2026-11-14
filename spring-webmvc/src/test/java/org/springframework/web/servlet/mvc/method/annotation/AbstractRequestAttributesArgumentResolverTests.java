@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -128,7 +128,7 @@ public abstract class AbstractRequestAttributesArgumentResolverTests {
 		Object actual = testResolveArgument(param, factory);
 		assertThat(actual).isNotNull();
 		assertThat(actual.getClass()).isEqualTo(Optional.class);
-		assertThat(((Optional<?>) actual)).isNotPresent();
+		assertThat((Optional<?>) actual).isNotPresent();
 
 		Foo foo = new Foo();
 		this.webRequest.setAttribute("foo", foo, getScope());
@@ -136,7 +136,7 @@ public abstract class AbstractRequestAttributesArgumentResolverTests {
 		actual = testResolveArgument(param, factory);
 		assertThat(actual).isNotNull();
 		assertThat(actual.getClass()).isEqualTo(Optional.class);
-		assertThat(((Optional<?>) actual)).isPresent();
+		assertThat((Optional<?>) actual).isPresent();
 		assertThat(((Optional<?>) actual).get()).isSameAs(foo);
 	}
 

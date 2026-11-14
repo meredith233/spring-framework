@@ -100,7 +100,7 @@ public class ClassReader {
    * @deprecated Use {@link #readByte(int)} and the other read methods instead. This field will
    *     eventually be deleted.
    */
-  @Deprecated
+  @Deprecated(forRemoval = false)
   // DontCheck(MemberName): can't be renamed (for backward binary compatibility).
   public final byte[] b;
 
@@ -188,16 +188,21 @@ public class ClassReader {
    * @param classFileOffset the offset in byteBuffer of the first byte of the ClassFile to be read.
    * @param checkClassVersion whether to check the class version or not.
    */
+  @SuppressWarnings("PMD.ConstructorCallsOverridableMethod")
   ClassReader(
       final byte[] classFileBuffer, final int classFileOffset, final boolean checkClassVersion) {
     this.classFileBuffer = classFileBuffer;
     this.b = classFileBuffer;
+
     // Check the class' major_version. This field is after the magic and minor_version fields, which
     // use 4 and 2 bytes respectively.
-    if (checkClassVersion && readShort(classFileOffset + 6) > Opcodes.V23) {
-      throw new IllegalArgumentException(
-          "Unsupported class file major version " + readShort(classFileOffset + 6));
-    }
+    // SPRING PATCH: leniently try to parse newer class files as well
+    // if (checkClassVersion && readShort(classFileOffset + 6) > Opcodes.V27) {
+    //   throw new IllegalArgumentException(
+    //       "Unsupported class file major version " + readShort(classFileOffset + 6));
+    // }
+    // END OF PATCH
+
     // Create the constant pool arrays. The constant_pool_count field is after the magic,
     // minor_version and major_version fields, which use 4, 2 and 2 bytes respectively.
     int constantPoolCount = readUnsignedShort(classFileOffset + 8);
@@ -3545,6 +3550,9 @@ public class ClassReader {
       final char[] charBuffer,
       final int codeAttributeOffset,
       final Label[] labels) {
+    if (length > classFileBuffer.length - offset) {
+      throw new IllegalArgumentException();
+    }
     for (Attribute attributePrototype : attributePrototypes) {
       if (attributePrototype.type.equals(type)) {
         return attributePrototype.read(
@@ -3601,6 +3609,20 @@ public class ClassReader {
    */
   public int readByte(final int offset) {
     return classFileBuffer[offset] & 0xFF;
+  }
+
+  /**
+   * Reads several bytes in this {@link ClassReader}. <i>This method is intended for {@link
+   * Attribute} sub classes, and is normally not needed by class generators or adapters.</i>
+   *
+   * @param offset the start offset of the bytes to be read in this {@link ClassReader}.
+   * @param length the number of bytes to read.
+   * @return the read bytes.
+   */
+  public byte[] readBytes(final int offset, final int length) {
+    byte[] result = new byte[length];
+    System.arraycopy(classFileBuffer, offset, result, 0, length);
+    return result;
   }
 
   /**

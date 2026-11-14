@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,6 +20,7 @@ import org.hamcrest.Matchers;
 import org.junit.jupiter.api.Test;
 
 import org.springframework.mock.web.MockHttpServletResponse;
+import org.springframework.test.json.JsonCompareMode;
 import org.springframework.test.web.servlet.StubMvcResult;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
@@ -80,13 +81,31 @@ class ContentResultMatchersTests {
 	@Test
 	void jsonLenientMatch() throws Exception {
 		new ContentResultMatchers().json("{\n \"foo\" : \"bar\"  \n}").match(getStubMvcResult(CONTENT));
+		new ContentResultMatchers().json("{\n \"foo\" : \"bar\"  \n}",
+				JsonCompareMode.LENIENT).match(getStubMvcResult(CONTENT));
+	}
+
+	@Test
+	@Deprecated
+	void jsonLenientMatchWithDeprecatedBooleanFlag() throws Exception {
 		new ContentResultMatchers().json("{\n \"foo\" : \"bar\"  \n}", false).match(getStubMvcResult(CONTENT));
 	}
 
 	@Test
 	void jsonStrictMatch() throws Exception {
-		new ContentResultMatchers().json("{\n \"foo\":\"bar\",   \"foo array\":[\"foo\",\"bar\"] \n}", true).match(getStubMvcResult(CONTENT));
-		new ContentResultMatchers().json("{\n \"foo array\":[\"foo\",\"bar\"], \"foo\":\"bar\" \n}", true).match(getStubMvcResult(CONTENT));
+		new ContentResultMatchers().json("{\n \"foo\":\"bar\",   \"foo array\":[\"foo\",\"bar\"] \n}",
+				JsonCompareMode.STRICT).match(getStubMvcResult(CONTENT));
+		new ContentResultMatchers().json("{\n \"foo array\":[\"foo\",\"bar\"], \"foo\":\"bar\" \n}",
+				JsonCompareMode.STRICT).match(getStubMvcResult(CONTENT));
+	}
+
+	@Test
+	@Deprecated
+	void jsonStrictMatchWithDeprecatedBooleanFlag() throws Exception {
+		new ContentResultMatchers().json("{\n \"foo\":\"bar\",   \"foo array\":[\"foo\",\"bar\"] \n}", true)
+				.match(getStubMvcResult(CONTENT));
+		new ContentResultMatchers().json("{\n \"foo array\":[\"foo\",\"bar\"], \"foo\":\"bar\" \n}", true)
+				.match(getStubMvcResult(CONTENT));
 	}
 
 	@Test
@@ -98,7 +117,16 @@ class ContentResultMatchersTests {
 	@Test
 	void jsonStrictNoMatch() {
 		assertThatExceptionOfType(AssertionError.class).isThrownBy(() ->
-				new ContentResultMatchers().json("{\"foo\":\"bar\",   \"foo array\":[\"bar\",\"foo\"]}", true).match(getStubMvcResult(CONTENT)));
+				new ContentResultMatchers().json("{\"foo\":\"bar\",   \"foo array\":[\"bar\",\"foo\"]}",
+						JsonCompareMode.STRICT).match(getStubMvcResult(CONTENT)));
+	}
+
+	@Test
+	@Deprecated
+	void jsonStrictNoMatchWithDeprecatedBooleanFlag() {
+		assertThatExceptionOfType(AssertionError.class).isThrownBy(() ->
+				new ContentResultMatchers().json("{\"foo\":\"bar\",   \"foo array\":[\"bar\",\"foo\"]}", true)
+						.match(getStubMvcResult(CONTENT)));
 	}
 
 	@Test  // gh-23622

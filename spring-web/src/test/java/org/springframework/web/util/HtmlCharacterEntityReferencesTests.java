@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -38,7 +38,7 @@ class HtmlCharacterEntityReferencesTests {
 	private static final String DTD_FILE = "HtmlCharacterEntityReferences.dtd";
 
 	@Test
-	void testSupportsAllCharacterEntityReferencesDefinedByHtml() {
+	void supportsAllCharacterEntityReferencesDefinedByHtml() {
 		HtmlCharacterEntityReferences references = new HtmlCharacterEntityReferences();
 		Map<Integer, String> charactersMap = getReferenceCharacterMap();
 		for (int character = 0; character < 10000; character++) {
@@ -81,7 +81,7 @@ class HtmlCharacterEntityReferencesTests {
 
 	// SPR-9293
 	@Test
-	void testConvertToReferenceUTF8() {
+	void convertToReferenceUTF8() {
 		HtmlCharacterEntityReferences entityReferences = new HtmlCharacterEntityReferences();
 		String utf8 = "UTF-8";
 		assertThat(entityReferences.convertToReference('<', utf8)).isEqualTo("&lt;");

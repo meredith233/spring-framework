@@ -27,7 +27,7 @@ have, with the notable exception of `@ModelAttribute`. Typically, such methods h
 ======
 Java::
 +
-[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+[source,java,indent=0,subs="verbatim,quotes"]
 ----
 	@Controller
 	public class FormController {
@@ -46,7 +46,7 @@ Java::
 
 Kotlin::
 +
-[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+[source,kotlin,indent=0,subs="verbatim,quotes"]
 ----
 	@Controller
 	class FormController {
@@ -72,7 +72,7 @@ controller-specific `Formatter` implementations, as the following example shows:
 ======
 Java::
 +
-[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+[source,java,indent=0,subs="verbatim,quotes"]
 ----
 	@Controller
 	public class FormController {
@@ -89,7 +89,7 @@ Java::
 
 Kotlin::
 +
-[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+[source,kotlin,indent=0,subs="verbatim,quotes"]
 ----
 	@Controller
 	class FormController {
@@ -105,10 +105,8 @@ Kotlin::
 <1> Defining an `@InitBinder` method on a custom formatter.
 ======
 
+
 [[mvc-ann-initbinder-model-design]]
 == Model Design
-[.small]#xref:web/webflux/controller/ann-initbinder.adoc#webflux-ann-initbinder-model-design[See equivalent in the Reactive stack]#
 
-include::partial$web/web-data-binding-model-design.adoc[]
-
-
+Please see xref:web/webmvc/mvc-data-binding.adoc[Data Binding] for guidance on safe model object design.

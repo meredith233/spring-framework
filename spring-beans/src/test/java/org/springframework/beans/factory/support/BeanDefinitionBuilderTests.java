@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,7 +16,6 @@
 
 package org.springframework.beans.factory.support;
 
-import java.util.Arrays;
 import java.util.function.Function;
 
 import org.junit.jupiter.api.Test;
@@ -48,7 +47,7 @@ class BeanDefinitionBuilderTests {
 		RootBeanDefinition rbd = (RootBeanDefinition) bdb.getBeanDefinition();
 		assertThat(rbd.isSingleton()).isFalse();
 		assertThat(rbd.getBeanClass()).isEqualTo(TestBean.class);
-		assertThat(Arrays.equals(dependsOn, rbd.getDependsOn())).as("Depends on was added").isTrue();
+		assertThat(rbd.getDependsOn()).as("Depends on was added").isEqualTo(dependsOn);
 		assertThat(rbd.getPropertyValues().contains("age")).isTrue();
 	}
 

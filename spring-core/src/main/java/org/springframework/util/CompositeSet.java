@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,15 +18,24 @@ package org.springframework.util;
 
 import java.util.Set;
 
+import org.jspecify.annotations.Nullable;
+
 /**
  * Composite set that combines two other sets. This type is only exposed through
  * {@link CompositeMap#keySet()} and {@link CompositeMap#entrySet()}.
  *
+ * <p><strong>WARNING</strong>: The two sets must be disjoint. Elements are not
+ * deduplicated, so an element present in both sets would be counted and iterated
+ * twice, which violates the {@link Set} contract. {@link CompositeMap} satisfies
+ * this requirement by wrapping its second map in a {@link FilteredMap} that hides
+ * keys present in the first map.
+ *
  * @author Arjen Poutsma
+ * @author Yanming Zhou
  * @since 6.2
  * @param <E> the type of elements maintained by this set
  */
-final class CompositeSet<E> extends CompositeCollection<E> implements Set<E> {
+final class CompositeSet<E extends @Nullable Object> extends CompositeCollection<E> implements Set<E> {
 
 	CompositeSet(Set<E> first, Set<E> second) {
 		super(first, second);
@@ -34,24 +43,29 @@ final class CompositeSet<E> extends CompositeCollection<E> implements Set<E> {
 
 
 	@Override
-	public boolean equals(Object obj) {
-		if (obj == this) {
+	public boolean remove(Object o) {
+		// A set contains a given element at most once: remove it from both sets
+		// so that an element hidden in the second set does not become visible.
+		boolean firstResult = this.first.remove(o);
+		boolean secondResult = this.second.remove(o);
+		return (firstResult || secondResult);
+	}
+
+
+	@Override
+	public boolean equals(@Nullable Object other) {
+		if (this == other) {
 			return true;
 		}
-		else if (obj instanceof Set<?> set) {
-			if (set.size() != size()) {
-				return false;
-			}
+		if (other instanceof Set<?> otherSet && size() == otherSet.size()) {
 			try {
-				return containsAll(set);
+				return containsAll(otherSet);
 			}
 			catch (ClassCastException | NullPointerException ignored) {
-				return false;
+				// fall through
 			}
 		}
-		else {
-			return false;
-		}
+		return false;
 	}
 
 	@Override
@@ -64,4 +78,5 @@ final class CompositeSet<E> extends CompositeCollection<E> implements Set<E> {
 		}
 		return hashCode;
 	}
+
 }

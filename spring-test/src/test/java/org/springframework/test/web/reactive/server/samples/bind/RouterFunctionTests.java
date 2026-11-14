@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2019 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -32,13 +32,13 @@ import static org.springframework.web.reactive.function.server.RouterFunctions.r
  * @author Rossen Stoyanchev
  * @since 5.0
  */
-public class RouterFunctionTests {
+class RouterFunctionTests {
 
 	private WebTestClient testClient;
 
 
 	@BeforeEach
-	public void setUp() throws Exception {
+	void setUp() throws Exception {
 
 		RouterFunction<?> route = route(GET("/test"), request ->
 				ServerResponse.ok().bodyValue("It works!"));
@@ -47,7 +47,7 @@ public class RouterFunctionTests {
 	}
 
 	@Test
-	public void test() throws Exception {
+	void test() throws Exception {
 		this.testClient.get().uri("/test")
 				.exchange()
 				.expectStatus().isOk()

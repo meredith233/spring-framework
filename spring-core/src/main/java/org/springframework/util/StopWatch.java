@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2023 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,7 +22,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.concurrent.TimeUnit;
 
-import org.springframework.lang.Nullable;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Simple stop watch, allowing for timing of a number of tasks, exposing total
@@ -37,10 +37,10 @@ import org.springframework.lang.Nullable;
  * <p>This class is normally used to verify performance during proof-of-concept
  * work and in development, rather than as part of production applications.
  *
- * <p>As of Spring Framework 5.2, running time is tracked and reported in
- * nanoseconds. As of 6.1, the default time unit for String renderings is
- * seconds with decimal points in nanosecond precision. Custom renderings with
- * specific time units can be requested through {@link #prettyPrint(TimeUnit)}.
+ * <p>Running time is tracked and reported in nanoseconds. As of Spring Framework
+ * 6.1, the default time unit for String renderings is seconds with decimal points
+ * in nanosecond precision. Custom renderings with specific time units can be
+ * requested through {@link #prettyPrint(TimeUnit)}.
  *
  * @author Rod Johnson
  * @author Juergen Hoeller
@@ -60,18 +60,15 @@ public class StopWatch {
 	 */
 	private final String id;
 
-	@Nullable
-	private List<TaskInfo> taskList = new ArrayList<>(1);
+	private @Nullable List<TaskInfo> taskList = new ArrayList<>(1);
 
 	/** Start time of the current task. */
 	private long startTimeNanos;
 
 	/** Name of the current task. */
-	@Nullable
-	private String currentTaskName;
+	private @Nullable String currentTaskName;
 
-	@Nullable
-	private TaskInfo lastTaskInfo;
+	private @Nullable TaskInfo lastTaskInfo;
 
 	private int taskCount;
 
@@ -181,8 +178,7 @@ public class StopWatch {
 	 * @since 4.2.2
 	 * @see #isRunning()
 	 */
-	@Nullable
-	public String currentTaskName() {
+	public @Nullable String currentTaskName() {
 		return this.currentTaskName;
 	}
 

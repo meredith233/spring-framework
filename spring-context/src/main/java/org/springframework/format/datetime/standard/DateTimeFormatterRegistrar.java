@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2022 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -43,6 +43,7 @@ import org.springframework.format.annotation.DateTimeFormat.ISO;
  *
  * @author Juergen Hoeller
  * @author Phillip Webb
+ * @author Junhwan Choi
  * @since 4.0
  * @see #setDateStyle
  * @see #setTimeStyle
@@ -51,7 +52,6 @@ import org.springframework.format.annotation.DateTimeFormat.ISO;
  * @see org.springframework.format.FormatterRegistrar#registerFormatters
  * @see org.springframework.format.datetime.DateFormatterRegistrar
  */
-@SuppressWarnings("NullAway")
 public class DateTimeFormatterRegistrar implements FormatterRegistrar {
 
 	private enum Type {DATE, TIME, DATE_TIME}
@@ -77,38 +77,38 @@ public class DateTimeFormatterRegistrar implements FormatterRegistrar {
 
 	/**
 	 * Set whether standard ISO formatting should be applied to all date/time types.
-	 * Default is "false" (no).
-	 * <p>If set to "true", the "dateStyle", "timeStyle" and "dateTimeStyle"
+	 * <p>Default is "false" (no).
+	 * <p>If set to "true", the "dateStyle", "timeStyle", and "dateTimeStyle"
 	 * properties are effectively ignored.
 	 */
 	public void setUseIsoFormat(boolean useIsoFormat) {
-		this.factories.get(Type.DATE).setIso(useIsoFormat ? ISO.DATE : ISO.NONE);
-		this.factories.get(Type.TIME).setIso(useIsoFormat ? ISO.TIME : ISO.NONE);
-		this.factories.get(Type.DATE_TIME).setIso(useIsoFormat ? ISO.DATE_TIME : ISO.NONE);
+		getFactory(Type.DATE).setIso(useIsoFormat ? ISO.DATE : ISO.NONE);
+		getFactory(Type.TIME).setIso(useIsoFormat ? ISO.TIME : ISO.NONE);
+		getFactory(Type.DATE_TIME).setIso(useIsoFormat ? ISO.DATE_TIME : ISO.NONE);
 	}
 
 	/**
 	 * Set the default format style of {@link java.time.LocalDate} objects.
-	 * Default is {@link java.time.format.FormatStyle#SHORT}.
+	 * <p>Default is {@link java.time.format.FormatStyle#SHORT}.
 	 */
 	public void setDateStyle(FormatStyle dateStyle) {
-		this.factories.get(Type.DATE).setDateStyle(dateStyle);
+		getFactory(Type.DATE).setDateStyle(dateStyle);
 	}
 
 	/**
 	 * Set the default format style of {@link java.time.LocalTime} objects.
-	 * Default is {@link java.time.format.FormatStyle#SHORT}.
+	 * <p>Default is {@link java.time.format.FormatStyle#SHORT}.
 	 */
 	public void setTimeStyle(FormatStyle timeStyle) {
-		this.factories.get(Type.TIME).setTimeStyle(timeStyle);
+		getFactory(Type.TIME).setTimeStyle(timeStyle);
 	}
 
 	/**
 	 * Set the default format style of {@link java.time.LocalDateTime} objects.
-	 * Default is {@link java.time.format.FormatStyle#SHORT}.
+	 * <p>Default is {@link java.time.format.FormatStyle#SHORT}.
 	 */
 	public void setDateTimeStyle(FormatStyle dateTimeStyle) {
-		this.factories.get(Type.DATE_TIME).setDateTimeStyle(dateTimeStyle);
+		getFactory(Type.DATE_TIME).setDateTimeStyle(dateTimeStyle);
 	}
 
 	/**
@@ -139,7 +139,7 @@ public class DateTimeFormatterRegistrar implements FormatterRegistrar {
 
 	/**
 	 * Set the formatter that will be used for objects representing date and time values.
-	 * <p>This formatter will be used for {@link LocalDateTime}, {@link ZonedDateTime}
+	 * <p>This formatter will be used for {@link LocalDateTime}, {@link ZonedDateTime},
 	 * and {@link OffsetDateTime} types. When specified, the
 	 * {@link #setDateTimeStyle dateTimeStyle} and
 	 * {@link #setUseIsoFormat useIsoFormat} properties will be ignored.
@@ -198,6 +198,7 @@ public class DateTimeFormatterRegistrar implements FormatterRegistrar {
 		registry.addFormatterForFieldType(MonthDay.class, new MonthDayFormatter());
 
 		registry.addFormatterForFieldAnnotation(new Jsr310DateTimeFormatAnnotationFormatterFactory());
+		registry.addFormatterForFieldAnnotation(new DurationFormatAnnotationFormatterFactory());
 	}
 
 	private DateTimeFormatter getFormatter(Type type) {
@@ -206,7 +207,12 @@ public class DateTimeFormatterRegistrar implements FormatterRegistrar {
 			return formatter;
 		}
 		DateTimeFormatter fallbackFormatter = getFallbackFormatter(type);
-		return this.factories.get(type).createDateTimeFormatter(fallbackFormatter);
+		return getFactory(type).createDateTimeFormatter(fallbackFormatter);
+	}
+
+	@SuppressWarnings("NullAway") // Well-known map keys
+	private DateTimeFormatterFactory getFactory(Type type) {
+		return this.factories.get(type);
 	}
 
 	private DateTimeFormatter getFallbackFormatter(Type type) {

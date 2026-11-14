@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2023 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,15 +16,26 @@
 
 package org.springframework.beans;
 
-import org.springframework.lang.Nullable;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Utility methods for classes that perform bean property access
  * according to the {@link PropertyAccessor} interface.
  *
  * @author Juergen Hoeller
+ * @author Sam Brannen
  * @since 1.2.6
+ * @deprecated as of 7.1, in favor of {@link PropertyPath}. Use
+ * {@link PropertyPath#parse(String)} and {@link PropertyPath#canonicalName()}
+ * in place of {@link #canonicalPropertyName} and {@link #canonicalPropertyNames},
+ * and match a registered path against a property by comparing canonical names
+ * in place of {@link #matchesProperty}. There is no direct replacement for
+ * {@link #getPropertyName}, {@link #isNestedOrIndexedProperty},
+ * {@link #getFirstNestedPropertySeparatorIndex}, or
+ * {@link #getLastNestedPropertySeparatorIndex}, which operate on raw,
+ * unparsed property path text.
  */
+@Deprecated(since = "7.1", forRemoval = true)
 public abstract class PropertyAccessorUtils {
 
 	/**
@@ -81,21 +92,23 @@ public abstract class PropertyAccessorUtils {
 	/**
 	 * Determine the first (or last) nested property separator in the
 	 * given property path, ignoring dots in keys (like "map[my.key]").
+	 * <p>Also tracks bracket nesting depth so that keys containing an unbalanced
+	 * number of {@code [} or {@code ]} characters do not interfere with the
+	 * detection of separators that precede or follow the key.
 	 * @param propertyPath the property path to check
 	 * @param last whether to return the last separator rather than the first
 	 * @return the index of the nested property separator, or -1 if none
 	 */
 	private static int getNestedPropertySeparatorIndex(String propertyPath, boolean last) {
-		boolean inKey = false;
+		int depth = 0;
 		int length = propertyPath.length();
 		int i = (last ? length - 1 : 0);
 		while (last ? i >= 0 : i < length) {
 			switch (propertyPath.charAt(i)) {
-				case PropertyAccessor.PROPERTY_KEY_PREFIX_CHAR, PropertyAccessor.PROPERTY_KEY_SUFFIX_CHAR -> {
-					inKey = !inKey;
-				}
+				case PropertyAccessor.PROPERTY_KEY_PREFIX_CHAR -> depth += (last ? -1 : 1);
+				case PropertyAccessor.PROPERTY_KEY_SUFFIX_CHAR -> depth += (last ? 1 : -1);
 				case PropertyAccessor.NESTED_PROPERTY_SEPARATOR_CHAR -> {
-					if (!inKey) {
+					if (depth <= 0) {
 						return i;
 					}
 				}
@@ -118,17 +131,21 @@ public abstract class PropertyAccessorUtils {
 	 * @return whether the paths match
 	 */
 	public static boolean matchesProperty(String registeredPath, String propertyPath) {
-		if (!registeredPath.startsWith(propertyPath)) {
+		// canonicalPropertyName, not PropertyPath.parse directly: this method's
+		// long-standing contract is non-throwing, even for a malformed path.
+		String registered = canonicalPropertyName(registeredPath);
+		String property = canonicalPropertyName(propertyPath);
+		if (!registered.startsWith(property)) {
 			return false;
 		}
-		if (registeredPath.length() == propertyPath.length()) {
+		if (registered.length() == property.length()) {
 			return true;
 		}
-		if (registeredPath.charAt(propertyPath.length()) != PropertyAccessor.PROPERTY_KEY_PREFIX_CHAR) {
+		if (registered.charAt(property.length()) != PropertyAccessor.PROPERTY_KEY_PREFIX_CHAR) {
 			return false;
 		}
-		return (registeredPath.indexOf(PropertyAccessor.PROPERTY_KEY_SUFFIX_CHAR, propertyPath.length() + 1) ==
-				registeredPath.length() - 1);
+		return (registered.indexOf(PropertyAccessor.PROPERTY_KEY_SUFFIX_CHAR, property.length() + 1) ==
+				registered.length() - 1);
 	}
 
 	/**
@@ -140,30 +157,7 @@ public abstract class PropertyAccessorUtils {
 	 * @return the canonical representation of the property path
 	 */
 	public static String canonicalPropertyName(@Nullable String propertyName) {
-		if (propertyName == null) {
-			return "";
-		}
-
-		StringBuilder sb = new StringBuilder(propertyName);
-		int searchIndex = 0;
-		while (searchIndex != -1) {
-			int keyStart = sb.indexOf(PropertyAccessor.PROPERTY_KEY_PREFIX, searchIndex);
-			searchIndex = -1;
-			if (keyStart != -1) {
-				int keyEnd = sb.indexOf(
-						PropertyAccessor.PROPERTY_KEY_SUFFIX, keyStart + PropertyAccessor.PROPERTY_KEY_PREFIX.length());
-				if (keyEnd != -1) {
-					String key = sb.substring(keyStart + PropertyAccessor.PROPERTY_KEY_PREFIX.length(), keyEnd);
-					if ((key.startsWith("'") && key.endsWith("'")) || (key.startsWith("\"") && key.endsWith("\""))) {
-						sb.delete(keyStart + 1, keyStart + 2);
-						sb.delete(keyEnd - 2, keyEnd - 1);
-						keyEnd = keyEnd - 2;
-					}
-					searchIndex = keyEnd + PropertyAccessor.PROPERTY_KEY_SUFFIX.length();
-				}
-			}
-		}
-		return sb.toString();
+		return PropertyPath.canonicalNameOrOriginal(propertyName);
 	}
 
 	/**
@@ -173,8 +167,7 @@ public abstract class PropertyAccessorUtils {
 	 * (as array of the same size)
 	 * @see #canonicalPropertyName(String)
 	 */
-	@Nullable
-	public static String[] canonicalPropertyNames(@Nullable String[] propertyNames) {
+	public static String @Nullable [] canonicalPropertyNames(String @Nullable [] propertyNames) {
 		if (propertyNames == null) {
 			return null;
 		}

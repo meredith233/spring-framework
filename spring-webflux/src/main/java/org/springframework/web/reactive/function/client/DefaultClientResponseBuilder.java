@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,9 +18,13 @@ package org.springframework.web.reactive.function.client;
 
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Map;
 import java.util.function.Consumer;
 import java.util.function.Function;
 
+import org.jspecify.annotations.Nullable;
 import reactor.core.publisher.Flux;
 
 import org.springframework.core.io.buffer.DataBuffer;
@@ -33,7 +37,6 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ResponseCookie;
 import org.springframework.http.client.reactive.ClientHttpResponse;
-import org.springframework.lang.Nullable;
 import org.springframework.util.Assert;
 import org.springframework.util.CollectionUtils;
 import org.springframework.util.LinkedMultiValueMap;
@@ -65,6 +68,11 @@ final class DefaultClientResponseBuilder implements ClientResponse.Builder {
 		public HttpHeaders getHeaders() {
 			return HttpHeaders.EMPTY;
 		}
+
+		@Override
+		public Map<String, Object> getAttributes() {
+			return Collections.emptyMap();
+		}
 	};
 
 
@@ -72,16 +80,13 @@ final class DefaultClientResponseBuilder implements ClientResponse.Builder {
 
 	private HttpStatusCode statusCode = HttpStatus.OK;
 
-	@Nullable
-	private HttpHeaders headers;
+	private @Nullable HttpHeaders headers;
 
-	@Nullable
-	private MultiValueMap<String, ResponseCookie> cookies;
+	private @Nullable MultiValueMap<String, ResponseCookie> cookies;
 
 	private Flux<DataBuffer> body = Flux.empty();
 
-	@Nullable
-	private ClientResponse originalResponse;
+	private @Nullable ClientResponse originalResponse;
 
 	private HttpRequest request;
 
@@ -140,7 +145,7 @@ final class DefaultClientResponseBuilder implements ClientResponse.Builder {
 	@SuppressWarnings({"ConstantConditions", "NullAway"})
 	private HttpHeaders getHeaders() {
 		if (this.headers == null) {
-			this.headers = new HttpHeaders(this.originalResponse.headers().asHttpHeaders());
+			this.headers = HttpHeaders.copyOf(this.originalResponse.headers().asHttpHeaders());
 		}
 		return this.headers;
 	}
@@ -162,7 +167,10 @@ final class DefaultClientResponseBuilder implements ClientResponse.Builder {
 	@SuppressWarnings({"ConstantConditions", "NullAway"})
 	private MultiValueMap<String, ResponseCookie> getCookies() {
 		if (this.cookies == null) {
-			this.cookies = new LinkedMultiValueMap<>(this.originalResponse.cookies());
+			MultiValueMap<String, ResponseCookie> originalCookies = this.originalResponse.cookies();
+			this.cookies = new LinkedMultiValueMap<>(originalCookies.size());
+			originalCookies.forEach(
+					(name, values) -> this.cookies.put(name, new ArrayList<>(values)));
 		}
 		return this.cookies;
 	}
@@ -221,16 +229,13 @@ final class DefaultClientResponseBuilder implements ClientResponse.Builder {
 
 		private final HttpStatusCode statusCode;
 
-		@Nullable
-		private final HttpHeaders headers;
+		private final @Nullable HttpHeaders headers;
 
-		@Nullable
-		private final MultiValueMap<String, ResponseCookie> cookies;
+		private final @Nullable MultiValueMap<String, ResponseCookie> cookies;
 
 		private final Flux<DataBuffer> body;
 
-		@Nullable
-		private final ClientResponse originalResponse;
+		private final @Nullable ClientResponse originalResponse;
 
 
 		BuiltClientHttpResponse(HttpStatusCode statusCode, @Nullable HttpHeaders headers,

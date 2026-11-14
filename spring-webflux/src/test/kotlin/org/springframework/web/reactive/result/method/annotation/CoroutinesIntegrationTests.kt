@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,18 +16,16 @@
 
 package org.springframework.web.reactive.result.method.annotation
 
-import kotlinx.coroutines.Deferred
-import kotlinx.coroutines.DelicateCoroutinesApi
-import kotlinx.coroutines.GlobalScope
-import kotlinx.coroutines.async
-import kotlinx.coroutines.delay
+import io.micrometer.observation.ObservationRegistry
+import io.micrometer.observation.tck.TestObservationRegistry
+import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatExceptionOfType
-import org.junit.jupiter.api.Assumptions.assumeFalse
 import org.springframework.context.ApplicationContext
 import org.springframework.context.annotation.AnnotationConfigApplicationContext
+import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.ComponentScan
 import org.springframework.context.annotation.Configuration
 import org.springframework.http.HttpHeaders
@@ -38,7 +36,6 @@ import org.springframework.web.bind.annotation.RestController
 import org.springframework.web.client.HttpServerErrorException
 import org.springframework.web.reactive.config.EnableWebFlux
 import org.springframework.web.testfixture.http.server.reactive.bootstrap.HttpServer
-import org.springframework.web.testfixture.http.server.reactive.bootstrap.UndertowHttpServer
 import reactor.core.publisher.Flux
 
 class CoroutinesIntegrationTests : AbstractRequestMappingIntegrationTests() {
@@ -88,6 +85,15 @@ class CoroutinesIntegrationTests : AbstractRequestMappingIntegrationTests() {
 	}
 
 	@ParameterizedHttpServerTest
+	fun `Handler method returning Flow with observation`(httpServer: HttpServer) {
+		startServer(httpServer)
+
+		val entity = performGet("/flow-observation", HttpHeaders.EMPTY, String::class.java)
+		assertThat(entity.statusCode).isEqualTo(HttpStatus.OK)
+		assertThat(entity.body).isEqualTo("http.server.requests")
+	}
+
+	@ParameterizedHttpServerTest
 	fun `Suspending handler method returning Flow`(httpServer: HttpServer) {
 		startServer(httpServer)
 
@@ -116,8 +122,6 @@ class CoroutinesIntegrationTests : AbstractRequestMappingIntegrationTests() {
 
 	@ParameterizedHttpServerTest
 	fun `Suspending handler method returning ResponseEntity of Flux `(httpServer: HttpServer) {
-		assumeFalse(httpServer is UndertowHttpServer, "Undertow currently fails")
-
 		startServer(httpServer)
 
 		val entity = performGet("/entity-flux", HttpHeaders.EMPTY, String::class.java)
@@ -138,11 +142,16 @@ class CoroutinesIntegrationTests : AbstractRequestMappingIntegrationTests() {
 	@Configuration
 	@EnableWebFlux
 	@ComponentScan(resourcePattern = "**/CoroutinesIntegrationTests*")
-	open class WebConfig
+	open class WebConfig {
+
+		@Bean
+		open fun observationRegistry(): ObservationRegistry = TestObservationRegistry.create()
+
+	}
 
 	@OptIn(DelicateCoroutinesApi::class)
 	@RestController
-	class CoroutinesController {
+	class CoroutinesController(private val observationRegistry: ObservationRegistry) {
 
 		@GetMapping("/suspend")
 		suspend fun suspendingEndpoint(): String {
@@ -168,6 +177,15 @@ class CoroutinesIntegrationTests : AbstractRequestMappingIntegrationTests() {
 			delay(1)
 			emit("bar")
 			delay(1)
+		}
+
+		@GetMapping("/flow-observation")
+		fun flowObservationEndpoint(): Flow<String?> {
+			return flow {
+				val currentObservation = observationRegistry.currentObservation
+				assertThat(currentObservation).isNotNull
+				emit(currentObservation?.context?.name)
+			}
 		}
 
 		@GetMapping("/suspending-flow")

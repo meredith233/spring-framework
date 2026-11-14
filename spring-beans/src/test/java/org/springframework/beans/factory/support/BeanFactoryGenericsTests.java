@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -45,6 +45,7 @@ import org.springframework.beans.testfixture.beans.GenericIntegerBean;
 import org.springframework.beans.testfixture.beans.GenericSetOfIntegerBean;
 import org.springframework.beans.testfixture.beans.TestBean;
 import org.springframework.core.OverridingClassLoader;
+import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.core.ResolvableType;
 import org.springframework.core.annotation.AnnotationAwareOrderComparator;
 import org.springframework.core.annotation.Order;
@@ -522,7 +523,7 @@ class BeanFactoryGenericsTests {
 				new ClassPathResource("genericBeanTests.xml", getClass()));
 
 		NamedUrlList list = bf.getBean("list", NamedUrlList.class);
-		assertThat(list).containsExactly(new URL("http://localhost:8080"));
+		assertThat(list).containsExactly(URI.create("http://localhost:8080").toURL());
 	}
 
 	@Test
@@ -532,7 +533,7 @@ class BeanFactoryGenericsTests {
 				new ClassPathResource("genericBeanTests.xml", getClass()));
 
 		NamedUrlSet set = bf.getBean("set", NamedUrlSet.class);
-		assertThat(set).containsExactly(new URL("http://localhost:8080"));
+		assertThat(set).containsExactly(URI.create("http://localhost:8080").toURL());
 	}
 
 	@Test
@@ -542,7 +543,7 @@ class BeanFactoryGenericsTests {
 				new ClassPathResource("genericBeanTests.xml", getClass()));
 
 		NamedUrlMap map = bf.getBean("map", NamedUrlMap.class);
-		assertThat(map).containsExactly(entry(10, new URL("http://localhost:8080")));
+		assertThat(map).containsExactly(entry(10, URI.create("http://localhost:8080").toURL()));
 	}
 
 	@Test
@@ -576,7 +577,7 @@ class BeanFactoryGenericsTests {
 				new ClassPathResource("genericBeanTests.xml", getClass()));
 
 		UrlSet urlSet = bf.getBean("setBean", UrlSet.class);
-		assertThat(urlSet).containsExactly(new URL("https://www.springframework.org"));
+		assertThat(urlSet).containsExactly(URI.create("https://www.springframework.org").toURL());
 	}
 
 	/**
@@ -792,9 +793,9 @@ class BeanFactoryGenericsTests {
 		assertThat(doubleStoreNames).containsExactly("store1");
 		assertThat(floatStoreNames).containsExactly("store2");
 
-		ObjectProvider<NumberStore<?>> numberStoreProvider = bf.getBeanProvider(ResolvableType.forClass(NumberStore.class));
-		ObjectProvider<NumberStore<Double>> doubleStoreProvider = bf.getBeanProvider(ResolvableType.forClassWithGenerics(NumberStore.class, Double.class));
-		ObjectProvider<NumberStore<Float>> floatStoreProvider = bf.getBeanProvider(ResolvableType.forClassWithGenerics(NumberStore.class, Float.class));
+		ObjectProvider<NumberStore<?>> numberStoreProvider = bf.getBeanProvider(new ParameterizedTypeReference<>() {});
+		ObjectProvider<NumberStore<Double>> doubleStoreProvider = bf.getBeanProvider(new ParameterizedTypeReference<>() {});
+		ObjectProvider<NumberStore<Float>> floatStoreProvider = bf.getBeanProvider(new ParameterizedTypeReference<>() {});
 		assertThatExceptionOfType(NoUniqueBeanDefinitionException.class).isThrownBy(numberStoreProvider::getObject);
 		assertThatExceptionOfType(NoUniqueBeanDefinitionException.class).isThrownBy(numberStoreProvider::getIfAvailable);
 		assertThat(numberStoreProvider.getIfUnique()).isNull();
@@ -926,11 +927,9 @@ class BeanFactoryGenericsTests {
 	public static class UrlSet extends HashSet<URL> {
 
 		public UrlSet() {
-			super();
 		}
 
 		public UrlSet(Set<? extends URL> urls) {
-			super();
 		}
 
 		public void setUrlNames(Set<URI> urlNames) throws MalformedURLException {

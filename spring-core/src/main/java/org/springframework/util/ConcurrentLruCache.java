@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2023 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -28,13 +28,15 @@ import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Function;
 
-import org.springframework.lang.Nullable;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Simple LRU (Least Recently Used) cache, bounded by a specified cache capacity.
+ *
  * <p>This is a simplified, opinionated implementation of an LRU cache for internal
  * use in Spring Framework. It is inspired from
  * <a href="https://github.com/ben-manes/concurrentlinkedhashmap">ConcurrentLinkedHashMap</a>.
+ *
  * <p>Read and write operations are internally recorded in dedicated buffers,
  * then drained at chosen times to avoid contention.
  *
@@ -45,7 +47,6 @@ import org.springframework.lang.Nullable;
  * @param <V> the type of the cached values, does not allow null values
  * @see #get(Object)
  */
-@SuppressWarnings({"unchecked", "NullAway"})
 public final class ConcurrentLruCache<K, V> {
 
 	private final int capacity;
@@ -70,6 +71,7 @@ public final class ConcurrentLruCache<K, V> {
 
 	private final AtomicReference<DrainStatus> drainStatus = new AtomicReference<>(DrainStatus.IDLE);
 
+
 	/**
 	 * Create a new cache instance with the given capacity and generator function.
 	 * @param capacity the maximum number of entries in the cache
@@ -89,6 +91,7 @@ public final class ConcurrentLruCache<K, V> {
 		this.writeOperations = new WriteOperations();
 	}
 
+
 	/**
 	 * Retrieve an entry from the cache, potentially triggering generation of the value.
 	 * @param key the key to retrieve the entry for
@@ -98,7 +101,7 @@ public final class ConcurrentLruCache<K, V> {
 		if (this.capacity == 0) {
 			return this.generator.apply(key);
 		}
-		final Node<K, V> node = this.cache.get(key);
+		Node<K, V> node = this.cache.get(key);
 		if (node == null) {
 			V value = this.generator.apply(key);
 			put(key, value);
@@ -111,9 +114,9 @@ public final class ConcurrentLruCache<K, V> {
 	private void put(K key, V value) {
 		Assert.notNull(key, "key must not be null");
 		Assert.notNull(value, "value must not be null");
-		final CacheEntry<V> cacheEntry = new CacheEntry<>(value, CacheEntryState.ACTIVE);
-		final Node<K, V> node = new Node<>(key, cacheEntry);
-		final Node<K, V> prior = this.cache.putIfAbsent(node.key, node);
+		CacheEntry<V> cacheEntry = new CacheEntry<>(value, CacheEntryState.ACTIVE);
+		Node<K, V> node = new Node<>(key, cacheEntry);
+		Node<K, V> prior = this.cache.putIfAbsent(node.key, node);
 		if (prior == null) {
 			processWrite(new AddTask(node));
 		}
@@ -124,29 +127,45 @@ public final class ConcurrentLruCache<K, V> {
 
 	private void processRead(Node<K, V> node) {
 		boolean drainRequested = this.readOperations.recordRead(node);
-		final DrainStatus status = this.drainStatus.get();
+		DrainStatus status = this.drainStatus.get();
 		if (status.shouldDrainBuffers(drainRequested)) {
 			drainOperations();
 		}
 	}
 
 	private void processWrite(Runnable task) {
-		this.writeOperations.add(task);
+		boolean backlogged = this.writeOperations.add(task);
 		this.drainStatus.lazySet(DrainStatus.REQUIRED);
-		drainOperations();
+		if (backlogged) {
+			// Apply back-pressure: wait for the lock instead of letting
+			// pending writes pile up faster than they can be drained.
+			this.evictionLock.lock();
+			drainOperationsAndUnlock();
+		}
+		else {
+			drainOperations();
+		}
 	}
 
 	private void drainOperations() {
 		if (this.evictionLock.tryLock()) {
-			try {
-				this.drainStatus.lazySet(DrainStatus.PROCESSING);
-				this.readOperations.drain();
-				this.writeOperations.drain();
-			}
-			finally {
-				this.drainStatus.compareAndSet(DrainStatus.PROCESSING, DrainStatus.IDLE);
-				this.evictionLock.unlock();
-			}
+			drainOperationsAndUnlock();
+		}
+	}
+
+	/*
+	 * Drain pending read and write operations, then release the eviction lock
+	 * which must be held by the current thread.
+	 */
+	private void drainOperationsAndUnlock() {
+		try {
+			this.drainStatus.lazySet(DrainStatus.PROCESSING);
+			this.readOperations.drain();
+			this.writeOperations.drain();
+		}
+		finally {
+			this.drainStatus.compareAndSet(DrainStatus.PROCESSING, DrainStatus.IDLE);
+			this.evictionLock.unlock();
 		}
 	}
 
@@ -176,14 +195,18 @@ public final class ConcurrentLruCache<K, V> {
 	}
 
 	/**
-	 * Immediately remove all entries from this cache.
+	 * Remove all entries from this cache.
+	 * <p>This method does not block or synchronize with in-flight
+	 * writes. An entry added concurrently while this method is running
+	 * may still survive this call, as if it had been added immediately
+	 * afterward.
 	 */
 	public void clear() {
 		this.evictionLock.lock();
 		try {
-			Node<K, V> node;
-			while ((node = this.evictionQueue.poll()) != null) {
+			for (Node<K, V> node : this.cache.values()) {
 				this.cache.remove(node.key, node);
+				this.evictionQueue.remove(node);
 				markAsRemoved(node);
 			}
 			this.readOperations.clear();
@@ -195,11 +218,15 @@ public final class ConcurrentLruCache<K, V> {
 	}
 
 	/*
-	 * Transition the node to the {@code removed} state and decrement the current size of the cache.
+	 * Transition the node to the {@code removed} state and decrement the
+	 * current size of the cache, unless the node has already been removed.
 	 */
 	private void markAsRemoved(Node<K, V> node) {
-		for (; ; ) {
+		while (true) {
 			CacheEntry<V> current = node.get();
+			if (current.state == CacheEntryState.REMOVED) {
+				return;
+			}
 			CacheEntry<V> removed = new CacheEntry<>(current.value, CacheEntryState.REMOVED);
 			if (node.compareAndSet(current, removed)) {
 				this.currentSize.lazySet(this.currentSize.get() - 1);
@@ -223,9 +250,8 @@ public final class ConcurrentLruCache<K, V> {
 	 * @return {@code true} if the key was present before,
 	 * {@code false} if there was no matching key
 	 */
-	@Nullable
 	public boolean remove(K key) {
-		final Node<K, V> node = this.cache.remove(key);
+		Node<K, V> node = this.cache.remove(key);
 		if (node == null) {
 			return false;
 		}
@@ -234,27 +260,29 @@ public final class ConcurrentLruCache<K, V> {
 		return true;
 	}
 
-	/*
+	/**
 	 * Transition the node from the {@code active} state to the {@code pending removal} state,
 	 * if the transition is valid.
 	 */
 	private void markForRemoval(Node<K, V> node) {
-		for (; ; ) {
-			final CacheEntry<V> current = node.get();
+		while (true) {
+			CacheEntry<V> current = node.get();
 			if (!current.isActive()) {
 				return;
 			}
-			final CacheEntry<V> pendingRemoval = new CacheEntry<>(current.value, CacheEntryState.PENDING_REMOVAL);
+			CacheEntry<V> pendingRemoval = new CacheEntry<>(current.value, CacheEntryState.PENDING_REMOVAL);
 			if (node.compareAndSet(current, pendingRemoval)) {
 				return;
 			}
 		}
 	}
 
+
 	/**
 	 * Write operation recorded when a new entry is added to the cache.
 	 */
 	private final class AddTask implements Runnable {
+
 		final Node<K, V> node;
 
 		AddTask(Node<K, V> node) {
@@ -272,7 +300,7 @@ public final class ConcurrentLruCache<K, V> {
 
 		private void evictEntries() {
 			while (currentSize.get() > capacity) {
-				final Node<K, V> node = evictionQueue.poll();
+				Node<K, V> node = evictionQueue.poll();
 				if (node == null) {
 					return;
 				}
@@ -280,7 +308,6 @@ public final class ConcurrentLruCache<K, V> {
 				markAsRemoved(node);
 			}
 		}
-
 	}
 
 
@@ -288,6 +315,7 @@ public final class ConcurrentLruCache<K, V> {
 	 * Write operation recorded when an entry is removed to the cache.
 	 */
 	private final class RemovalTask implements Runnable {
+
 		final Node<K, V> node;
 
 		RemovalTask(Node<K, V> node) {
@@ -307,7 +335,7 @@ public final class ConcurrentLruCache<K, V> {
 	 */
 	private enum DrainStatus {
 
-		/*
+		/**
 		 * No drain operation currently running.
 		 */
 		IDLE {
@@ -317,7 +345,7 @@ public final class ConcurrentLruCache<K, V> {
 			}
 		},
 
-		/*
+		/**
 		 * A drain operation is required due to a pending write modification.
 		 */
 		REQUIRED {
@@ -327,7 +355,7 @@ public final class ConcurrentLruCache<K, V> {
 			}
 		},
 
-		/*
+		/**
 		 * A drain operation is in progress.
 		 */
 		PROCESSING {
@@ -345,9 +373,12 @@ public final class ConcurrentLruCache<K, V> {
 		abstract boolean shouldDrainBuffers(boolean delayable);
 	}
 
+
 	private enum CacheEntryState {
+
 		ACTIVE, PENDING_REMOVAL, REMOVED
 	}
+
 
 	private record CacheEntry<V>(V value, CacheEntryState state) {
 
@@ -356,15 +387,10 @@ public final class ConcurrentLruCache<K, V> {
 		}
 	}
 
+
 	private static final class ReadOperations<K, V> {
 
-		private static final int BUFFER_COUNT = detectNumberOfBuffers();
-
-		private static int detectNumberOfBuffers() {
-			int availableProcessors = Runtime.getRuntime().availableProcessors();
-			int nextPowerOfTwo = 1 << (Integer.SIZE - Integer.numberOfLeadingZeros(availableProcessors - 1));
-			return Math.min(4, nextPowerOfTwo);
-		}
+		private static final int BUFFER_COUNT = 4;
 
 		private static final int BUFFERS_MASK = BUFFER_COUNT - 1;
 
@@ -376,23 +402,17 @@ public final class ConcurrentLruCache<K, V> {
 
 		private static final int BUFFER_INDEX_MASK = BUFFER_SIZE - 1;
 
-		/*
-		 * Number of operations recorded, for each buffer
-		 */
+		// Number of operations recorded, for each buffer
 		private final AtomicLongArray recordedCount = new AtomicLongArray(BUFFER_COUNT);
 
-		/*
-		 * Number of operations read, for each buffer
-		 */
+		// Number of operations read, for each buffer
 		private final long[] readCount = new long[BUFFER_COUNT];
 
-		/*
-		 * Number of operations processed, for each buffer
-		 */
+		// Number of operations processed, for each buffer
 		private final AtomicLongArray processedCount = new AtomicLongArray(BUFFER_COUNT);
 
-		@SuppressWarnings("rawtypes")
-		private final AtomicReferenceArray<Node<K, V>>[] buffers = new AtomicReferenceArray[BUFFER_COUNT];
+		@SuppressWarnings({"unchecked", "rawtypes"})
+		private final AtomicReferenceArray<@Nullable Node<K, V>>[] buffers = new AtomicReferenceArray[BUFFER_COUNT];
 
 		private final EvictionQueue<K, V> evictionQueue;
 
@@ -429,7 +449,7 @@ public final class ConcurrentLruCache<K, V> {
 
 		void clear() {
 			for (int i = 0; i < BUFFER_COUNT; i++) {
-				AtomicReferenceArray<Node<K, V>> buffer = this.buffers[i];
+				AtomicReferenceArray<@Nullable Node<K, V>> buffer = this.buffers[i];
 				for (int j = 0; j < BUFFER_SIZE; j++) {
 					buffer.lazySet(j, null);
 				}
@@ -440,7 +460,7 @@ public final class ConcurrentLruCache<K, V> {
 			final long writeCount = this.recordedCount.get(bufferIndex);
 			for (int i = 0; i < MAX_DRAIN_COUNT; i++) {
 				final int index = (int) (this.readCount[bufferIndex] & BUFFER_INDEX_MASK);
-				final AtomicReferenceArray<Node<K, V>> buffer = this.buffers[bufferIndex];
+				final AtomicReferenceArray<@Nullable Node<K, V>> buffer = this.buffers[bufferIndex];
 				final Node<K, V> node = buffer.get(index);
 				if (node == null) {
 					break;
@@ -451,54 +471,78 @@ public final class ConcurrentLruCache<K, V> {
 			}
 			this.processedCount.lazySet(bufferIndex, writeCount);
 		}
+
 	}
+
 
 	private static final class WriteOperations {
 
 		private static final int DRAIN_THRESHOLD = 16;
 
+		private static final int MAX_PENDING_OPERATIONS = 64 * DRAIN_THRESHOLD;
+
 		private final Queue<Runnable> operations = new ConcurrentLinkedQueue<>();
 
-		public void add(Runnable task) {
+		private final AtomicInteger pendingCount = new AtomicInteger();
+
+		/**
+		 * Record the given write operation.
+		 * @return {@code true} if too many operations are pending and the
+		 * caller must wait for them to be drained, {@code false} otherwise
+		 */
+		public boolean add(Runnable task) {
 			this.operations.add(task);
+			return (this.pendingCount.incrementAndGet() > MAX_PENDING_OPERATIONS);
 		}
 
 		public void drain() {
-			for (int i = 0; i < DRAIN_THRESHOLD; i++) {
-				final Runnable task = this.operations.poll();
-				if (task == null) {
-					break;
+			int drained = 0;
+			try {
+				while (drained < DRAIN_THRESHOLD) {
+					final Runnable task = this.operations.poll();
+					if (task == null) {
+						break;
+					}
+					drained++;
+					task.run();
 				}
-				task.run();
+			}
+			finally {
+				this.pendingCount.addAndGet(-drained);
 			}
 		}
 
 		public void drainAll() {
-			Runnable task;
-			while ((task = this.operations.poll()) != null) {
-				task.run();
+			int drained = 0;
+			try {
+				Runnable task;
+				while ((task = this.operations.poll()) != null) {
+					drained++;
+					task.run();
+				}
+			}
+			finally {
+				this.pendingCount.addAndGet(-drained);
 			}
 		}
-
 	}
+
 
 	@SuppressWarnings("serial")
 	private static final class Node<K, V> extends AtomicReference<CacheEntry<V>> {
+
 		final K key;
 
-		@Nullable
-		Node<K, V> prev;
+		@Nullable Node<K, V> prev;
 
-		@Nullable
-		Node<K, V> next;
+		@Nullable Node<K, V> next;
 
 		Node(K key, CacheEntry<V> cacheEntry) {
 			super(cacheEntry);
 			this.key = key;
 		}
 
-		@Nullable
-		public Node<K, V> getPrevious() {
+		public @Nullable Node<K, V> getPrevious() {
 			return this.prev;
 		}
 
@@ -506,8 +550,7 @@ public final class ConcurrentLruCache<K, V> {
 			this.prev = prev;
 		}
 
-		@Nullable
-		public Node<K, V> getNext() {
+		public @Nullable Node<K, V> getNext() {
 			return this.next;
 		}
 
@@ -523,22 +566,17 @@ public final class ConcurrentLruCache<K, V> {
 
 	private static final class EvictionQueue<K, V> {
 
-		@Nullable
-		Node<K, V> first;
+		@Nullable Node<K, V> first;
 
-		@Nullable
-		Node<K, V> last;
+		@Nullable Node<K, V> last;
 
-
-		@Nullable
-		Node<K, V> poll() {
+		@Nullable Node<K, V> poll() {
 			if (this.first == null) {
 				return null;
 			}
-			final Node<K, V> f = this.first;
-			final Node<K, V> next = f.getNext();
+			Node<K, V> f = this.first;
+			Node<K, V> next = f.getNext();
 			f.setNext(null);
-
 			this.first = next;
 			if (next == null) {
 				this.last = null;
@@ -557,15 +595,12 @@ public final class ConcurrentLruCache<K, V> {
 		}
 
 		private boolean contains(Node<K, V> e) {
-			return (e.getPrevious() != null)
-					|| (e.getNext() != null)
-					|| (e == this.first);
+			return (e.getPrevious() != null || e.getNext() != null || e == this.first);
 		}
 
-		private void linkLast(final Node<K, V> e) {
-			final Node<K, V> l = this.last;
+		private void linkLast(Node<K, V> e) {
+			Node<K, V> l = this.last;
 			this.last = e;
-
 			if (l == null) {
 				this.first = e;
 			}
@@ -576,8 +611,8 @@ public final class ConcurrentLruCache<K, V> {
 		}
 
 		private void unlink(Node<K, V> e) {
-			final Node<K, V> prev = e.getPrevious();
-			final Node<K, V> next = e.getNext();
+			Node<K, V> prev = e.getPrevious();
+			Node<K, V> next = e.getNext();
 			if (prev == null) {
 				this.first = next;
 			}
@@ -606,7 +641,6 @@ public final class ConcurrentLruCache<K, V> {
 				unlink(e);
 			}
 		}
-
 	}
 
 }

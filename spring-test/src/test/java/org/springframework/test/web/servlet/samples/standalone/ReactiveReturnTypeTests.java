@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2019 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -39,11 +39,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  *
  * @author Rossen Stoyanchev
  */
-public class ReactiveReturnTypeTests {
-
+class ReactiveReturnTypeTests {
 
 	@Test // SPR-16869
-	public void sseWithFlux() throws Exception {
+	void sseWithFlux() throws Exception {
 
 		MockMvc mockMvc = MockMvcBuilders.standaloneSetup(ReactiveController.class).build();
 
@@ -53,7 +52,7 @@ public class ReactiveReturnTypeTests {
 				.andReturn();
 
 		mockMvc.perform(asyncDispatch(mvcResult))
-				.andExpect(content().string("data:event0\n\ndata:event1\n\ndata:event2\n\n"));
+				.andExpect(content().string("data: event0\n\ndata: event1\n\ndata: event2\n\n"));
 	}
 
 

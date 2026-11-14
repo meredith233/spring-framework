@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,13 +16,18 @@
 
 package org.springframework.web.reactive.result.view;
 
+import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 
+import org.jspecify.annotations.Nullable;
+import org.reactivestreams.Publisher;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
@@ -35,10 +40,19 @@ import org.springframework.core.ReactiveAdapter;
 import org.springframework.core.ReactiveAdapterRegistry;
 import org.springframework.core.ResolvableType;
 import org.springframework.core.annotation.AnnotationAwareOrderComparator;
+import org.springframework.core.io.buffer.DataBuffer;
+import org.springframework.core.io.buffer.DataBufferFactory;
+import org.springframework.core.io.buffer.DataBufferUtils;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.MediaType;
-import org.springframework.lang.Nullable;
+import org.springframework.http.codec.ServerSentEvent;
+import org.springframework.http.server.reactive.ServerHttpRequest;
+import org.springframework.http.server.reactive.ServerHttpResponse;
+import org.springframework.http.server.reactive.ServerHttpResponseDecorator;
 import org.springframework.ui.Model;
+import org.springframework.util.Assert;
 import org.springframework.util.ClassUtils;
 import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.ModelAttribute;
@@ -48,7 +62,9 @@ import org.springframework.web.reactive.HandlerResultHandler;
 import org.springframework.web.reactive.accept.RequestedContentTypeResolver;
 import org.springframework.web.reactive.result.HandlerResultHandlerSupport;
 import org.springframework.web.server.NotAcceptableStatusException;
+import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.server.ServerWebExchange;
+import org.springframework.web.util.SseUtils;
 
 /**
  * {@code HandlerResultHandler} that encapsulates the view resolution algorithm
@@ -66,16 +82,17 @@ import org.springframework.web.server.ServerWebExchange;
  *
  * <p>A String-based view name is resolved through the configured
  * {@link ViewResolver} instances into a {@link View} to use for rendering.
- * If a view is left unspecified (e.g. by returning {@code null} or a
+ * If a view is left unspecified (for example, by returning {@code null} or a
  * model-related return value), a default view name is selected.
  *
  * <p>By default this resolver is ordered at {@link Ordered#LOWEST_PRECEDENCE}
  * and generally needs to be late in the order since it interprets any String
  * return value as a view name or any non-simple value type as a model attribute
  * while other result handlers may interpret the same otherwise based on the
- * presence of annotations, e.g. for {@code @ResponseBody}.
+ * presence of annotations, for example, for {@code @ResponseBody}.
  *
  * @author Rossen Stoyanchev
+ * @author Sebastien Deleuze
  * @since 5.0
  */
 public class ViewResolutionResultHandler extends HandlerResultHandlerSupport implements HandlerResultHandler, Ordered {
@@ -88,6 +105,8 @@ public class ViewResolutionResultHandler extends HandlerResultHandlerSupport imp
 	private final List<ViewResolver> viewResolvers = new ArrayList<>(4);
 
 	private final List<View> defaultViews = new ArrayList<>(4);
+
+	private final SseStreamHandler sseHandler = new SseStreamHandler();
 
 
 	/**
@@ -148,21 +167,45 @@ public class ViewResolutionResultHandler extends HandlerResultHandlerSupport imp
 			return true;
 		}
 
-		Class<?> type = result.getReturnType().toClass();
+		ResolvableType returnType = result.getReturnType();
+		Class<?> type = returnType.toClass();
+
 		ReactiveAdapter adapter = getAdapter(result);
 		if (adapter != null) {
 			if (adapter.isNoValue()) {
 				return true;
 			}
-			type = result.getReturnType().getGeneric().toClass();
+
+			type = returnType.getGeneric().toClass();
+			returnType = returnType.getNested(2);
+
+			if (adapter.isMultiValue()) {
+				return (Fragment.class.isAssignableFrom(type) || isSseFragmentStream(returnType));
+			}
 		}
 
 		return (CharSequence.class.isAssignableFrom(type) ||
 				Rendering.class.isAssignableFrom(type) ||
+				FragmentsRendering.class.isAssignableFrom(type) ||
 				Model.class.isAssignableFrom(type) ||
 				Map.class.isAssignableFrom(type) ||
 				View.class.isAssignableFrom(type) ||
+				isFragmentCollection(returnType.getNested(2)) ||
 				!BeanUtils.isSimpleProperty(type));
+	}
+
+	private boolean hasModelAnnotation(MethodParameter parameter) {
+		return parameter.hasMethodAnnotation(ModelAttribute.class);
+	}
+
+	private static boolean isFragmentCollection(ResolvableType returnType) {
+		return (Collection.class.isAssignableFrom(returnType.resolve(Object.class)) &&
+				Fragment.class.equals(returnType.getNested(2).resolve()));
+	}
+
+	private static boolean isSseFragmentStream(ResolvableType returnType) {
+		return (ServerSentEvent.class.equals(returnType.resolve()) &&
+				Fragment.class.equals(returnType.getNested(2).resolve()));
 	}
 
 	@Override
@@ -171,18 +214,28 @@ public class ViewResolutionResultHandler extends HandlerResultHandlerSupport imp
 		Mono<Object> valueMono;
 		ResolvableType valueType;
 		ReactiveAdapter adapter = getAdapter(result);
+		BindingContext bindingContext = result.getBindingContext();
+		Locale locale = LocaleContextHolder.getLocale(exchange.getLocaleContext());
 
 		if (adapter != null) {
 			if (adapter.isMultiValue()) {
-				throw new IllegalArgumentException(
-						"Multi-value reactive types not supported in view resolution: " + result.getReturnType());
+				if (isSseFragmentStream(result.getReturnType().getNested(2))) {
+					return handleSseFragmentStream(exchange, result, adapter, locale, bindingContext);
+				}
+
+				valueMono = (result.getReturnValue() != null ?
+						Mono.just(FragmentsRendering.fragmentsPublisher(adapter.toPublisher(result.getReturnValue())).build()) :
+						Mono.empty());
+
+				valueType = ResolvableType.forClass(FragmentsRendering.class);
 			}
+			else {
+				valueMono = (result.getReturnValue() != null ?
+						Mono.from(adapter.toPublisher(result.getReturnValue())) : Mono.empty());
 
-			valueMono = (result.getReturnValue() != null ?
-					Mono.from(adapter.toPublisher(result.getReturnValue())) : Mono.empty());
-
-			valueType = (adapter.isNoValue() ? ResolvableType.forClass(Void.class) :
-					result.getReturnType().getGeneric());
+				valueType = (adapter.isNoValue() ? ResolvableType.forClass(Void.class) :
+						result.getReturnType().getGeneric());
+			}
 		}
 		else {
 			valueMono = Mono.justOrEmpty(result.getReturnValue());
@@ -196,69 +249,99 @@ public class ViewResolutionResultHandler extends HandlerResultHandlerSupport imp
 					Mono<List<View>> viewsMono;
 					Model model = result.getModel();
 					MethodParameter parameter = result.getReturnTypeSource();
-					Locale locale = LocaleContextHolder.getLocale(exchange.getLocaleContext());
 
 					Class<?> clazz = valueType.toClass();
 					if (clazz == Object.class) {
 						clazz = returnValue.getClass();
 					}
 
-					if (returnValue == NO_VALUE || ClassUtils.isVoidType(clazz)) {
-						viewsMono = resolveViews(getDefaultViewName(exchange), locale);
+					if (Collection.class.isAssignableFrom(clazz)) {
+						returnValue = FragmentsRendering.fragments((Collection<Fragment>) returnValue).build();
+						clazz = FragmentsRendering.class;
 					}
-					else if (CharSequence.class.isAssignableFrom(clazz) && !hasModelAnnotation(parameter)) {
-						viewsMono = resolveViews(returnValue.toString(), locale);
-					}
-					else if (Rendering.class.isAssignableFrom(clazz)) {
-						Rendering render = (Rendering) returnValue;
-						HttpStatusCode status = render.status();
-						if (status != null) {
-							exchange.getResponse().setStatusCode(status);
+
+					try {
+						if (returnValue == NO_VALUE || ClassUtils.isVoidType(clazz)) {
+							viewsMono = resolveViews(getDefaultViewName(exchange), locale);
 						}
-						exchange.getResponse().getHeaders().putAll(render.headers());
-						model.addAllAttributes(render.modelAttributes());
-						Object view = render.view();
-						if (view == null) {
-							view = getDefaultViewName(exchange);
+						else if (CharSequence.class.isAssignableFrom(clazz) && !hasModelAnnotation(parameter)) {
+							viewsMono = resolveViews(returnValue.toString(), locale);
 						}
-						viewsMono = (view instanceof String viewName ? resolveViews(viewName, locale) :
-								Mono.just(Collections.singletonList((View) view)));
+						else if (Rendering.class.isAssignableFrom(clazz)) {
+							Rendering render = (Rendering) returnValue;
+							HttpStatusCode status = render.status();
+							if (status != null) {
+								exchange.getResponse().setStatusCode(status);
+							}
+							exchange.getResponse().getHeaders().putAll(render.headers());
+							model.addAllAttributes(render.modelAttributes());
+							Object view = render.view();
+							if (view == null) {
+								view = getDefaultViewName(exchange);
+							}
+							viewsMono = (view instanceof String viewName ? resolveViews(viewName, locale) :
+									Mono.just(Collections.singletonList((View) view)));
+						}
+						else if (FragmentsRendering.class.isAssignableFrom(clazz)) {
+							ServerHttpResponse response = exchange.getResponse();
+							FragmentsRendering render = (FragmentsRendering) returnValue;
+							HttpStatusCode status = render.status();
+							if (status != null) {
+								response.setStatusCode(status);
+							}
+							response.getHeaders().putAll(render.headers());
+							bindingContext.updateModel(exchange);
+
+							StreamHandler streamHandler =
+									(this.sseHandler.supports(exchange.getRequest()) ? this.sseHandler : null);
+
+							if (streamHandler != null) {
+								streamHandler.updateResponse(exchange);
+							}
+
+							Flux<Flux<DataBuffer>> renderFlux = render.fragments()
+									.concatMap(fragment -> renderFragment(fragment, null, streamHandler, locale, bindingContext, exchange))
+									.doOnDiscard(DataBuffer.class, DataBufferUtils::release);
+
+							return response.writeAndFlushWith(renderFlux);
+						}
+						else if (Model.class.isAssignableFrom(clazz)) {
+							model.addAllAttributes(((Model) returnValue).asMap());
+							viewsMono = resolveViews(getDefaultViewName(exchange), locale);
+						}
+						else if (Map.class.isAssignableFrom(clazz) && !hasModelAnnotation(parameter)) {
+							model.addAllAttributes((Map<String, ?>) returnValue);
+							viewsMono = resolveViews(getDefaultViewName(exchange), locale);
+						}
+						else if (View.class.isAssignableFrom(clazz)) {
+							viewsMono = Mono.just(Collections.singletonList((View) returnValue));
+						}
+						else {
+							String name = getNameForReturnValue(parameter);
+							model.addAttribute(name, returnValue);
+							viewsMono = resolveViews(getDefaultViewName(exchange), locale);
+						}
 					}
-					else if (Model.class.isAssignableFrom(clazz)) {
-						model.addAllAttributes(((Model) returnValue).asMap());
-						viewsMono = resolveViews(getDefaultViewName(exchange), locale);
+					catch (ResponseStatusException ex) {
+						return Mono.error(ex);
 					}
-					else if (Map.class.isAssignableFrom(clazz) && !hasModelAnnotation(parameter)) {
-						model.addAllAttributes((Map<String, ?>) returnValue);
-						viewsMono = resolveViews(getDefaultViewName(exchange), locale);
-					}
-					else if (View.class.isAssignableFrom(clazz)) {
-						viewsMono = Mono.just(Collections.singletonList((View) returnValue));
-					}
-					else {
-						String name = getNameForReturnValue(parameter);
-						model.addAttribute(name, returnValue);
-						viewsMono = resolveViews(getDefaultViewName(exchange), locale);
-					}
-					BindingContext bindingContext = result.getBindingContext();
 					bindingContext.updateModel(exchange);
-					return viewsMono.flatMap(views -> render(views, model.asMap(), bindingContext, exchange));
+					return viewsMono.flatMap(views -> render(views, model.asMap(), null, bindingContext, exchange));
 				});
-	}
-
-
-	private boolean hasModelAnnotation(MethodParameter parameter) {
-		return parameter.hasMethodAnnotation(ModelAttribute.class);
 	}
 
 	/**
 	 * Select a default view name when a controller did not specify it.
 	 * Use the request path the leading and trailing slash stripped.
+	 * @throws ResponseStatusException with a 400 error code if the path contains a "redirect:" prefix
 	 */
 	private String getDefaultViewName(ServerWebExchange exchange) {
 		String path = exchange.getRequest().getPath().pathWithinApplication().value();
 		if (path.startsWith("/")) {
 			path = path.substring(1);
+		}
+		if (path.startsWith(UrlBasedViewResolver.REDIRECT_URL_PREFIX)) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Rejected path '" + path + "' with 'redirect:' prefix");
 		}
 		if (path.endsWith("/")) {
 			path = path.substring(0, path.length() - 1);
@@ -280,6 +363,55 @@ public class ViewResolutionResultHandler extends HandlerResultHandlerSupport imp
 				});
 	}
 
+	private Mono<Void> handleSseFragmentStream(
+			ServerWebExchange exchange, HandlerResult result, ReactiveAdapter adapter, Locale locale,
+			BindingContext bindingContext) {
+
+		this.sseHandler.updateResponse(exchange);
+
+		Flux<ServerSentEvent<Fragment>> eventFlux =
+				Flux.from(adapter.toPublisher(result.getReturnValue()));
+
+		Flux<Flux<DataBuffer>> dataBufferFlux = eventFlux
+				.concatMap(event -> renderFragment(event.data(), event, this.sseHandler, locale, bindingContext, exchange))
+				.doOnDiscard(DataBuffer.class, DataBufferUtils::release);
+
+		return exchange.getResponse().writeAndFlushWith(dataBufferFlux);
+	}
+
+	private Mono<Flux<DataBuffer>> renderFragment(
+			@Nullable Fragment fragment, @Nullable Object streamingHints, @Nullable StreamHandler streamHandler,
+			Locale locale, BindingContext bindingContext, ServerWebExchange exchange) {
+
+		if (fragment == null) {
+			return Mono.empty();
+		}
+
+		// Merge attributes from top-level model
+		fragment.mergeAttributes(bindingContext.getModel());
+
+		BodySavingResponse response = new BodySavingResponse(exchange.getResponse());
+		ServerWebExchange mutatedExchange = exchange.mutate().response(response).build();
+
+		Mono<List<View>> selectedViews = (fragment.isResolved() ?
+				Mono.just(List.of(fragment.view())) :
+				resolveViews(fragment.viewName() != null ? fragment.viewName() : getDefaultViewName(exchange), locale));
+
+		Map<String, Object> model = fragment.model();
+
+		if (streamHandler != null) {
+			return selectedViews
+					.flatMap(views ->
+							render(views, model, MediaType.TEXT_HTML, bindingContext, mutatedExchange))
+					.then(Mono.fromSupplier(() -> streamHandler.format(
+							response.getBodyFlux(), fragment, streamingHints, exchange)));
+		}
+		else {
+			return selectedViews.flatMap(views -> render(views, model, null, bindingContext, mutatedExchange))
+					.then(Mono.fromSupplier(response::getBodyFlux));
+		}
+	}
+
 	private String getNameForReturnValue(MethodParameter returnType) {
 		return Optional.ofNullable(returnType.getMethodAnnotation(ModelAttribute.class))
 				.filter(ann -> StringUtils.hasText(ann.value()))
@@ -287,7 +419,8 @@ public class ViewResolutionResultHandler extends HandlerResultHandlerSupport imp
 				.orElseGet(() -> Conventions.getVariableNameForParameter(returnType));
 	}
 
-	private Mono<? extends Void> render(List<View> views, Map<String, Object> model,
+	private Mono<? extends Void> render(
+			List<View> views, Map<String, Object> model, @Nullable MediaType bestMediaType,
 			BindingContext bindingContext, ServerWebExchange exchange) {
 
 		for (View view : views) {
@@ -296,19 +429,20 @@ public class ViewResolutionResultHandler extends HandlerResultHandlerSupport imp
 			}
 		}
 		List<MediaType> mediaTypes = getMediaTypes(views);
-		MediaType bestMediaType;
-		try {
-			bestMediaType = selectMediaType(exchange, () -> mediaTypes);
-		}
-		catch (NotAcceptableStatusException ex) {
-			HttpStatusCode statusCode = exchange.getResponse().getStatusCode();
-			if (statusCode != null && statusCode.isError()) {
-				if (logger.isDebugEnabled()) {
-					logger.debug("Ignoring error response content (if any). " + ex.getReason());
-				}
-				return Mono.empty();
+		if (bestMediaType == null) {
+			try {
+				bestMediaType = selectMediaType(exchange, () -> mediaTypes);
 			}
-			throw ex;
+			catch (NotAcceptableStatusException ex) {
+				HttpStatusCode statusCode = exchange.getResponse().getStatusCode();
+				if (statusCode != null && statusCode.isError()) {
+					if (logger.isDebugEnabled()) {
+						logger.debug("Ignoring error response content (if any). " + ex.getReason());
+					}
+					return Mono.empty();
+				}
+				throw ex;
+			}
 		}
 		if (bestMediaType != null) {
 			for (View view : views) {
@@ -334,6 +468,155 @@ public class ViewResolutionResultHandler extends HandlerResultHandlerSupport imp
 		return views.stream()
 				.flatMap(view -> view.getSupportedMediaTypes().stream())
 				.toList();
+	}
+
+
+	/**
+	 * ServerHttpResponse that saves the body Flux and does not write.
+	 */
+	private static class BodySavingResponse extends ServerHttpResponseDecorator {
+
+		private @Nullable Flux<DataBuffer> bodyFlux;
+
+		private @Nullable HttpHeaders headers;
+
+		BodySavingResponse(ServerHttpResponse delegate) {
+			super(delegate);
+		}
+
+		@Override
+		public HttpHeaders getHeaders() {
+			if (!super.getHeaders().containsHeader(HttpHeaders.CONTENT_TYPE)) {
+				return super.getHeaders();
+			}
+			// Content-type is set, ignore further updates
+			if (this.headers == null) {
+				this.headers = new HttpHeaders();
+				this.headers.putAll(super.getHeaders());
+			}
+			return this.headers;
+		}
+
+		public Flux<DataBuffer> getBodyFlux() {
+			Assert.state(this.bodyFlux != null, "Body not set");
+			return this.bodyFlux;
+		}
+
+		@Override
+		public Mono<Void> writeWith(Publisher<? extends DataBuffer> body) {
+			this.bodyFlux = Flux.from(body);
+			return Mono.empty();
+		}
+
+		@Override
+		public Mono<Void> writeAndFlushWith(Publisher<? extends Publisher<? extends DataBuffer>> body) {
+			this.bodyFlux = Flux.from(body).flatMap(Flux::from);
+			return Mono.empty();
+		}
+	}
+
+
+	/**
+	 * Strategy to render fragment with stream formatting.
+	 */
+	private interface StreamHandler {
+
+		/**
+		 * Whether the formatter supports the given request.
+		 */
+		boolean supports(ServerHttpRequest request);
+
+		/**
+		 * Update the response before streaming, for example, to set the content-type.
+		 */
+		void updateResponse(ServerWebExchange exchange);
+
+		/**
+		 * Format the given fragment.
+		 * @param fragmentContent the fragment serialized to data buffers
+		 * @param fragment the fragment being rendered
+		 * @param streamingHints extra hints for the stream format (e.g. ServerSentEvent wrapper)
+		 * @param exchange the current exchange
+		 * @return the formatted fragment
+		 */
+		Flux<DataBuffer> format(
+				Flux<DataBuffer> fragmentContent, Fragment fragment, @Nullable Object streamingHints,
+				ServerWebExchange exchange);
+	}
+
+
+	/**
+	 * Formatter for Server-Sent Events formatting.
+	 */
+	private static class SseStreamHandler implements StreamHandler {
+
+		@Override
+		public boolean supports(ServerHttpRequest request) {
+			String header = request.getHeaders().getFirst(HttpHeaders.ACCEPT);
+			return (header != null && header.contains(MediaType.TEXT_EVENT_STREAM_VALUE));
+		}
+
+		@Override
+		public void updateResponse(ServerWebExchange exchange) {
+			MediaType mediaType = MediaType.TEXT_EVENT_STREAM;
+			Charset charset = getCharset(exchange.getRequest());
+			mediaType = (charset != null ? new MediaType(mediaType, charset) : mediaType);
+			exchange.getResponse().getHeaders().setContentType(mediaType);
+		}
+
+		private @Nullable Charset getCharset(ServerHttpRequest request) {
+			for (MediaType mediaType : request.getHeaders().getAccept()) {
+				if (mediaType.isCompatibleWith(MediaType.TEXT_EVENT_STREAM)) {
+					if (mediaType.getCharset() != null) {
+						return mediaType.getCharset();
+					}
+					break;
+				}
+			}
+			return null;
+		}
+
+		@Override
+		public Flux<DataBuffer> format(
+				Flux<DataBuffer> fragmentFlux, Fragment fragment, @Nullable Object hints,
+				ServerWebExchange exchange) {
+
+			MediaType mediaType = exchange.getResponse().getHeaders().getContentType();
+			Charset charset = (mediaType != null && mediaType.getCharset() != null ?
+					mediaType.getCharset() : StandardCharsets.UTF_8);
+			Assert.state(hints == null || hints instanceof ServerSentEvent, "Expected ServerSentEvent");
+
+			DataBufferFactory bufferFactory = exchange.getResponse().bufferFactory();
+
+			ServerSentEvent<?> sse = (ServerSentEvent<?>) hints;
+			CharSequence eventText = (sse != null ? sse.format() :
+					(fragment.viewName() != null ? "event:" + fragment.viewName() + "\n" : "") + "data: ");
+
+			DataBuffer prefix = encodeText(eventText.toString(), charset, bufferFactory);
+			DataBuffer suffix = encodeText("\n\n", charset, bufferFactory);
+
+			Mono<DataBuffer> content = DataBufferUtils.join(fragmentFlux)
+					.map(buffer -> {
+						String text;
+						try {
+							text = buffer.toString(charset);
+						}
+						finally {
+							DataBufferUtils.release(buffer);
+						}
+						StringBuilder escaped = new StringBuilder();
+						SseUtils.appendFieldValue("data", text, escaped);
+						return bufferFactory.wrap(escaped.toString().getBytes(charset));
+					});
+
+			return Flux.concat(Flux.just(prefix), content, Flux.just(suffix));
+		}
+
+		private DataBuffer encodeText(String text, Charset charset, DataBufferFactory bufferFactory) {
+			byte[] bytes = text.getBytes(charset);
+			return bufferFactory.wrap(bytes);
+		}
+
 	}
 
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -28,6 +28,7 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.reactive.accept.RequestedContentTypeResolverBuilder;
+import org.springframework.web.reactive.config.ApiVersionConfigurer;
 import org.springframework.web.reactive.config.CorsRegistry;
 import org.springframework.web.reactive.config.PathMatchConfigurer;
 import org.springframework.web.reactive.config.ViewResolverRegistry;
@@ -40,10 +41,10 @@ import static org.assertj.core.api.Assertions.assertThat;
  *
  * @author Rossen Stoyanchev
  */
-public class DefaultControllerSpecTests {
+class DefaultControllerSpecTests {
 
 	@Test
-	public void controller() {
+	void controller() {
 		new DefaultControllerSpec(new MyController()).build()
 				.get().uri("/")
 				.exchange()
@@ -58,7 +59,7 @@ public class DefaultControllerSpecTests {
 	}
 
 	@Test
-	public void controllerAdvice() {
+	void controllerAdvice() {
 		new DefaultControllerSpec(new MyController())
 				.controllerAdvice(new MyControllerAdvice())
 				.build()
@@ -69,7 +70,7 @@ public class DefaultControllerSpecTests {
 	}
 
 	@Test
-	public void controllerAdviceWithClassArgument() {
+	void controllerAdviceWithClassArgument() {
 		new DefaultControllerSpec(MyController.class)
 				.controllerAdvice(MyControllerAdvice.class)
 				.build()
@@ -80,13 +81,14 @@ public class DefaultControllerSpecTests {
 	}
 
 	@Test
-	public void configurerConsumers() {
+	void configurerConsumers() {
 		TestConsumer<ArgumentResolverConfigurer> argumentResolverConsumer = new TestConsumer<>();
 		TestConsumer<RequestedContentTypeResolverBuilder> contentTypeResolverConsumer = new TestConsumer<>();
 		TestConsumer<CorsRegistry> corsRegistryConsumer = new TestConsumer<>();
 		TestConsumer<FormatterRegistry> formatterConsumer = new TestConsumer<>();
 		TestConsumer<ServerCodecConfigurer> codecsConsumer = new TestConsumer<>();
 		TestConsumer<PathMatchConfigurer> pathMatchingConsumer = new TestConsumer<>();
+		TestConsumer<ApiVersionConfigurer> versionConsumer = new TestConsumer<>();
 		TestConsumer<ViewResolverRegistry> viewResolverConsumer = new TestConsumer<>();
 
 		new DefaultControllerSpec(new MyController())
@@ -96,6 +98,7 @@ public class DefaultControllerSpecTests {
 				.formatters(formatterConsumer)
 				.httpMessageCodecs(codecsConsumer)
 				.pathMatching(pathMatchingConsumer)
+				.apiVersioning(versionConsumer)
 				.viewResolvers(viewResolverConsumer)
 				.build();
 
@@ -105,11 +108,12 @@ public class DefaultControllerSpecTests {
 		assertThat(formatterConsumer.getValue()).isNotNull();
 		assertThat(codecsConsumer.getValue()).isNotNull();
 		assertThat(pathMatchingConsumer.getValue()).isNotNull();
+		assertThat(versionConsumer.getValue()).isNotNull();
 		assertThat(viewResolverConsumer.getValue()).isNotNull();
 	}
 
 	@Test // gh-25854
-	public void uriTemplate() {
+	void uriTemplate() {
 		new DefaultControllerSpec(new MyController()).build()
 				.get().uri("/")
 				.exchange()

@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,18 +16,20 @@
 
 package org.springframework.context.annotation;
 
+import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
-import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.jspecify.annotations.Nullable;
 
+import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.BeanDefinitionStoreException;
+import org.springframework.beans.factory.BeanRegistrar;
+import org.springframework.beans.factory.ListableBeanFactory;
 import org.springframework.beans.factory.annotation.AnnotatedBeanDefinition;
 import org.springframework.beans.factory.annotation.AnnotatedGenericBeanDefinition;
 import org.springframework.beans.factory.config.BeanDefinition;
@@ -36,10 +38,11 @@ import org.springframework.beans.factory.groovy.GroovyBeanDefinitionReader;
 import org.springframework.beans.factory.parsing.SourceExtractor;
 import org.springframework.beans.factory.support.AbstractBeanDefinition;
 import org.springframework.beans.factory.support.AbstractBeanDefinitionReader;
+import org.springframework.beans.factory.support.BeanDefinitionOverrideException;
 import org.springframework.beans.factory.support.BeanDefinitionReader;
 import org.springframework.beans.factory.support.BeanDefinitionRegistry;
 import org.springframework.beans.factory.support.BeanNameGenerator;
-import org.springframework.beans.factory.support.DefaultListableBeanFactory;
+import org.springframework.beans.factory.support.BeanRegistryAdapter;
 import org.springframework.beans.factory.support.RootBeanDefinition;
 import org.springframework.beans.factory.xml.XmlBeanDefinitionReader;
 import org.springframework.context.annotation.ConfigurationCondition.ConfigurationPhase;
@@ -51,9 +54,9 @@ import org.springframework.core.type.AnnotationMetadata;
 import org.springframework.core.type.MethodMetadata;
 import org.springframework.core.type.StandardAnnotationMetadata;
 import org.springframework.core.type.StandardMethodMetadata;
-import org.springframework.lang.NonNull;
 import org.springframework.util.Assert;
 import org.springframework.util.ClassUtils;
+import org.springframework.util.MultiValueMap;
 import org.springframework.util.StringUtils;
 
 /**
@@ -146,7 +149,8 @@ class ConfigurationClassBeanDefinitionReader {
 		}
 
 		loadBeanDefinitionsFromImportedResources(configClass.getImportedResources());
-		loadBeanDefinitionsFromRegistrars(configClass.getImportBeanDefinitionRegistrars());
+		loadBeanDefinitionsFromImportBeanDefinitionRegistrars(configClass.getImportBeanDefinitionRegistrars());
+		loadBeanDefinitionsFromBeanRegistrars(configClass.getBeanRegistrars());
 	}
 
 	/**
@@ -158,9 +162,17 @@ class ConfigurationClassBeanDefinitionReader {
 
 		ScopeMetadata scopeMetadata = scopeMetadataResolver.resolveScopeMetadata(configBeanDef);
 		configBeanDef.setScope(scopeMetadata.getScopeName());
-		String configBeanName = this.importBeanNameGenerator.generateBeanName(configBeanDef, this.registry);
-		AnnotationConfigUtils.processCommonDefinitionAnnotations(configBeanDef, metadata);
 
+		String configBeanName;
+		try {
+			configBeanName = this.importBeanNameGenerator.generateBeanName(configBeanDef, this.registry);
+		}
+		catch (IllegalArgumentException ex) {
+			throw new IllegalStateException("Failed to generate bean name for imported class '" +
+					configClass.getMetadata().getClassName() + "'", ex);
+		}
+
+		AnnotationConfigUtils.processCommonDefinitionAnnotations(configBeanDef, metadata);
 		BeanDefinitionHolder definitionHolder = new BeanDefinitionHolder(configBeanDef, configBeanName);
 		definitionHolder = AnnotationConfigUtils.applyScopedProxyMode(scopeMetadata, definitionHolder, this.registry);
 		this.registry.registerBeanDefinition(definitionHolder.getBeanName(), definitionHolder.getBeanDefinition());
@@ -192,17 +204,30 @@ class ConfigurationClassBeanDefinitionReader {
 		AnnotationAttributes bean = AnnotationConfigUtils.attributesFor(metadata, Bean.class);
 		Assert.state(bean != null, "No @Bean annotation attributes");
 
-		// Consider name and any aliases
-		List<String> names = new ArrayList<>(Arrays.asList(bean.getStringArray("name")));
-		String beanName = (!names.isEmpty() ? names.remove(0) : methodName);
-
-		// Register aliases even when overridden
-		for (String alias : names) {
-			this.registry.registerAlias(beanName, alias);
+		// Consider name and any aliases.
+		String[] explicitNames = bean.getStringArray("name");
+		String beanName = (explicitNames.length > 0 && StringUtils.hasText(explicitNames[0])) ? explicitNames[0] : null;
+		String localBeanName = defaultBeanName(beanName, methodName);
+		beanName = (this.importBeanNameGenerator instanceof ConfigurationBeanNameGenerator cbng ?
+				cbng.deriveBeanName(metadata, beanName) : localBeanName);
+		if (!localBeanName.equals(beanName) && !this.registry.containsBeanDefinition(localBeanName) &&
+				!this.registry.isAlias(localBeanName)) {
+			// Register original name as alias unless registered already.
+			this.registry.registerAlias(beanName, localBeanName);
+		}
+		if (explicitNames.length > 0) {
+			// Register aliases even when overridden below.
+			for (int i = 1; i < explicitNames.length; i++) {
+				this.registry.registerAlias(beanName, explicitNames[i]);
+			}
 		}
 
-		// Has this effectively been overridden before (e.g. via XML)?
-		if (isOverriddenByExistingDefinition(beanMethod, beanName)) {
+		ConfigurationClassBeanDefinition beanDef =
+				new ConfigurationClassBeanDefinition(configClass, metadata, localBeanName);
+		beanDef.setSource(this.sourceExtractor.extractSource(metadata, configClass.getResource()));
+
+		// Has this effectively been overridden before (for example, via XML)?
+		if (isOverriddenByExistingDefinition(beanMethod, beanName, beanDef)) {
 			if (beanName.equals(beanMethod.getConfigurationClass().getBeanName())) {
 				throw new BeanDefinitionStoreException(beanMethod.getConfigurationClass().getResource().getDescription(),
 						beanName, "Bean name derived from @Bean method '" + beanMethod.getMetadata().getMethodName() +
@@ -210,9 +235,6 @@ class ConfigurationClassBeanDefinitionReader {
 			}
 			return;
 		}
-
-		ConfigurationClassBeanDefinition beanDef = new ConfigurationClassBeanDefinition(configClass, metadata, beanName);
-		beanDef.setSource(this.sourceExtractor.extractSource(metadata, configClass.getResource()));
 
 		if (metadata.isStatic()) {
 			// static @Bean method
@@ -282,37 +304,48 @@ class ConfigurationClassBeanDefinitionReader {
 					new BeanDefinitionHolder(beanDef, beanName), this.registry,
 					proxyMode == ScopedProxyMode.TARGET_CLASS);
 			beanDefToRegister = new ConfigurationClassBeanDefinition(
-					(RootBeanDefinition) proxyDef.getBeanDefinition(), configClass, metadata, beanName);
+					(RootBeanDefinition) proxyDef.getBeanDefinition(), configClass, metadata, localBeanName);
 		}
 
 		if (logger.isTraceEnabled()) {
-			logger.trace(String.format("Registering bean definition for @Bean method %s.%s()",
-					configClass.getMetadata().getClassName(), beanName));
+			logger.trace("Registering bean definition for @Bean method %s.%s() with bean name '%s'"
+					.formatted(configClass.getMetadata().getClassName(), methodName, beanName));
 		}
 		this.registry.registerBeanDefinition(beanName, beanDefToRegister);
 	}
 
-	protected boolean isOverriddenByExistingDefinition(BeanMethod beanMethod, String beanName) {
+	private static String defaultBeanName(@Nullable String beanName, String methodName) {
+		return (beanName != null ? beanName : methodName);
+	}
+
+	@SuppressWarnings("NullAway") // Reflection
+	private boolean isOverriddenByExistingDefinition(
+			BeanMethod beanMethod, String beanName, ConfigurationClassBeanDefinition newBeanDef) {
+
 		if (!this.registry.containsBeanDefinition(beanName)) {
 			return false;
 		}
 		BeanDefinition existingBeanDef = this.registry.getBeanDefinition(beanName);
+		ConfigurationClass configClass = beanMethod.getConfigurationClass();
 
-		// Is the existing bean definition one that was created from a configuration class?
-		// -> allow the current bean method to override, since both are at second-pass level.
-		// However, if the bean method is an overloaded case on the same configuration class,
-		// preserve the existing bean definition.
+		// If the bean method is an overloaded case on the same configuration class,
+		// preserve the existing bean definition and mark it as overloaded.
 		if (existingBeanDef instanceof ConfigurationClassBeanDefinition ccbd) {
-			if (ccbd.getMetadata().getClassName().equals(
-					beanMethod.getConfigurationClass().getMetadata().getClassName())) {
-				if (ccbd.getFactoryMethodMetadata().getMethodName().equals(ccbd.getFactoryMethodName())) {
-					ccbd.setNonUniqueFactoryMethodName(ccbd.getFactoryMethodMetadata().getMethodName());
-				}
-				return true;
-			}
-			else {
+			if (!ccbd.getMetadata().getClassName().equals(configClass.getMetadata().getClassName())) {
 				return false;
 			}
+			if (ccbd.getFactoryMethodMetadata().getMethodName().equals(beanMethod.getMetadata().getMethodName())) {
+				ccbd.setNonUniqueFactoryMethodName(ccbd.getFactoryMethodMetadata().getMethodName());
+				return true;
+			}
+			Map<String, @Nullable Object> attributes =
+					configClass.getMetadata().getAnnotationAttributes(Configuration.class.getName());
+			if ((attributes != null && (Boolean) attributes.get("enforceUniqueMethods")) ||
+					!this.registry.isBeanDefinitionOverridable(beanName)) {
+				throw new BeanDefinitionOverrideException(beanName, newBeanDef, existingBeanDef,
+						"@Bean method override with same bean name but different method name: " + existingBeanDef);
+			}
+			return true;
 		}
 
 		// A bean definition resulting from a component scan can be silently overridden
@@ -333,14 +366,15 @@ class ConfigurationClassBeanDefinitionReader {
 
 		// At this point, it's a top-level override (probably XML), just having been parsed
 		// before configuration class processing kicks in...
-		if (this.registry instanceof DefaultListableBeanFactory dlbf && !dlbf.isBeanDefinitionOverridable(beanName)) {
-			throw new BeanDefinitionStoreException(beanMethod.getConfigurationClass().getResource().getDescription(),
-					beanName, "@Bean definition illegally overridden by existing bean definition: " + existingBeanDef);
+		if (!this.registry.isBeanDefinitionOverridable(beanName)) {
+			throw new BeanDefinitionOverrideException(beanName,
+					new ConfigurationClassBeanDefinition(configClass, beanMethod.getMetadata(), beanName),
+					existingBeanDef,
+					"@Bean definition illegally overridden by existing bean definition: " + existingBeanDef);
 		}
 		if (logger.isDebugEnabled()) {
-			logger.debug(String.format("Skipping bean definition for %s: a definition for bean '%s' " +
-					"already exists. This top-level bean definition is considered as an override.",
-					beanMethod, beanName));
+			logger.debug(("Skipping bean definition for %s: a definition for bean '%s' already exists. " +
+					"This top-level bean definition is considered as an override.").formatted(beanMethod, beanName));
 		}
 		return true;
 	}
@@ -366,9 +400,11 @@ class ConfigurationClassBeanDefinitionReader {
 			BeanDefinitionReader reader = readerInstanceCache.get(readerClass);
 			if (reader == null) {
 				try {
+					Constructor<? extends BeanDefinitionReader> constructor =
+							readerClass.getDeclaredConstructor(BeanDefinitionRegistry.class);
 					// Instantiate the specified BeanDefinitionReader
-					reader = readerClass.getConstructor(BeanDefinitionRegistry.class).newInstance(this.registry);
-					// Delegate the current ResourceLoader to it if possible
+					reader = BeanUtils.instantiateClass(constructor, this.registry);
+					// Delegate the current ResourceLoader and Environment to it if possible
 					if (reader instanceof AbstractBeanDefinitionReader abdr) {
 						abdr.setResourceLoader(this.resourceLoader);
 						abdr.setEnvironment(this.environment);
@@ -377,18 +413,29 @@ class ConfigurationClassBeanDefinitionReader {
 				}
 				catch (Throwable ex) {
 					throw new IllegalStateException(
-							"Could not instantiate BeanDefinitionReader class [" + readerClass.getName() + "]");
+							"Could not instantiate BeanDefinitionReader class [" + readerClass.getName() + "]", ex);
 				}
 			}
-
-			// TODO SPR-6310: qualify relative path locations as done in AbstractContextLoader.modifyLocations
 			reader.loadBeanDefinitions(resource);
 		});
 	}
 
-	private void loadBeanDefinitionsFromRegistrars(Map<ImportBeanDefinitionRegistrar, AnnotationMetadata> registrars) {
+	private void loadBeanDefinitionsFromImportBeanDefinitionRegistrars(
+			Map<ImportBeanDefinitionRegistrar, AnnotationMetadata> registrars) {
+
 		registrars.forEach((registrar, metadata) ->
 				registrar.registerBeanDefinitions(metadata, this.registry, this.importBeanNameGenerator));
+	}
+
+	private void loadBeanDefinitionsFromBeanRegistrars(MultiValueMap<String, BeanRegistrar> registrars) {
+		registrars.values().forEach(registrarList -> registrarList.forEach(registrar -> {
+			if (!(this.registry instanceof ListableBeanFactory beanFactory)) {
+				throw new IllegalStateException("Cannot support bean registrars since " +
+						this.registry.getClass().getName() + " does not implement ListableBeanFactory");
+			}
+			registrar.register(new BeanRegistryAdapter(
+					this.registry, beanFactory, this.environment, registrar.getClass()), this.environment);
+		}));
 	}
 
 
@@ -405,32 +452,32 @@ class ConfigurationClassBeanDefinitionReader {
 
 		private final MethodMetadata factoryMethodMetadata;
 
-		private final String derivedBeanName;
+		private final String localBeanName;
 
 		public ConfigurationClassBeanDefinition(
-				ConfigurationClass configClass, MethodMetadata beanMethodMetadata, String derivedBeanName) {
+				ConfigurationClass configClass, MethodMetadata beanMethodMetadata, String localBeanName) {
 
 			this.annotationMetadata = configClass.getMetadata();
 			this.factoryMethodMetadata = beanMethodMetadata;
-			this.derivedBeanName = derivedBeanName;
+			this.localBeanName = localBeanName;
 			setResource(configClass.getResource());
 			setLenientConstructorResolution(false);
 		}
 
 		public ConfigurationClassBeanDefinition(RootBeanDefinition original,
-				ConfigurationClass configClass, MethodMetadata beanMethodMetadata, String derivedBeanName) {
+				ConfigurationClass configClass, MethodMetadata beanMethodMetadata, String localBeanName) {
 
 			super(original);
 			this.annotationMetadata = configClass.getMetadata();
 			this.factoryMethodMetadata = beanMethodMetadata;
-			this.derivedBeanName = derivedBeanName;
+			this.localBeanName = localBeanName;
 		}
 
 		private ConfigurationClassBeanDefinition(ConfigurationClassBeanDefinition original) {
 			super(original);
 			this.annotationMetadata = original.annotationMetadata;
 			this.factoryMethodMetadata = original.factoryMethodMetadata;
-			this.derivedBeanName = original.derivedBeanName;
+			this.localBeanName = original.localBeanName;
 		}
 
 		@Override
@@ -439,7 +486,6 @@ class ConfigurationClassBeanDefinitionReader {
 		}
 
 		@Override
-		@NonNull
 		public MethodMetadata getFactoryMethodMetadata() {
 			return this.factoryMethodMetadata;
 		}
@@ -447,7 +493,7 @@ class ConfigurationClassBeanDefinitionReader {
 		@Override
 		public boolean isFactoryMethod(Method candidate) {
 			return (super.isFactoryMethod(candidate) && BeanAnnotationHelper.isBeanAnnotated(candidate) &&
-					BeanAnnotationHelper.determineBeanNameFor(candidate).equals(this.derivedBeanName));
+					BeanAnnotationHelper.determineBeanNameFor(candidate).equals(this.localBeanName));
 		}
 
 		@Override

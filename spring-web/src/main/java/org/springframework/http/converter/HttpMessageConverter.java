@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2021 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,10 +20,11 @@ import java.io.IOException;
 import java.util.Collections;
 import java.util.List;
 
+import org.jspecify.annotations.Nullable;
+
 import org.springframework.http.HttpInputMessage;
 import org.springframework.http.HttpOutputMessage;
 import org.springframework.http.MediaType;
-import org.springframework.lang.Nullable;
 
 /**
  * Strategy interface for converting from and to HTTP requests and responses.
@@ -33,6 +34,7 @@ import org.springframework.lang.Nullable;
  * @author Rossen Stoyanchev
  * @since 3.0
  * @param <T> the converted object type
+ * @see SmartHttpMessageConverter
  */
 public interface HttpMessageConverter<T> {
 
@@ -53,6 +55,24 @@ public interface HttpMessageConverter<T> {
 	 * @return {@code true} if writable; {@code false} otherwise
 	 */
 	boolean canWrite(Class<?> clazz, @Nullable MediaType mediaType);
+
+	/**
+	 * Indicates whether this message converter can
+	 * {@linkplain #write(Object, MediaType, HttpOutputMessage) write} the
+	 * given payload multiple times.
+	 * <p>This can be used by HTTP client libraries to know whether a message can be
+	 * sent again, for example after an HTTP redirect. The default implementation
+	 * returns {@code false}. This typically returns false if the payload can be read
+	 * only once.
+	 * @param t the object t
+	 * @param contentType the content type to use when writing.
+	 * @return {@code true} if {@code t} can be written repeatedly;
+	 * {@code false} otherwise
+	 * @since 7.1
+	 */
+	default boolean canWriteRepeatedly(T t, @Nullable MediaType contentType) {
+		return false;
+	}
 
 	/**
 	 * Return the list of media types supported by this converter. The list may

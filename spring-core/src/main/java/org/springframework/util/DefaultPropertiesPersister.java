@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2022 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -43,7 +43,7 @@ import java.util.Properties;
  * should already apply proper decoding/encoding of characters. If you prefer
  * to escape unicode characters in your properties files, do <i>not</i> specify
  * an encoding for a Reader/Writer (like ReloadableResourceBundleMessageSource's
- * "defaultEncoding" and "fileEncodings" properties).
+ * "defaultCharset" and "fileEncodings" properties).
  *
  * @author Juergen Hoeller
  * @author Sebastien Deleuze

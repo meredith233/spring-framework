@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -140,7 +140,7 @@ class SqlLobValueTests {
 	}
 
 	@Test
-	void testOtherConstructors() throws SQLException {
+	void otherConstructors() throws SQLException {
 		// a bit BS, but we need to test them, as long as they don't throw exceptions
 
 		SqlLobValue lob = new SqlLobValue("bla");
@@ -174,7 +174,7 @@ class SqlLobValueTests {
 	}
 
 	@Test
-	void testCorrectCleanup() throws SQLException {
+	void correctCleanup() throws SQLException {
 		SqlLobValue lob = new SqlLobValue("Bla", handler);
 		lob.setTypeValue(preparedStatement, 1, Types.CLOB, "test");
 		lob.cleanup();
@@ -183,7 +183,7 @@ class SqlLobValueTests {
 	}
 
 	@Test
-	void testOtherSqlType() {
+	void otherSqlType() {
 		SqlLobValue lob = new SqlLobValue("Bla", handler);
 		assertThatIllegalArgumentException().isThrownBy(() ->
 				lob.setTypeValue(preparedStatement, 1, Types.SMALLINT, "test"));

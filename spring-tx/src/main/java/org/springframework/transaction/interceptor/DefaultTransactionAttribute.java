@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,7 +20,8 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.Set;
 
-import org.springframework.lang.Nullable;
+import org.jspecify.annotations.Nullable;
+
 import org.springframework.transaction.support.DefaultTransactionDefinition;
 import org.springframework.util.CollectionUtils;
 import org.springframework.util.StringUtils;
@@ -38,20 +39,17 @@ import org.springframework.util.StringValueResolver;
 @SuppressWarnings("serial")
 public class DefaultTransactionAttribute extends DefaultTransactionDefinition implements TransactionAttribute {
 
-	@Nullable
-	private String descriptor;
+	private @Nullable String descriptor;
 
-	@Nullable
-	private String timeoutString;
+	private @Nullable String timeoutString;
 
-	@Nullable
-	private String qualifier;
+	private @Nullable String qualifier;
 
 	private Collection<String> labels = Collections.emptyList();
 
 
 	/**
-	 * Create a new DefaultTransactionAttribute, with default settings.
+	 * Create a new {@code DefaultTransactionAttribute} with default settings.
 	 * Can be modified through bean property setters.
 	 * @see #setPropagationBehavior
 	 * @see #setIsolationLevel
@@ -75,7 +73,7 @@ public class DefaultTransactionAttribute extends DefaultTransactionDefinition im
 	}
 
 	/**
-	 * Create a new DefaultTransactionAttribute with the given
+	 * Create a new {@code DefaultTransactionAttribute} with the given
 	 * propagation behavior. Can be modified through bean property setters.
 	 * @param propagationBehavior one of the propagation constants in the
 	 * TransactionDefinition interface
@@ -90,7 +88,7 @@ public class DefaultTransactionAttribute extends DefaultTransactionDefinition im
 
 	/**
 	 * Set a descriptor for this transaction attribute,
-	 * e.g. indicating where the attribute is applying.
+	 * for example, indicating where the attribute is applying.
 	 * @since 4.3.4
 	 */
 	public void setDescriptor(@Nullable String descriptor) {
@@ -102,8 +100,7 @@ public class DefaultTransactionAttribute extends DefaultTransactionDefinition im
 	 * or {@code null} if none.
 	 * @since 4.3.4
 	 */
-	@Nullable
-	public String getDescriptor() {
+	public @Nullable String getDescriptor() {
 		return this.descriptor;
 	}
 
@@ -125,8 +122,7 @@ public class DefaultTransactionAttribute extends DefaultTransactionDefinition im
 	 * @see #getTimeout
 	 * @see #resolveAttributeStrings
 	 */
-	@Nullable
-	public String getTimeoutString() {
+	public @Nullable String getTimeoutString() {
 		return this.timeoutString;
 	}
 
@@ -146,8 +142,7 @@ public class DefaultTransactionAttribute extends DefaultTransactionDefinition im
 	 * @since 3.0
 	 */
 	@Override
-	@Nullable
-	public String getQualifier() {
+	public @Nullable String getQualifier() {
 		return this.qualifier;
 	}
 
@@ -206,7 +201,7 @@ public class DefaultTransactionAttribute extends DefaultTransactionDefinition im
 				}
 				catch (RuntimeException ex) {
 					throw new IllegalArgumentException(
-							"Invalid timeoutString value \"" + timeoutString + "\" - cannot parse into int");
+							"Invalid timeoutString value \"" + timeoutString + "\"; " + ex);
 				}
 			}
 		}

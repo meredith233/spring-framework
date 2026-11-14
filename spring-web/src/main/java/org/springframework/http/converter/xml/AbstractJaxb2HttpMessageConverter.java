@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2019 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,14 +16,18 @@
 
 package org.springframework.http.converter.xml;
 
+import java.nio.charset.Charset;
+import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
 
 import jakarta.xml.bind.JAXBContext;
 import jakarta.xml.bind.JAXBException;
 import jakarta.xml.bind.Marshaller;
 import jakarta.xml.bind.Unmarshaller;
+import org.jspecify.annotations.Nullable;
 
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.http.converter.HttpMessageConversionException;
 
 /**
@@ -37,7 +41,7 @@ import org.springframework.http.converter.HttpMessageConversionException;
  */
 public abstract class AbstractJaxb2HttpMessageConverter<T> extends AbstractXmlHttpMessageConverter<T> {
 
-	private final ConcurrentMap<Class<?>, JAXBContext> jaxbContexts = new ConcurrentHashMap<>(64);
+	private final Map<Class<?>, JAXBContext> jaxbContexts = new ConcurrentHashMap<>(64);
 
 
 	/**
@@ -114,6 +118,22 @@ public abstract class AbstractJaxb2HttpMessageConverter<T> extends AbstractXmlHt
 						"Could not create JAXBContext for class [" + clazz + "]: " + ex.getMessage(), ex);
 			}
 		});
+	}
+
+	/**
+	 * Detect the charset from the given {@link HttpHeaders#getContentType()}.
+	 * @param httpHeaders the current HTTP headers
+	 * @return the charset defined in the content type header, or {@code null} if not found
+	 * @since 6.2.8
+	 */
+	protected @Nullable Charset detectCharset(HttpHeaders httpHeaders) {
+		MediaType contentType = httpHeaders.getContentType();
+		if (contentType != null && contentType.getCharset() != null) {
+			return contentType.getCharset();
+		}
+		else {
+			return null;
+		}
 	}
 
 }

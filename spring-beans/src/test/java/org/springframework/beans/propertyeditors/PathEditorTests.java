@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,6 +19,7 @@ package org.springframework.beans.propertyeditors;
 import java.beans.PropertyEditor;
 import java.io.File;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 
 import org.junit.jupiter.api.Test;
 
@@ -34,7 +35,7 @@ import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException
 class PathEditorTests {
 
 	@Test
-	void testClasspathPathName() {
+	void classpathPathName() {
 		PropertyEditor pathEditor = new PathEditor();
 		pathEditor.setAsText("classpath:" + ClassUtils.classPackageAsResourcePath(getClass()) + "/" +
 				ClassUtils.getShortName(getClass()) + ".class");
@@ -45,14 +46,14 @@ class PathEditorTests {
 	}
 
 	@Test
-	void testWithNonExistentResource() {
-		PropertyEditor propertyEditor = new PathEditor();
+	void withNonExistentResource() {
+		PropertyEditor pathEditor = new PathEditor();
 		assertThatIllegalArgumentException().isThrownBy(() ->
-				propertyEditor.setAsText("classpath:/no_way_this_file_is_found.doc"));
+				pathEditor.setAsText("classpath:/no_way_this_file_is_found.doc"));
 	}
 
 	@Test
-	void testWithNonExistentPath() {
+	void withNonExistentPath() {
 		PropertyEditor pathEditor = new PathEditor();
 		pathEditor.setAsText("file:/no_way_this_file_is_found.doc");
 		Object value = pathEditor.getValue();
@@ -62,7 +63,7 @@ class PathEditorTests {
 	}
 
 	@Test
-	void testAbsolutePath() {
+	void absolutePath() {
 		PropertyEditor pathEditor = new PathEditor();
 		pathEditor.setAsText("/no_way_this_file_is_found.doc");
 		Object value = pathEditor.getValue();
@@ -72,7 +73,7 @@ class PathEditorTests {
 	}
 
 	@Test
-	void testWindowsAbsolutePath() {
+	void windowsAbsolutePath() {
 		PropertyEditor pathEditor = new PathEditor();
 		pathEditor.setAsText("C:\\no_way_this_file_is_found.doc");
 		Object value = pathEditor.getValue();
@@ -82,7 +83,7 @@ class PathEditorTests {
 	}
 
 	@Test
-	void testWindowsAbsoluteFilePath() {
+	void windowsAbsoluteFilePath() {
 		PropertyEditor pathEditor = new PathEditor();
 		try {
 			pathEditor.setAsText("file://C:\\no_way_this_file_is_found.doc");
@@ -99,7 +100,17 @@ class PathEditorTests {
 	}
 
 	@Test
-	void testUnqualifiedPathNameFound() {
+	void currentDirectory() {
+		PropertyEditor pathEditor = new PathEditor();
+		pathEditor.setAsText("file:.");
+		Object value = pathEditor.getValue();
+		assertThat(value).isInstanceOf(Path.class);
+		Path path = (Path) value;
+		assertThat(path).isEqualTo(Paths.get("."));
+	}
+
+	@Test
+	void unqualifiedPathNameFound() {
 		PropertyEditor pathEditor = new PathEditor();
 		String fileName = ClassUtils.classPackageAsResourcePath(getClass()) + "/" +
 				ClassUtils.getShortName(getClass()) + ".class";
@@ -117,7 +128,7 @@ class PathEditorTests {
 	}
 
 	@Test
-	void testUnqualifiedPathNameNotFound() {
+	void unqualifiedPathNameNotFound() {
 		PropertyEditor pathEditor = new PathEditor();
 		String fileName = ClassUtils.classPackageAsResourcePath(getClass()) + "/" +
 				ClassUtils.getShortName(getClass()) + ".clazz";

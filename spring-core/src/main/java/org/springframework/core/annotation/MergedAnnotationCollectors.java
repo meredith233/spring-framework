@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2020 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -26,6 +26,8 @@ import java.util.function.IntFunction;
 import java.util.stream.Collector;
 import java.util.stream.Collector.Characteristics;
 
+import org.jspecify.annotations.Nullable;
+
 import org.springframework.core.annotation.MergedAnnotation.Adapt;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
@@ -36,6 +38,7 @@ import org.springframework.util.MultiValueMap;
  *
  * @author Phillip Webb
  * @author Sam Brannen
+ * @author Chengang Guan
  * @since 5.2
  */
 public abstract class MergedAnnotationCollectors {
@@ -108,10 +111,10 @@ public abstract class MergedAnnotationCollectors {
 	 * annotations into a {@link LinkedMultiValueMap}
 	 * @see #toMultiValueMap(Function, MergedAnnotation.Adapt...)
 	 */
-	public static <A extends Annotation> Collector<MergedAnnotation<A>, ?, MultiValueMap<String, Object>> toMultiValueMap(
+	public static <A extends Annotation> Collector<MergedAnnotation<A>, ? extends @Nullable Object, @Nullable MultiValueMap<String, @Nullable Object>> toMultiValueMap(
 			Adapt... adaptations) {
 
-		return toMultiValueMap(Function.identity(), adaptations);
+		return toMultiValueMap((MultiValueMap<String, @Nullable Object> t) -> t, IDENTITY_FINISH_CHARACTERISTICS, adaptations);
 	}
 
 	/**
@@ -126,20 +129,31 @@ public abstract class MergedAnnotationCollectors {
 	 * annotations into a {@link LinkedMultiValueMap}
 	 * @see #toMultiValueMap(MergedAnnotation.Adapt...)
 	 */
-	public static <A extends Annotation> Collector<MergedAnnotation<A>, ?, MultiValueMap<String, Object>> toMultiValueMap(
-			Function<MultiValueMap<String, Object>, MultiValueMap<String, Object>> finisher,
+	public static <A extends Annotation> Collector<MergedAnnotation<A>, ? extends @Nullable Object, @Nullable MultiValueMap<String, @Nullable Object>> toMultiValueMap(
+			Function<MultiValueMap<String, @Nullable Object>, @Nullable MultiValueMap<String, @Nullable Object>> finisher,
 			Adapt... adaptations) {
 
-		Characteristics[] characteristics = (isSameInstance(finisher, Function.identity()) ?
-				IDENTITY_FINISH_CHARACTERISTICS : NO_CHARACTERISTICS);
-		return Collector.of(LinkedMultiValueMap::new,
-				(map, annotation) -> annotation.asMap(adaptations).forEach(map::add),
-				MergedAnnotationCollectors::combiner, finisher, characteristics);
+		return toMultiValueMap(finisher, NO_CHARACTERISTICS, adaptations);
 	}
 
 
-	private static boolean isSameInstance(Object instance, Object candidate) {
-		return instance == candidate;
+	/**
+	 * Internal overload that allows callers to explicitly control the
+	 * {@link Characteristics} of the resulting {@link Collector}.
+	 * <p>The public {@link #toMultiValueMap(Adapt...)} variant passes
+	 * {@link #IDENTITY_FINISH_CHARACTERISTICS} because its finisher is a known
+	 * identity function. The public
+	 * {@link #toMultiValueMap(Function, Adapt...)} variant conservatively passes
+	 * {@link #NO_CHARACTERISTICS} because an arbitrary finisher cannot be
+	 * reliably proven to be the identity function.
+	 */
+	private static <A extends Annotation> Collector<MergedAnnotation<A>, ? extends @Nullable Object, @Nullable MultiValueMap<String, @Nullable Object>> toMultiValueMap(
+			Function<MultiValueMap<String, @Nullable Object>, @Nullable MultiValueMap<String, @Nullable Object>> finisher,
+			Characteristics[] characteristics, Adapt... adaptations) {
+
+		return Collector.of(LinkedMultiValueMap::new,
+				(MultiValueMap<String, @Nullable Object> map, MergedAnnotation<A> annotation) -> annotation.asMap(adaptations).forEach(map::add),
+				MergedAnnotationCollectors::combiner, finisher, characteristics);
 	}
 
 	/**
@@ -157,7 +171,7 @@ public abstract class MergedAnnotationCollectors {
 	 * <p>This method is only invoked if the {@link java.util.stream.Stream} is
 	 * processed in {@linkplain java.util.stream.Stream#parallel() parallel}.
 	 */
-	private static <K, V> MultiValueMap<K, V> combiner(MultiValueMap<K, V> map, MultiValueMap<K, V> additions) {
+	private static <K, V> MultiValueMap<K, @Nullable V> combiner(MultiValueMap<K, @Nullable V> map, MultiValueMap<K, @Nullable V> additions) {
 		map.addAll(additions);
 		return map;
 	}

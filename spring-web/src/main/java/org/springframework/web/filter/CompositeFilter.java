@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2016 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -75,14 +75,37 @@ public class CompositeFilter implements Filter {
 	}
 
 	/**
-	 * Clean up all the filters supplied, calling each one's destroy method in turn, but in reverse order.
-	 * @see Filter#init(FilterConfig)
+	 * Clean up all the filters supplied, calling each one's {@code destroy()}
+	 * method in turn, but in reverse order.
+	 * <p>If a filter's {@code destroy()} method throws a {@link RuntimeException}
+	 * or {@link Error}, the remaining filters are still destroyed. Once all
+	 * filters have been processed, the first failure is rethrown as is, with any
+	 * subsequent failures added to it as {@linkplain Throwable#addSuppressed
+	 * suppressed exceptions}.
+	 * @see Filter#destroy()
 	 */
 	@Override
 	public void destroy() {
+		Throwable firstFailure = null;
 		for (int i = this.filters.size(); i-- > 0;) {
 			Filter filter = this.filters.get(i);
-			filter.destroy();
+			try {
+				filter.destroy();
+			}
+			catch (Throwable ex) {
+				if (firstFailure == null) {
+					firstFailure = ex;
+				}
+				else if (firstFailure != ex) {
+					firstFailure.addSuppressed(ex);
+				}
+			}
+		}
+		if (firstFailure instanceof RuntimeException runtimeException) {
+			throw runtimeException;
+		}
+		if (firstFailure instanceof Error error) {
+			throw error;
 		}
 	}
 

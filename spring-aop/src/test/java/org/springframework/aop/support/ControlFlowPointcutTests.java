@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -93,7 +93,7 @@ class ControlFlowPointcutTests {
 
 	/**
 	 * Check that we can use a cflow pointcut in conjunction with
-	 * a static pointcut: e.g. all setter methods that are invoked under
+	 * a static pointcut: for example, all setter methods that are invoked under
 	 * a particular class. This greatly reduces the number of calls
 	 * to the cflow pointcut, meaning that it's not so prohibitively
 	 * expensive.
@@ -152,7 +152,7 @@ class ControlFlowPointcutTests {
 	}
 
 	@Test
-	void testToString() {
+	void toStringOutput() {
 		String pointcutType = ControlFlowPointcut.class.getName();
 		String componentType = MyComponent.class.getName();
 

@@ -44,6 +44,11 @@ The following example uses `@Cacheable` on the `findBook` method with multiple c
 	public Book findBook(ISBN isbn) {...}
 ----
 
+TIP: When `@Cacheable` is combined with `@Retryable`, the retry advice is applied
+outermost, so each retry attempt checks the cache before invoking the method. See
+xref:core/resilience.adoc#resilience-annotations-retryable-combining-cacheable[Combining `@Retryable` with `@Cacheable`]
+for details.
+
 [[cache-annotations-cacheable-default-key]]
 === Default Key Generation
 
@@ -98,7 +103,7 @@ through its `key` attribute. You can use xref:core/expressions.adoc[SpEL] to pic
 arguments of interest (or their nested properties), perform operations, or even
 invoke arbitrary methods without having to write any code or implement any interface.
 This is the recommended approach over the
-xref:integration/cache/annotations.adoc#cache-annotations-cacheable-default-key[default generator],
+<<cache-annotations-cacheable-default-key,default generator>>,
 since methods tend to be quite different in signatures as the code base grows. While the
 default strategy might work for some methods, it rarely works for all methods.
 
@@ -160,7 +165,7 @@ For applications that work with several cache managers, you can set the
 <1> Specifying `anotherCacheManager`.
 
 You can also replace the `CacheResolver` entirely in a fashion similar to that of
-replacing xref:integration/cache/annotations.adoc#cache-annotations-cacheable-key[key generation].
+replacing <<cache-annotations-cacheable-key,key generation>>.
 The resolution is requested for every cache operation, letting the implementation
 actually resolve the caches to use based on runtime arguments. The following example
 shows how to specify a `CacheResolver`:
@@ -211,8 +216,8 @@ documentation of your cache provider for more details.
 [[cache-annotations-cacheable-reactive]]
 === Caching with CompletableFuture and Reactive Return Types
 
-As of 6.1, cache annotations take `CompletableFuture` and reactive return types
-into account, automatically adapting the cache interaction accordingly.
+Cache annotations take `CompletableFuture` and reactive return types into account,
+automatically adapting the cache interaction accordingly.
 
 For a method returning a `CompletableFuture`, the object produced by that future
 will be cached whenever it is complete, and the cache lookup for a cache hit will
@@ -245,6 +250,10 @@ and the cache lookup for a cache hit will be retrieved as a `Flux` (backed by a
 	public Flux<Book> findBooks(String author) {...}
 ----
 
+This collected `List` is also what an `unless` SpEL expression sees as the `#result` for
+such a method (see <<cache-spel-context,SpEL evaluation context>>); the `Flux` returned
+to the caller is unaffected by this collection process.
+
 Such `CompletableFuture` and reactive adaptation also works for synchronized caching,
 computing the value only once in case of a concurrent cache miss:
 
@@ -271,6 +280,15 @@ enabled: set `setAsyncCacheMode(true)` on your `CaffeineCacheManager` instance.
 		return cacheManager;
 	}
 ----
+
+NOTE: On a cache miss, the publisher returned by a reactive method is subscribed to with
+the caller's Reactor `Context`, so that context-dependent operations such as reactive
+transactions or security work as they would without caching. With `sync=true`, however,
+the cache itself subscribes to the publisher in order to compute the value only once for
+concurrent callers, and the caller's `Context` is therefore not propagated. In either
+case, a cached value is returned to subsequent callers regardless of their `Context`, so
+any context-dependent value that affects the result should be passed as a method
+argument in order to become part of the cache key.
 
 Last but not least, be aware that annotation-driven caching is not appropriate
 for sophisticated reactive interactions involving composition and back pressure.
@@ -332,7 +350,7 @@ metadata, such as the argument names. The following table describes the items ma
 available to the context so that you can use them for key and conditional computations:
 
 [[cache-spel-context-tbl]]
-.Cache SpEL available metadata
+.Cache metadata available in SpEL expressions
 |===
 | Name| Location| Description| Example
 
@@ -358,7 +376,7 @@ available to the context so that you can use them for key and conditional comput
 
 | `args`
 | Root object
-| The arguments (as array) used for invoking the target
+| The arguments (as an object array) used for invoking the target
 | `#root.args[0]`
 
 | `caches`
@@ -368,17 +386,20 @@ available to the context so that you can use them for key and conditional comput
 
 | Argument name
 | Evaluation context
-| Name of any of the method arguments. If the names are not available
-  (perhaps due to having no debug information), the argument names are also available under the `#a<#arg>`
-  where `#arg` stands for the argument index (starting from `0`).
+| The name of a particular method argument. If the names are not available
+  (for example, because the code was compiled without the `-parameters` flag), individual
+  arguments are also available using the `#a<#arg>` syntax where `<#arg>` stands for the
+  argument index (starting from 0).
 | `#iban` or `#a0` (you can also use `#p0` or `#p<#arg>` notation as an alias).
 
 | `result`
 | Evaluation context
-| The result of the method call (the value to be cached). Only available in `unless`
-  expressions, `cache put` expressions (to compute the `key`), or `cache evict`
-  expressions (when `beforeInvocation` is `false`). For supported wrappers (such as
-  `Optional`), `#result` refers to the actual object, not the wrapper.
+| The result of the method call (the value to be cached, or evaluated for eviction). Only
+  available in `unless` expressions, `cache put` expressions (`key`, `condition`, or
+  `unless`), or `cache evict` expressions (`key` or `condition`, when `beforeInvocation`
+  is `false`). For supported wrappers (such as `Optional`), `#result` refers to the
+  actual object, not the wrapper. For a method returning a `Flux`, `#result` refers to a
+  `List` containing all values collected from the `Flux`.
 | `#result`
 |===
 
@@ -407,8 +428,13 @@ other), such declarations should be avoided. Note also that such conditions shou
 on the result object (that is, the `#result` variable), as these are validated up-front to
 confirm the exclusion.
 
-As of 6.1, `@CachePut` takes `CompletableFuture` and reactive return types into account,
-performing the put operation whenever the produced object is available.
+`@CachePut` takes `CompletableFuture` and reactive return types into account, performing
+the put operation whenever the produced object is available.
+
+TIP: When `@CachePut` is combined with `@Retryable`, the retry advice is applied
+outermost, so each successful retry attempt updates the cache; a failed attempt does
+not. See xref:core/resilience.adoc#resilience-annotations-retryable-combining-cacheable[Combining `@Retryable` with `@Cacheable`]
+for details.
 
 
 [[cache-annotations-evict]]
@@ -452,8 +478,19 @@ trigger, the return values are ignored (as they do not interact with the cache).
 not the case with `@Cacheable` which adds data to the cache or updates data in the cache
 and, thus, requires a result.
 
-As of 6.1, `@CacheEvict` takes `CompletableFuture` and reactive return types into account,
-performing an after-invocation evict operation whenever processing has completed.
+`@CacheEvict` takes `CompletableFuture` and reactive return types into account,
+performing an after-invocation evict operation whenever processing has completed. As with
+`@Cacheable` and `@CachePut`, for a method returning a `Flux`, all emitted elements are
+collected into a `List` before the evict operation is performed. When `beforeInvocation`
+is `false`, that same `List` is what the `condition` SpEL expression sees as the
+`#result`. Either way, the `Flux` returned to the caller is unaffected by this collection
+process.
+
+TIP: When `@CacheEvict` is combined with `@Retryable`, the retry advice is applied
+outermost, so eviction runs again on every retry attempt -- and, with
+`beforeInvocation=true`, before each attempt regardless of its outcome. See
+xref:core/resilience.adoc#resilience-annotations-retryable-combining-cacheable[Combining `@Retryable` with `@Cacheable`]
+for details.
 
 
 [[cache-annotations-caching]]
@@ -500,12 +537,12 @@ Placing this annotation on the class does not turn on any caching operation.
 An operation-level customization always overrides a customization set on `@CacheConfig`.
 Therefore, this gives three levels of customizations for each cache operation:
 
-* Globally configured, e.g. through `CachingConfigurer`: see next section.
+* Globally configured, for example, through `CachingConfigurer`: see next section.
 * At the class level, using `@CacheConfig`.
 * At the operation level.
 
 NOTE: Provider-specific settings are typically available on the `CacheManager` bean,
-e.g. on `CaffeineCacheManager`. These are effectively also global.
+for example, on `CaffeineCacheManager`. These are effectively also global.
 
 
 [[cache-annotation-enable]]
@@ -518,41 +555,9 @@ disable it by removing only one configuration line rather than all the annotatio
 your code).
 
 To enable caching annotations add the annotation `@EnableCaching` to one of your
-`@Configuration` classes:
+`@Configuration` classes or use the `cache:annotation-driven` element with XML:
 
-[source,java,indent=0,subs="verbatim,quotes"]
-----
-	@Configuration
-	@EnableCaching
-	public class AppConfig {
-
-		@Bean
-		CacheManager cacheManager() {
-			CaffeineCacheManager cacheManager = new CaffeineCacheManager();
-			cacheManager.setCacheSpecification(...);
-			return cacheManager;
-		}
-	}
-----
-
-Alternatively, for XML configuration you can use the `cache:annotation-driven` element:
-
-[source,xml,indent=0,subs="verbatim,quotes"]
-----
-	<beans xmlns="http://www.springframework.org/schema/beans"
-		xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-		xmlns:cache="http://www.springframework.org/schema/cache"
-		xsi:schemaLocation="
-			http://www.springframework.org/schema/beans https://www.springframework.org/schema/beans/spring-beans.xsd
-			http://www.springframework.org/schema/cache https://www.springframework.org/schema/cache/spring-cache.xsd">
-
-		<cache:annotation-driven/>
-
-		<bean id="cacheManager" class="org.springframework.cache.caffeine.CaffeineCacheManager">
-			<property name="cacheSpecification" value="..."/>
-		</bean>
-	</beans>
-----
+include-code::./CacheConfiguration[tag=snippet,indent=0]
 
 Both the `cache:annotation-driven` element and the `@EnableCaching` annotation let you
 specify various options that influence the way the caching behavior is added to the
@@ -680,11 +685,11 @@ triggers cache population or eviction. This is quite handy as a template mechani
 as it eliminates the need to duplicate cache annotation declarations, which is
 especially useful if the key or condition are specified or if the foreign imports
 (`org.springframework`) are not allowed in your code base. Similarly to the rest
-of the xref:core/beans/classpath-scanning.adoc#beans-stereotype-annotations[stereotype] annotations, you can
-use `@Cacheable`, `@CachePut`, `@CacheEvict`, and `@CacheConfig` as
-xref:core/beans/classpath-scanning.adoc#beans-meta-annotations[meta-annotations] (that is, annotations that
-can annotate other annotations). In the following example, we replace a common
-`@Cacheable` declaration with our own custom annotation:
+of the xref:core/beans/classpath-scanning.adoc#beans-stereotype-annotations[stereotype]
+annotations, you can use `@Cacheable`, `@CachePut`, `@CacheEvict`, and `@CacheConfig`
+as xref:core/beans/classpath-scanning.adoc#beans-meta-annotations[meta-annotations]
+(that is, annotations that can annotate other annotations). In the following example,
+we replace a common `@Cacheable` declaration with our own custom annotation:
 
 [source,java,indent=0,subs="verbatim,quotes"]
 ----
@@ -715,7 +720,5 @@ preceding code:
 
 Even though `@SlowService` is not a Spring annotation, the container automatically picks
 up its declaration at runtime and understands its meaning. Note that, as mentioned
-xref:integration/cache/annotations.adoc#cache-annotation-enable[earlier], annotation-driven behavior needs to be enabled.
-
-
-
+<<cache-annotation-enable,earlier>>,
+annotation-driven behavior needs to be enabled.

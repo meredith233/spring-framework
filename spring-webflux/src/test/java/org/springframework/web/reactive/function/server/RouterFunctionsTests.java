@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -28,11 +28,14 @@ import reactor.test.StepVerifier;
 
 import org.springframework.core.io.buffer.DataBuffer;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseCookie;
 import org.springframework.http.server.reactive.HttpHandler;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.reactive.CorsWebFilter;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.server.ServerWebExchange;
 import org.springframework.web.server.WebFilter;
@@ -223,11 +226,6 @@ class RouterFunctionsTests {
 					public HttpStatus statusCode() {
 						return HttpStatus.OK;
 					}
-					@SuppressWarnings("deprecation")
-					@Override
-					public int rawStatusCode() {
-						return 200;
-					}
 					@Override
 					public HttpHeaders headers() {
 						return new HttpHeaders();
@@ -262,11 +260,6 @@ class RouterFunctionsTests {
 					public HttpStatus statusCode() {
 						return HttpStatus.OK;
 					}
-					@SuppressWarnings("deprecation")
-					@Override
-					public int rawStatusCode() {
-						return 200;
-					}
 					@Override
 					public HttpHeaders headers() {
 						return new HttpHeaders();
@@ -290,6 +283,58 @@ class RouterFunctionsTests {
 		MockServerHttpResponse httpResponse = new MockServerHttpResponse();
 		result.handle(httpRequest, httpResponse).block();
 		assertThat(httpResponse.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+	}
+
+	@Test
+	void toHttpHandlerPreFlightRequestDefaultHandling() {
+		RouterFunction<ServerResponse> routerFunction =
+				RouterFunctions.route(RequestPredicates.all(), request -> ServerResponse.accepted().build());
+
+		HttpHandler handler = RouterFunctions.toHttpHandler(routerFunction);
+		assertThat(handler).isNotNull();
+
+		MockServerHttpRequest httpRequest = MockServerHttpRequest.options("https://localhost")
+				.header("Origin", "https://example.com")
+				.header(HttpHeaders.ACCESS_CONTROL_REQUEST_METHOD, "PUT")
+				.build();
+
+		MockServerHttpResponse httpResponse = new MockServerHttpResponse();
+		handler.handle(httpRequest, httpResponse).block();
+
+		assertThat(httpResponse.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+	}
+
+	@Test
+	void toHttpHandlerPreFlightRequestHandled() {
+
+		CorsWebFilter corsFilter = new CorsWebFilter(exchange -> {
+			if (exchange.getRequest().getPath().value().equals("/path")) {
+				CorsConfiguration corsConfig = new CorsConfiguration();
+				corsConfig.addAllowedOrigin("https://example.com");
+				corsConfig.addAllowedMethod(HttpMethod.PUT);
+				return corsConfig;
+			}
+			return null;
+		});
+
+		RouterFunction<ServerResponse> routerFunction = RouterFunctions.route()
+				.PUT("/path", request -> {
+					throw new IllegalStateException("Not expected");
+				})
+				.build();
+
+		HttpHandler handler = RouterFunctions.toHttpHandler(
+				routerFunction, HandlerStrategies.builder().webFilter(corsFilter).build());
+
+		MockServerHttpRequest httpRequest = MockServerHttpRequest.options("https://localhost/path")
+				.header("Origin", "https://example.com")
+				.header(HttpHeaders.ACCESS_CONTROL_REQUEST_METHOD, "PUT")
+				.build();
+
+		MockServerHttpResponse httpResponse = new MockServerHttpResponse();
+		handler.handle(httpRequest, httpResponse).block();
+
+		assertThat(httpResponse.getStatusCode()).isNull();
 	}
 
 	@Test

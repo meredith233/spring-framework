@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2021 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -47,6 +47,7 @@ public final class TableMetaDataProviderFactory {
 	 * @param context the class that holds configuration and meta-data
 	 * @return instance of the TableMetaDataProvider implementation to be used
 	 */
+	@SuppressWarnings("removal")
 	public static TableMetaDataProvider createMetaDataProvider(DataSource dataSource, TableMetaDataContext context) {
 		try {
 			return JdbcUtils.extractDatabaseMetaData(dataSource, databaseMetaData -> {
@@ -65,6 +66,9 @@ public final class TableMetaDataProviderFactory {
 				}
 				else if ("HSQL Database Engine".equals(databaseProductName)) {
 					provider = new HsqlTableMetaDataProvider(databaseMetaData);
+				}
+				else if ("MySQL".equals(databaseProductName) || "MariaDB".equals(databaseProductName)) {
+					provider = new MySQLTableMetaDataProvider(databaseMetaData);
 				}
 				else {
 					provider = new GenericTableMetaDataProvider(databaseMetaData);

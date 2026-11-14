@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -44,38 +44,38 @@ class YamlMapFactoryBeanTests {
 
 
 	@Test
-	void testSetIgnoreResourceNotFound() {
+	void setIgnoreResourceNotFound() {
 		this.factory.setResolutionMethod(YamlMapFactoryBean.ResolutionMethod.OVERRIDE_AND_IGNORE);
-		this.factory.setResources(new FileSystemResource("non-exsitent-file.yml"));
+		this.factory.setResources(new FileSystemResource("non-existent-file.yml"));
 		assertThat(this.factory.getObject()).isEmpty();
 	}
 
 	@Test
-	void testSetBarfOnResourceNotFound() {
+	void setBarfOnResourceNotFound() {
 		assertThatIllegalStateException().isThrownBy(() -> {
-				this.factory.setResources(new FileSystemResource("non-exsitent-file.yml"));
+				this.factory.setResources(new FileSystemResource("non-existent-file.yml"));
 				this.factory.getObject().size();
 		});
 	}
 
 	@Test
-	void testGetObject() {
+	void getObject() {
 		this.factory.setResources(new ByteArrayResource("foo: bar".getBytes()));
 		assertThat(this.factory.getObject()).hasSize(1);
 	}
 
 	@SuppressWarnings("unchecked")
 	@Test
-	void testOverrideAndRemoveDefaults() {
+	void overrideAndRemoveDefaults() {
 		this.factory.setResources(new ByteArrayResource("foo:\n  bar: spam".getBytes()),
 				new ByteArrayResource("foo:\n  spam: bar".getBytes()));
 
 		assertThat(this.factory.getObject()).hasSize(1);
-		assertThat(((Map<String, Object>) this.factory.getObject().get("foo"))).hasSize(2);
+		assertThat((Map<String, Object>) this.factory.getObject().get("foo")).hasSize(2);
 	}
 
 	@Test
-	void testFirstFound() {
+	void firstFound() {
 		this.factory.setResolutionMethod(YamlProcessor.ResolutionMethod.FIRST_FOUND);
 		this.factory.setResources(new AbstractResource() {
 			@Override
@@ -92,7 +92,7 @@ class YamlMapFactoryBeanTests {
 	}
 
 	@Test
-	void testMapWithPeriodsInKey() {
+	void mapWithPeriodsInKey() {
 		this.factory.setResources(new ByteArrayResource("foo:\n  ? key1.key2\n  : value".getBytes()));
 		Map<String, Object> map = this.factory.getObject();
 
@@ -107,7 +107,7 @@ class YamlMapFactoryBeanTests {
 	}
 
 	@Test
-	void testMapWithIntegerValue() {
+	void mapWithIntegerValue() {
 		this.factory.setResources(new ByteArrayResource("foo:\n  ? key1.key2\n  : 3".getBytes()));
 		Map<String, Object> map = this.factory.getObject();
 
@@ -122,7 +122,7 @@ class YamlMapFactoryBeanTests {
 	}
 
 	@Test
-	void testDuplicateKey() {
+	void duplicateKey() {
 		this.factory.setResources(new ByteArrayResource("mymap:\n  foo: bar\nmymap:\n  bar: foo".getBytes()));
 		assertThatExceptionOfType(DuplicateKeyException.class).isThrownBy(() ->
 				this.factory.getObject().get("mymap"));

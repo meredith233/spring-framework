@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2023 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,8 +16,11 @@
 
 package org.springframework.jdbc.support;
 
+import java.sql.BatchUpdateException;
 import java.sql.SQLException;
 import java.util.Set;
+
+import org.jspecify.annotations.Nullable;
 
 import org.springframework.dao.CannotAcquireLockException;
 import org.springframework.dao.DataAccessException;
@@ -28,7 +31,6 @@ import org.springframework.dao.PessimisticLockingFailureException;
 import org.springframework.dao.QueryTimeoutException;
 import org.springframework.dao.TransientDataAccessResourceException;
 import org.springframework.jdbc.BadSqlGrammarException;
-import org.springframework.lang.Nullable;
 
 /**
  * {@link SQLExceptionTranslator} implementation that analyzes the SQL state in
@@ -41,7 +43,9 @@ import org.springframework.lang.Nullable;
  *
  * <p>This translator is commonly used as a {@link #setFallbackTranslator fallback}
  * behind a primary translator such as {@link SQLErrorCodeSQLExceptionTranslator} or
- * {@link SQLExceptionSubclassTranslator}.
+ * {@link SQLExceptionSubclassTranslator}. As of 6.2.12, it specifically introspects
+ * {@link java.sql.BatchUpdateException} to look at the underlying exception
+ * (for alignment when used behind a {@link SQLExceptionSubclassTranslator}).
  *
  * @author Rod Johnson
  * @author Juergen Hoeller
@@ -70,10 +74,15 @@ public class SQLStateSQLExceptionTranslator extends AbstractFallbackSQLException
 			"44"   // With check violation
 		);
 
+	private static final Set<String> PESSIMISTIC_LOCKING_FAILURE_CODES = Set.of(
+			"40",  // Transaction rollback
+			"61"   // Oracle: deadlock
+	);
+
 	private static final Set<String> DATA_ACCESS_RESOURCE_FAILURE_CODES = Set.of(
 			"08",  // Connection exception
-			"53",  // PostgreSQL: insufficient resources (e.g. disk full)
-			"54",  // PostgreSQL: program limit exceeded (e.g. statement too complex)
+			"53",  // PostgreSQL: insufficient resources (for example, disk full)
+			"54",  // PostgreSQL: program limit exceeded (for example, statement too complex)
 			"57",  // DB2: out-of-memory exception / database not started
 			"58"   // DB2: unexpected system error
 		);
@@ -84,25 +93,38 @@ public class SQLStateSQLExceptionTranslator extends AbstractFallbackSQLException
 			"S1"   // DB2: communication failure
 		);
 
-	private static final Set<String> PESSIMISTIC_LOCKING_FAILURE_CODES = Set.of(
-			"40",  // Transaction rollback
-			"61"   // Oracle: deadlock
-		);
-
 	private static final Set<Integer> DUPLICATE_KEY_ERROR_CODES = Set.of(
 			1,     // Oracle
 			301,   // SAP HANA
 			1062,  // MySQL/MariaDB
 			2601,  // MS SQL Server
-			2627   // MS SQL Server
+			2627,  // MS SQL Server
+			-239,  // Informix
+			-268   // Informix
 		);
 
 
 	@Override
-	@Nullable
-	protected DataAccessException doTranslate(String task, @Nullable String sql, SQLException ex) {
-		// First, the getSQLState check...
-		String sqlState = getSqlState(ex);
+	protected @Nullable DataAccessException doTranslate(String task, @Nullable String sql, SQLException ex) {
+		SQLException sqlEx = ex;
+		String sqlState;
+		if (sqlEx instanceof BatchUpdateException) {
+			// Unwrap BatchUpdateException to expose contained exception
+			// with potentially more specific SQL state.
+			if (sqlEx.getNextException() != null) {
+				SQLException nestedSqlEx = sqlEx.getNextException();
+				if (nestedSqlEx.getSQLState() != null) {
+					sqlEx = nestedSqlEx;
+				}
+			}
+			sqlState = sqlEx.getSQLState();
+		}
+		else {
+			// Expose top-level exception but potentially use nested SQL state.
+			sqlState = getSqlState(sqlEx);
+		}
+
+		// The actual SQL state check...
 		if (sqlState != null && sqlState.length() >= 2) {
 			String classCode = sqlState.substring(0, 2);
 			if (logger.isDebugEnabled()) {
@@ -112,29 +134,32 @@ public class SQLStateSQLExceptionTranslator extends AbstractFallbackSQLException
 				return new BadSqlGrammarException(task, (sql != null ? sql : ""), ex);
 			}
 			else if (DATA_INTEGRITY_VIOLATION_CODES.contains(classCode)) {
-				if (indicatesDuplicateKey(sqlState, ex.getErrorCode())) {
-					return new DuplicateKeyException(buildMessage(task, sql, ex), ex);
+				if (indicatesDuplicateKey(sqlState, sqlEx.getErrorCode())) {
+					return new DuplicateKeyException(buildMessage(task, sql, sqlEx), ex);
 				}
-				return new DataIntegrityViolationException(buildMessage(task, sql, ex), ex);
-			}
-			else if (DATA_ACCESS_RESOURCE_FAILURE_CODES.contains(classCode)) {
-				return new DataAccessResourceFailureException(buildMessage(task, sql, ex), ex);
-			}
-			else if (TRANSIENT_DATA_ACCESS_RESOURCE_CODES.contains(classCode)) {
-				return new TransientDataAccessResourceException(buildMessage(task, sql, ex), ex);
+				return new DataIntegrityViolationException(buildMessage(task, sql, sqlEx), ex);
 			}
 			else if (PESSIMISTIC_LOCKING_FAILURE_CODES.contains(classCode)) {
 				if (indicatesCannotAcquireLock(sqlState)) {
-					return new CannotAcquireLockException(buildMessage(task, sql, ex), ex);
+					return new CannotAcquireLockException(buildMessage(task, sql, sqlEx), ex);
 				}
-				return new PessimisticLockingFailureException(buildMessage(task, sql, ex), ex);
+				return new PessimisticLockingFailureException(buildMessage(task, sql, sqlEx), ex);
+			}
+			else if (DATA_ACCESS_RESOURCE_FAILURE_CODES.contains(classCode)) {
+				if (indicatesQueryTimeout(sqlState)) {
+					return new QueryTimeoutException(buildMessage(task, sql, sqlEx), ex);
+				}
+				return new DataAccessResourceFailureException(buildMessage(task, sql, sqlEx), ex);
+			}
+			else if (TRANSIENT_DATA_ACCESS_RESOURCE_CODES.contains(classCode)) {
+				return new TransientDataAccessResourceException(buildMessage(task, sql, sqlEx), ex);
 			}
 		}
 
 		// For MySQL: exception class name indicating a timeout?
 		// (since MySQL doesn't throw the JDBC 4 SQLTimeoutException)
-		if (ex.getClass().getName().contains("Timeout")) {
-			return new QueryTimeoutException(buildMessage(task, sql, ex), ex);
+		if (sqlEx.getClass().getName().contains("Timeout")) {
+			return new QueryTimeoutException(buildMessage(task, sql, sqlEx), ex);
 		}
 
 		// Couldn't resolve anything proper - resort to UncategorizedSQLException.
@@ -149,8 +174,7 @@ public class SQLStateSQLExceptionTranslator extends AbstractFallbackSQLException
 	 * is to be extracted
 	 * @return the SQL state code
 	 */
-	@Nullable
-	private String getSqlState(SQLException ex) {
+	private @Nullable String getSqlState(SQLException ex) {
 		String sqlState = ex.getSQLState();
 		if (sqlState == null) {
 			SQLException nestedEx = ex.getNextException();
@@ -182,6 +206,15 @@ public class SQLStateSQLExceptionTranslator extends AbstractFallbackSQLException
 	 */
 	static boolean indicatesCannotAcquireLock(@Nullable String sqlState) {
 		return "40001".equals(sqlState);
+	}
+
+	/**
+	 * Check whether the given SQL state indicates a {@link QueryTimeoutException},
+	 * with SQL state 57014 as a specific indication.
+	 * @param sqlState the SQL state value
+	 */
+	static boolean indicatesQueryTimeout(@Nullable String sqlState) {
+		return "57014".equals(sqlState);
 	}
 
 }

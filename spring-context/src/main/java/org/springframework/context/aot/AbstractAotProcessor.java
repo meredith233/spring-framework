@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,13 +17,15 @@
 package org.springframework.context.aot;
 
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.nio.file.Path;
+
+import org.jspecify.annotations.Nullable;
 
 import org.springframework.aot.generate.FileSystemGeneratedFiles;
 import org.springframework.aot.generate.GeneratedFiles.Kind;
 import org.springframework.aot.hint.RuntimeHints;
 import org.springframework.aot.nativex.FileNativeConfigurationWriter;
-import org.springframework.lang.Nullable;
 import org.springframework.util.Assert;
 import org.springframework.util.FileSystemUtils;
 
@@ -47,11 +49,11 @@ import org.springframework.util.FileSystemUtils;
 public abstract class AbstractAotProcessor<T> {
 
 	/**
-	 * The name of a system property that is made available when the processor
-	 * runs.
+	 * The name of a system property that is made available when the processor runs.
+	 * @since 6.2
 	 * @see #doProcess()
 	 */
-	private static final String AOT_PROCESSING = "spring.aot.processing";
+	public static final String AOT_PROCESSING = "spring.aot.processing";
 
 	private final Settings settings;
 
@@ -102,7 +104,7 @@ public abstract class AbstractAotProcessor<T> {
 				FileSystemUtils.deleteRecursively(path);
 			}
 			catch (IOException ex) {
-				throw new RuntimeException("Failed to delete existing output in '" + path + "'");
+				throw new UncheckedIOException("Failed to delete existing output in '" + path + "'", ex);
 			}
 		}
 	}
@@ -125,6 +127,7 @@ public abstract class AbstractAotProcessor<T> {
 		writer.write(hints);
 	}
 
+
 	/**
 	 * Common settings for AOT processors.
 	 */
@@ -140,7 +143,6 @@ public abstract class AbstractAotProcessor<T> {
 
 		private final String artifactId;
 
-
 		private Settings(Path sourceOutput, Path resourceOutput, Path classOutput, String groupId, String artifactId) {
 			this.sourceOutput = sourceOutput;
 			this.resourceOutput = resourceOutput;
@@ -149,14 +151,12 @@ public abstract class AbstractAotProcessor<T> {
 			this.artifactId = artifactId;
 		}
 
-
 		/**
 		 * Create a new {@link Builder} for {@link Settings}.
 		 */
 		public static Builder builder() {
 			return new Builder();
 		}
-
 
 		/**
 		 * Get the output directory for generated sources.
@@ -199,26 +199,19 @@ public abstract class AbstractAotProcessor<T> {
 		 */
 		public static final class Builder {
 
-			@Nullable
-			private Path sourceOutput;
+			private @Nullable Path sourceOutput;
 
-			@Nullable
-			private Path resourceOutput;
+			private @Nullable Path resourceOutput;
 
-			@Nullable
-			private Path classOutput;
+			private @Nullable Path classOutput;
 
-			@Nullable
-			private String groupId;
+			private @Nullable String groupId;
 
-			@Nullable
-			private String artifactId;
-
+			private @Nullable String artifactId;
 
 			private Builder() {
 				// internal constructor
 			}
-
 
 			/**
 			 * Set the output directory for generated sources.

@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2019 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -49,7 +49,7 @@ public class ExpectedLookupTemplate extends JndiTemplate {
 
 	/**
 	 * Construct a new JndiTemplate that will always return the given object,
-	 * but honour only requests for the given name.
+	 * but honor only requests for the given name.
 	 * @param name the name the client is expected to look up
 	 * @param object the object that will be returned
 	 */

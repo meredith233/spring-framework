@@ -1,5 +1,5 @@
 /*
- * Copyright 2023-2023 the original author or authors.
+ * Copyright 2023-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,14 +22,14 @@ import java.net.http.HttpClient;
 import java.time.Duration;
 import java.util.concurrent.Executor;
 
+import org.jspecify.annotations.Nullable;
+
 import org.springframework.core.task.SimpleAsyncTaskExecutor;
 import org.springframework.http.HttpMethod;
-import org.springframework.lang.Nullable;
 import org.springframework.util.Assert;
 
 /**
- * {@link ClientHttpRequestFactory} implementation based on the Java
- * {@link HttpClient}.
+ * {@link ClientHttpRequestFactory} implementation based on the Java {@link HttpClient}.
  *
  * @author Marten Deinum
  * @author Arjen Poutsma
@@ -41,8 +41,9 @@ public class JdkClientHttpRequestFactory implements ClientHttpRequestFactory {
 
 	private final Executor executor;
 
-	@Nullable
-	private Duration readTimeout;
+	private @Nullable Duration readTimeout;
+
+	private boolean compression = true;
 
 
 	/**
@@ -80,29 +81,39 @@ public class JdkClientHttpRequestFactory implements ClientHttpRequestFactory {
 
 	/**
 	 * Set the underlying {@code HttpClient}'s read timeout (in milliseconds).
-	 * A timeout value of 0 specifies an infinite timeout.
+	 * <p>A timeout value of 0 specifies an infinite timeout.
 	 * <p>Default is the system's default timeout.
 	 * @see java.net.http.HttpRequest.Builder#timeout
 	 */
 	public void setReadTimeout(int readTimeout) {
-		this.readTimeout = Duration.ofMillis(readTimeout);
+		Assert.isTrue(readTimeout >= 0, "Timeout must be a non-negative value");
+		this.readTimeout = (readTimeout == 0 ? null : Duration.ofMillis(readTimeout));
 	}
 
 	/**
-	 * Set the underlying {@code HttpClient}'s read timeout as a
-	 * {@code Duration}.
+	 * Set the underlying {@code HttpClient}'s read timeout as a {@code Duration}.
+	 * <p>A timeout value of 0 specifies an infinite timeout.
 	 * <p>Default is the system's default timeout.
 	 * @see java.net.http.HttpRequest.Builder#timeout
 	 */
 	public void setReadTimeout(Duration readTimeout) {
 		Assert.notNull(readTimeout, "ReadTimeout must not be null");
-		this.readTimeout = readTimeout;
+		Assert.isTrue(!readTimeout.isNegative(), "Timeout must be a non-negative value");
+		this.readTimeout = (readTimeout.isZero() ? null : readTimeout);
+	}
+
+	/**
+	 * Set whether support for uncompressing "gzip" and "deflate" HTTP responses is enabled.
+	 * @since 7.0
+	 */
+	public void enableCompression(boolean enable) {
+		this.compression = enable;
 	}
 
 
 	@Override
 	public ClientHttpRequest createRequest(URI uri, HttpMethod httpMethod) throws IOException {
-		return new JdkClientHttpRequest(this.httpClient, uri, httpMethod, this.executor, this.readTimeout);
+		return new JdkClientHttpRequest(this.httpClient, uri, httpMethod, this.executor, this.readTimeout, this.compression);
 	}
 
 }

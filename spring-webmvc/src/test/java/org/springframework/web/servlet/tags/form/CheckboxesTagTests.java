@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -35,7 +35,7 @@ import org.dom4j.io.SAXReader;
 import org.junit.jupiter.api.Test;
 
 import org.springframework.beans.propertyeditors.StringTrimmerEditor;
-import org.springframework.beans.testfixture.beans.Colour;
+import org.springframework.beans.testfixture.beans.Color;
 import org.springframework.beans.testfixture.beans.Pet;
 import org.springframework.beans.testfixture.beans.TestBean;
 import org.springframework.format.Formatter;
@@ -55,13 +55,14 @@ import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException
  * @author Jeremy Grelle
  */
 @SuppressWarnings({ "rawtypes", "unchecked" })
-public class CheckboxesTagTests extends AbstractFormTagTests {
+class CheckboxesTagTests extends AbstractFormTagTests {
 
 	private CheckboxesTag tag;
 
 	private TestBean bean;
 
 	@Override
+	@SuppressWarnings("serial")
 	protected void onSetUp() {
 		this.tag = new CheckboxesTag() {
 			@Override
@@ -741,10 +742,7 @@ public class CheckboxesTagTests extends AbstractFormTagTests {
 
 	@Override
 	protected TestBean createTestBean() {
-		List colours = new ArrayList();
-		colours.add(Colour.BLUE);
-		colours.add(Colour.RED);
-		colours.add(Colour.GREEN);
+		List colors = List.of(Color.BLUE, Color.RED, Color.GREEN);
 
 		List pets = new ArrayList();
 		pets.add(new Pet("Rudiger"));
@@ -763,7 +761,7 @@ public class CheckboxesTagTests extends AbstractFormTagTests {
 		this.bean.setSomeBoolean(Boolean.TRUE);
 		this.bean.setStringArray(new String[] {"bar", "foo"});
 		this.bean.setSomeIntegerArray(new Integer[] {2, 1});
-		this.bean.setOtherColours(colours);
+		this.bean.setOtherColors(colors);
 		this.bean.setPets(pets);
 		this.bean.setSomeSet(someObjects);
 		List list = new ArrayList();

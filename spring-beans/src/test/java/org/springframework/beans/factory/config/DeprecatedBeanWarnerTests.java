@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -35,7 +35,7 @@ class DeprecatedBeanWarnerTests {
 
 	@Test
 	@SuppressWarnings("deprecation")
-	public void postProcess() {
+	void postProcess() {
 		DefaultListableBeanFactory beanFactory = new DefaultListableBeanFactory();
 		BeanDefinition def = new RootBeanDefinition(MyDeprecatedBean.class);
 		String beanName = "deprecated";

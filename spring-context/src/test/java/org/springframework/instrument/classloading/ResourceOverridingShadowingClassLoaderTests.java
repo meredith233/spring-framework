@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -38,40 +38,40 @@ class ResourceOverridingShadowingClassLoaderTests {
 
 
 	@Test
-	void testFindsExistingResourceWithGetResourceAndNoOverrides() {
+	void findsExistingResourceWithGetResourceAndNoOverrides() {
 		assertThat(thisClassLoader.getResource(EXISTING_RESOURCE)).isNotNull();
 		assertThat(overridingLoader.getResource(EXISTING_RESOURCE)).isNotNull();
 	}
 
 	@Test
-	void testDoesNotFindExistingResourceWithGetResourceAndNullOverride() {
+	void doesNotFindExistingResourceWithGetResourceAndNullOverride() {
 		assertThat(thisClassLoader.getResource(EXISTING_RESOURCE)).isNotNull();
 		overridingLoader.override(EXISTING_RESOURCE, null);
 		assertThat(overridingLoader.getResource(EXISTING_RESOURCE)).isNull();
 	}
 
 	@Test
-	void testFindsExistingResourceWithGetResourceAsStreamAndNoOverrides() {
+	void findsExistingResourceWithGetResourceAsStreamAndNoOverrides() {
 		assertThat(thisClassLoader.getResourceAsStream(EXISTING_RESOURCE)).isNotNull();
 		assertThat(overridingLoader.getResourceAsStream(EXISTING_RESOURCE)).isNotNull();
 	}
 
 	@Test
-	void testDoesNotFindExistingResourceWithGetResourceAsStreamAndNullOverride() {
+	void doesNotFindExistingResourceWithGetResourceAsStreamAndNullOverride() {
 		assertThat(thisClassLoader.getResourceAsStream(EXISTING_RESOURCE)).isNotNull();
 		overridingLoader.override(EXISTING_RESOURCE, null);
 		assertThat(overridingLoader.getResourceAsStream(EXISTING_RESOURCE)).isNull();
 	}
 
 	@Test
-	void testFindsExistingResourceWithGetResourcesAndNoOverrides() throws IOException {
+	void findsExistingResourceWithGetResourcesAndNoOverrides() throws IOException {
 		assertThat(thisClassLoader.getResources(EXISTING_RESOURCE)).isNotNull();
 		assertThat(overridingLoader.getResources(EXISTING_RESOURCE)).isNotNull();
 		assertThat(countElements(overridingLoader.getResources(EXISTING_RESOURCE))).isEqualTo(1);
 	}
 
 	@Test
-	void testDoesNotFindExistingResourceWithGetResourcesAndNullOverride() throws IOException {
+	void doesNotFindExistingResourceWithGetResourcesAndNullOverride() throws IOException {
 		assertThat(thisClassLoader.getResources(EXISTING_RESOURCE)).isNotNull();
 		overridingLoader.override(EXISTING_RESOURCE, null);
 		assertThat(countElements(overridingLoader.getResources(EXISTING_RESOURCE))).isEqualTo(0);

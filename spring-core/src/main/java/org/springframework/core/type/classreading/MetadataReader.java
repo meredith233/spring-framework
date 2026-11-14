@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2009 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,7 +22,8 @@ import org.springframework.core.type.ClassMetadata;
 
 /**
  * Simple facade for accessing class metadata,
- * as read by an ASM {@link org.springframework.asm.ClassReader}.
+ * as read by an ASM {@link org.springframework.asm.ClassReader} or the
+ * {@code java.lang.classfile.ClassFile} API on Java 24 and higher.
  *
  * @author Juergen Hoeller
  * @since 2.5

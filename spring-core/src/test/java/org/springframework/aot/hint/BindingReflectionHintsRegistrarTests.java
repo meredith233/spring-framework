@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -31,6 +31,7 @@ import com.fasterxml.jackson.databind.annotation.JsonPOJOBuilder;
 import com.fasterxml.jackson.databind.deser.std.StdDeserializer;
 import org.junit.jupiter.api.Test;
 
+import org.springframework.aot.hint.predicate.ReflectionHintsPredicates;
 import org.springframework.aot.hint.predicate.RuntimeHintsPredicates;
 import org.springframework.core.ResolvableType;
 
@@ -54,7 +55,7 @@ class BindingReflectionHintsRegistrarTests {
 				.satisfies(typeHint -> {
 					assertThat(typeHint.getType()).isEqualTo(TypeReference.of(SampleEmptyClass.class));
 					assertThat(typeHint.getMemberCategories()).containsExactlyInAnyOrder(
-							MemberCategory.DECLARED_FIELDS, MemberCategory.INVOKE_DECLARED_CONSTRUCTORS);
+							MemberCategory.ACCESS_DECLARED_FIELDS, MemberCategory.INVOKE_DECLARED_CONSTRUCTORS);
 					assertThat(typeHint.constructors()).isEmpty();
 					assertThat(typeHint.fields()).isEmpty();
 					assertThat(typeHint.methods()).isEmpty();
@@ -68,7 +69,7 @@ class BindingReflectionHintsRegistrarTests {
 				typeHint -> {
 					assertThat(typeHint.getType()).isEqualTo(TypeReference.of(SampleEmptyClass.class));
 					assertThat(typeHint.getMemberCategories()).containsExactlyInAnyOrder(
-							MemberCategory.DECLARED_FIELDS, MemberCategory.INVOKE_DECLARED_CONSTRUCTORS);
+							MemberCategory.ACCESS_DECLARED_FIELDS, MemberCategory.INVOKE_DECLARED_CONSTRUCTORS);
 					assertThat(typeHint.constructors()).isEmpty();
 					assertThat(typeHint.fields()).isEmpty();
 					assertThat(typeHint.methods()).isEmpty();
@@ -76,7 +77,7 @@ class BindingReflectionHintsRegistrarTests {
 				typeHint -> {
 					assertThat(typeHint.getType()).isEqualTo(TypeReference.of(SampleExtendingClass.class));
 					assertThat(typeHint.getMemberCategories()).containsExactlyInAnyOrder(
-							MemberCategory.DECLARED_FIELDS, MemberCategory.INVOKE_DECLARED_CONSTRUCTORS);
+							MemberCategory.ACCESS_DECLARED_FIELDS, MemberCategory.INVOKE_DECLARED_CONSTRUCTORS);
 					assertThat(typeHint.constructors()).isEmpty();
 					assertThat(typeHint.fields()).isEmpty();
 					assertThat(typeHint.methods()).isEmpty();
@@ -198,7 +199,7 @@ class BindingReflectionHintsRegistrarTests {
 				typeHint -> {
 					assertThat(typeHint.getType()).isEqualTo(TypeReference.of(ResolvableType.class));
 					assertThat(typeHint.getMemberCategories()).containsExactlyInAnyOrder(
-							MemberCategory.DECLARED_FIELDS, MemberCategory.INVOKE_DECLARED_CONSTRUCTORS);
+							MemberCategory.ACCESS_DECLARED_FIELDS, MemberCategory.INVOKE_DECLARED_CONSTRUCTORS);
 					assertThat(typeHint.constructors()).isEmpty();
 					assertThat(typeHint.fields()).isEmpty();
 					assertThat(typeHint.methods()).hasSizeGreaterThan(1);
@@ -254,7 +255,7 @@ class BindingReflectionHintsRegistrarTests {
 	@Test
 	void registerTypeForSerializationWithRecordWithProperty() {
 		bindingRegistrar.registerReflectionHints(this.hints.reflection(), SampleRecordWithProperty.class);
-		assertThat(RuntimeHintsPredicates.reflection().onMethod(SampleRecordWithProperty.class, "getNameProperty"))
+		assertThat(RuntimeHintsPredicates.reflection().onMethodInvocation(SampleRecordWithProperty.class, "getNameProperty"))
 				.accepts(this.hints);
 	}
 
@@ -267,18 +268,18 @@ class BindingReflectionHintsRegistrarTests {
 	@Test
 	void registerTypeForJacksonAnnotations() {
 		bindingRegistrar.registerReflectionHints(this.hints.reflection(), SampleClassWithJsonProperty.class);
-		assertThat(RuntimeHintsPredicates.reflection().onField(SampleClassWithJsonProperty.class, "privateField"))
+		assertThat(RuntimeHintsPredicates.reflection().onFieldAccess(SampleClassWithJsonProperty.class, "privateField"))
 				.accepts(this.hints);
-		assertThat(RuntimeHintsPredicates.reflection().onMethod(SampleClassWithJsonProperty.class, "packagePrivateMethod").invoke())
+		assertThat(RuntimeHintsPredicates.reflection().onMethodInvocation(SampleClassWithJsonProperty.class, "packagePrivateMethod"))
 				.accepts(this.hints);
 	}
 
 	@Test
 	void registerTypeForInheritedJacksonAnnotations() {
 		bindingRegistrar.registerReflectionHints(this.hints.reflection(), SampleClassWithInheritedJsonProperty.class);
-		assertThat(RuntimeHintsPredicates.reflection().onField(SampleClassWithJsonProperty.class, "privateField"))
+		assertThat(RuntimeHintsPredicates.reflection().onFieldAccess(SampleClassWithJsonProperty.class, "privateField"))
 				.accepts(this.hints);
-		assertThat(RuntimeHintsPredicates.reflection().onMethod(SampleClassWithJsonProperty.class, "packagePrivateMethod").invoke())
+		assertThat(RuntimeHintsPredicates.reflection().onMethodInvocation(SampleClassWithJsonProperty.class, "packagePrivateMethod"))
 				.accepts(this.hints);
 	}
 
@@ -299,6 +300,16 @@ class BindingReflectionHintsRegistrarTests {
 				.accepts(this.hints);
 		assertThat(RuntimeHintsPredicates.reflection().onType(CustomDeserializer2.class).withMemberCategory(MemberCategory.INVOKE_DECLARED_CONSTRUCTORS))
 				.accepts(this.hints);
+	}
+
+	@Test
+	void registerTypeForObjectToObjectConverter() {
+		bindingRegistrar.registerReflectionHints(this.hints.reflection(), Source.class);
+		ReflectionHintsPredicates reflection = RuntimeHintsPredicates.reflection();
+		assertThat(reflection.onMethodInvocation(Source.class, "valueOf")).accepts(this.hints);
+		assertThat(reflection.onMethodInvocation(Source.class, "of")).accepts(this.hints);
+		assertThat(reflection.onMethodInvocation(Source.class, "from")).accepts(this.hints);
+		assertThat(reflection.onMethodInvocation(Source.class, "toData")).accepts(this.hints);
 	}
 
 
@@ -459,5 +470,32 @@ class BindingReflectionHintsRegistrarTests {
 			return null;
 		}
 	}
+
+	static class Source {
+
+		private final String value;
+
+		private Source(String value) {
+			this.value = value;
+		}
+
+		public static Source valueOf(String value) {
+			return new Source(value);
+		}
+
+		public static Source of(String value) {
+			return new Source(value);
+		}
+
+		public static Source from(String value) {
+			return new Source(value);
+		}
+
+		public Data toData() {
+			return new Data(this.value);
+		}
+	}
+
+	record Data(String value) { }
 
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2023 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -25,5 +25,7 @@ import java.io.Serializable
  * @author Sebastien Deleuze
  * @since 6.0.5
  */
+@Suppress("removal", "DEPRECATION")
+@Deprecated(level = DeprecationLevel.WARNING, message = "Use ReflectionHints")
 inline fun <reified T : Serializable> SerializationHints.registerType(noinline serializationHint: (JavaSerializationHint.Builder) -> Unit = {}) =
 	registerType(T::class.java, serializationHint::invoke)

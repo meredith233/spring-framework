@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2021 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,14 +16,15 @@
 
 package org.springframework.orm.jpa;
 
+import java.sql.Connection;
 import java.sql.SQLException;
 
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceException;
+import org.jspecify.annotations.Nullable;
 
 import org.springframework.dao.support.PersistenceExceptionTranslator;
 import org.springframework.jdbc.datasource.ConnectionHandle;
-import org.springframework.lang.Nullable;
 import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.TransactionException;
 
@@ -78,16 +79,15 @@ public interface JpaDialect extends PersistenceExceptionTranslator {
 	 * @throws org.springframework.transaction.TransactionException in case of invalid arguments
 	 * @see #cleanupTransaction
 	 * @see jakarta.persistence.EntityTransaction#begin
-	 * @see org.springframework.jdbc.datasource.DataSourceUtils#prepareConnectionForTransaction
+	 * @see org.springframework.jdbc.datasource.DataSourceUtils#prepareConnectionForTransaction(Connection, TransactionDefinition)
 	 */
-	@Nullable
-	Object beginTransaction(EntityManager entityManager, TransactionDefinition definition)
+	@Nullable Object beginTransaction(EntityManager entityManager, TransactionDefinition definition)
 			throws PersistenceException, SQLException, TransactionException;
 
 	/**
 	 * Prepare a JPA transaction, applying the specified semantics. Called by
 	 * EntityManagerFactoryUtils when enlisting an EntityManager in a JTA transaction
-	 * or a locally joined transaction (e.g. after upgrading an unsynchronized
+	 * or a locally joined transaction (for example, after upgrading an unsynchronized
 	 * EntityManager to a synchronized one).
 	 * <p>An implementation can apply the read-only flag as flush mode. In that case,
 	 * a transaction data object can be returned that holds the previous flush mode
@@ -99,12 +99,11 @@ public interface JpaDialect extends PersistenceExceptionTranslator {
 	 * @param readOnly whether the transaction is supposed to be read-only
 	 * @param name the name of the transaction (if any)
 	 * @return an arbitrary object that holds transaction data, if any
-	 * (to be passed into cleanupTransaction)
+	 * (to be passed into {@link #cleanupTransaction})
 	 * @throws jakarta.persistence.PersistenceException if thrown by JPA methods
 	 * @see #cleanupTransaction
 	 */
-	@Nullable
-	Object prepareTransaction(EntityManager entityManager, boolean readOnly, @Nullable String name)
+	@Nullable Object prepareTransaction(EntityManager entityManager, boolean readOnly, @Nullable String name)
 			throws PersistenceException;
 
 	/**
@@ -116,6 +115,7 @@ public interface JpaDialect extends PersistenceExceptionTranslator {
 	 * @param transactionData arbitrary object that holds transaction data, if any
 	 * (as returned by beginTransaction or prepareTransaction)
 	 * @see #beginTransaction
+	 * @see #prepareTransaction
 	 * @see org.springframework.jdbc.datasource.DataSourceUtils#resetConnectionAfterTransaction
 	 */
 	void cleanupTransaction(@Nullable Object transactionData);
@@ -150,8 +150,7 @@ public interface JpaDialect extends PersistenceExceptionTranslator {
 	 * @see org.springframework.jdbc.datasource.SimpleConnectionHandle
 	 * @see JpaTransactionManager#setDataSource
 	 */
-	@Nullable
-	ConnectionHandle getJdbcConnection(EntityManager entityManager, boolean readOnly)
+	@Nullable ConnectionHandle getJdbcConnection(EntityManager entityManager, boolean readOnly)
 			throws PersistenceException, SQLException;
 
 	/**

@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2022 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -25,8 +25,9 @@ import java.util.List;
 import java.util.Set;
 import java.util.function.Predicate;
 
+import org.jspecify.annotations.Nullable;
+
 import org.springframework.core.annotation.AnnotationUtils;
-import org.springframework.lang.Nullable;
 import org.springframework.util.ClassUtils;
 import org.springframework.util.StringUtils;
 
@@ -110,7 +111,7 @@ public final class HandlerTypePredicate implements Predicate<Class<?>> {
 	}
 
 	/**
-	 * Match handlers declared under a base package, e.g. "org.example".
+	 * Match handlers declared under a base package, for example, "org.example".
 	 * @param packages one or more base package names
 	 */
 	public static HandlerTypePredicate forBasePackage(String... packages) {
@@ -163,7 +164,7 @@ public final class HandlerTypePredicate implements Predicate<Class<?>> {
 		private final List<Class<? extends Annotation>> annotations = new ArrayList<>();
 
 		/**
-		 * Match handlers declared under a base package, e.g. "org.example".
+		 * Match handlers declared under a base package, for example, "org.example".
 		 * @param packages one or more base package classes
 		 */
 		public Builder basePackage(String... packages) {

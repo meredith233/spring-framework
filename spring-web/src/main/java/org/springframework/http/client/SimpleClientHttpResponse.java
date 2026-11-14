@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2023 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,10 +19,12 @@ package org.springframework.http.client;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.HttpURLConnection;
+import java.util.Objects;
+
+import org.jspecify.annotations.Nullable;
 
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatusCode;
-import org.springframework.lang.Nullable;
 import org.springframework.util.StreamUtils;
 import org.springframework.util.StringUtils;
 
@@ -38,11 +40,9 @@ final class SimpleClientHttpResponse implements ClientHttpResponse {
 
 	private final HttpURLConnection connection;
 
-	@Nullable
-	private HttpHeaders headers;
+	private @Nullable HttpHeaders headers;
 
-	@Nullable
-	private InputStream responseStream;
+	private @Nullable InputStream responseStream;
 
 
 	SimpleClientHttpResponse(HttpURLConnection connection) {
@@ -85,8 +85,15 @@ final class SimpleClientHttpResponse implements ClientHttpResponse {
 
 	@Override
 	public InputStream getBody() throws IOException {
-		InputStream errorStream = this.connection.getErrorStream();
-		this.responseStream = (errorStream != null ? errorStream : this.connection.getInputStream());
+		if (this.responseStream == null) {
+			if (this.connection.getResponseCode() >= 400) {
+				InputStream errorStream = this.connection.getErrorStream();
+				this.responseStream = (errorStream != null) ? errorStream : InputStream.nullInputStream();
+			}
+			else {
+				this.responseStream = this.connection.getInputStream();
+			}
+		}
 		return this.responseStream;
 	}
 
@@ -96,6 +103,7 @@ final class SimpleClientHttpResponse implements ClientHttpResponse {
 			if (this.responseStream == null) {
 				getBody();
 			}
+			Objects.requireNonNull(this.responseStream);
 			StreamUtils.drain(this.responseStream);
 			this.responseStream.close();
 		}

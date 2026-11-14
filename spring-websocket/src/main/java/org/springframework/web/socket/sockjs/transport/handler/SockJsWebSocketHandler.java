@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2023 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -38,7 +38,7 @@ import org.springframework.web.socket.sockjs.transport.session.WebSocketServerSo
  * {@link WebSocketHandler}.
  *
  * <p>Methods in this class allow exceptions from the wrapped {@link WebSocketHandler} to
- * propagate. However, any exceptions resulting from SockJS message handling (e.g. while
+ * propagate. However, any exceptions resulting from SockJS message handling (for example, while
  * sending SockJS frames or heartbeat messages) are caught and treated as transport
  * errors, i.e. routed to the
  * {@link WebSocketHandler#handleTransportError(WebSocketSession, Throwable)

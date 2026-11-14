@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -102,7 +102,7 @@ class ServerWebExchangeMethodArgumentResolverTests {
 	}
 
 	@Test // gh-25822
-	public void resolveUriComponentsBuilderWithContextPath() {
+	void resolveUriComponentsBuilderWithContextPath() {
 		ServerWebExchange exchange = MockServerWebExchange.from(
 				MockServerHttpRequest.get("https://example.org:9999/app/path?q=foo").contextPath("/app"));
 

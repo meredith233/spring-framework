@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -25,9 +25,12 @@ import java.net.URL;
 import java.nio.channels.Channels;
 import java.nio.channels.ReadableByteChannel;
 import java.nio.charset.Charset;
+import java.nio.file.Path;
 
-import org.springframework.lang.Nullable;
+import org.jspecify.annotations.Nullable;
+
 import org.springframework.util.FileCopyUtils;
+import org.springframework.util.function.IOConsumer;
 
 /**
  * Interface for a resource descriptor that abstracts from the actual
@@ -90,11 +93,13 @@ public interface Resource extends InputStreamSource {
 
 	/**
 	 * Determine whether this resource represents a file in a file system.
-	 * <p>A value of {@code true} strongly suggests (but does not guarantee)
-	 * that a {@link #getFile()} call will succeed.
+	 * <p>A value of {@code true} suggests (but does not guarantee) that a
+	 * {@link #getFile()} call will succeed. For non-default file systems,
+	 * {@link #getFilePath()} is the more reliable follow-up call.
 	 * <p>This is conservatively {@code false} by default.
 	 * @since 5.0
 	 * @see #getFile()
+	 * @see #getFilePath()
 	 */
 	default boolean isFile() {
 		return false;
@@ -117,12 +122,25 @@ public interface Resource extends InputStreamSource {
 
 	/**
 	 * Return a File handle for this resource.
-	 * @throws java.io.FileNotFoundException if the resource cannot be resolved as
-	 * absolute file path, i.e. if the resource is not available in a file system
+	 * <p>Note: This only works for files in the default file system.
+	 * @throws UnsupportedOperationException if the resource is a file but cannot be
+	 * exposed as a {@code java.io.File}; try {@link #getFilePath()} instead
+	 * @throws java.io.FileNotFoundException if the resource cannot be resolved as a file
 	 * @throws IOException in case of general resolution/reading failures
 	 * @see #getInputStream()
 	 */
 	File getFile() throws IOException;
+
+	/**
+	 * Return an NIO Path handle for this resource.
+	 * <p>Note: This works for files in non-default file systems as well.
+	 * @throws java.io.FileNotFoundException if the resource cannot be resolved as a file
+	 * @throws IOException in case of general resolution/reading failures
+	 * @since 7.0
+	 */
+	default Path getFilePath() throws IOException {
+		return getFile().toPath();
+	}
 
 	/**
 	 * Return a {@link ReadableByteChannel}.
@@ -137,6 +155,26 @@ public interface Resource extends InputStreamSource {
 	 */
 	default ReadableByteChannel readableChannel() throws IOException {
 		return Channels.newChannel(getInputStream());
+	}
+
+	/**
+	 * Process the contents of this resource through the given consumer callback.
+	 * <p>The given consumer will be invoked a single time by default - but may
+	 * also be invoked multiple times in case of a multi-content resource handle,
+	 * for example returned from a
+	 * {@link ResourceLoader#getResource getResource("classpath*:...")} call.
+	 * While {@link #getInputStream()} returns a merged sequence of content
+	 * in such a case, this method performs one callback per file content.
+	 * @param consumer a consumer for each InputStream
+	 * @throws IOException in case of general resolution/reading failures
+	 * @since 7.1
+	 * @see #getInputStream()
+	 * @see ResourceLoader#CLASSPATH_ALL_URL_PREFIX
+	 */
+	default void consumeContent(IOConsumer<InputStream> consumer) throws IOException {
+		try (InputStream inputStream = getInputStream()) {
+			consumer.accept(inputStream);
+		}
 	}
 
 	/**
@@ -166,6 +204,7 @@ public interface Resource extends InputStreamSource {
 
 	/**
 	 * Determine the content length for this resource.
+	 * @return the content length (or -1 if undetermined)
 	 * @throws IOException if the resource cannot be resolved
 	 * (in the file system or as some other known physical resource type)
 	 */
@@ -173,6 +212,7 @@ public interface Resource extends InputStreamSource {
 
 	/**
 	 * Determine the last-modified timestamp for this resource.
+	 * @return the last-modified timestamp (or 0 if not known)
 	 * @throws IOException if the resource cannot be resolved
 	 * (in the file system or as some other known physical resource type)
 	 */
@@ -193,8 +233,7 @@ public interface Resource extends InputStreamSource {
 	 * have a filename.
 	 * <p>Implementations are encouraged to return the filename unencoded.
 	 */
-	@Nullable
-	String getFilename();
+	@Nullable String getFilename();
 
 	/**
 	 * Return a description for this resource,

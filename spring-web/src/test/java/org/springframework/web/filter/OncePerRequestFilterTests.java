@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -50,7 +50,8 @@ class OncePerRequestFilterTests {
 
 
 	@BeforeEach
-	public void setup() throws Exception {
+	@SuppressWarnings("serial")
+	void setup() throws Exception {
 		this.request = new MockHttpServletRequest();
 		this.request.setScheme("http");
 		this.request.setServerName("localhost");
@@ -100,7 +101,7 @@ class OncePerRequestFilterTests {
 	}
 
 	@Test // gh-23196
-	public void filterNestedErrorDispatch() throws ServletException, IOException {
+	void filterNestedErrorDispatch() throws ServletException, IOException {
 
 		// Opt in for ERROR dispatch
 		this.filter.setShouldNotFilterErrorDispatch(false);

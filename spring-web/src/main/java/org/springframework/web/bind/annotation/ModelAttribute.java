@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2022 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -37,8 +37,8 @@ import org.springframework.ui.Model;
  * external clients. Therefore the design and use of data binding should be considered
  * carefully with regard to security. For more details, please refer to the dedicated
  * sections on data binding for
- * <a href="https://docs.spring.io/spring-framework/docs/current/reference/html/web.html#mvc-ann-initbinder-model-design">Spring Web MVC</a> and
- * <a href="https://docs.spring.io/spring-framework/docs/current/reference/html/web-reactive.html#webflux-ann-initbinder-model-design">Spring WebFlux</a>
+ * <a href="https://docs.spring.io/spring-framework/reference/web/webmvc/mvc-data-binding.html#mvc-data-binding-design">Spring Web MVC</a> and
+ * <a href="https://docs.spring.io/spring-framework/reference/web/webflux/data-binding.html#webflux-data-binding-design">Spring WebFlux</a>
  * in the reference manual.
  *
  * <p>{@code @ModelAttribute} can be used to expose command objects to a web view,
@@ -82,7 +82,7 @@ public @interface ModelAttribute {
 	 * <p>The default model attribute name is inferred from the declared
 	 * attribute type (i.e. the method parameter type or method return type),
 	 * based on the non-qualified class name:
-	 * e.g. "orderAddress" for class "mypackage.OrderAddress",
+	 * for example, "orderAddress" for class "mypackage.OrderAddress",
 	 * or "orderAddressList" for "List&lt;mypackage.OrderAddress&gt;".
 	 * @since 4.3
 	 */
@@ -93,7 +93,14 @@ public @interface ModelAttribute {
 	 * Allows data binding to be disabled directly on an {@code @ModelAttribute}
 	 * method parameter or on the attribute returned from an {@code @ModelAttribute}
 	 * method, both of which would prevent data binding for that attribute.
-	 * <p>By default this is set to {@code true} in which case data binding applies.
+	 * <p><strong>Note:</strong> This flag only controls binding via setters and
+	 * direct binding to fields of an existing object. It does not preclude
+	 * constructor binding, which is required to create the object and is safer
+	 * as the constructor declares explicitly the inputs it needs.
+	 * A typical case is where a model attribute is stored in the session, via
+	 * {@link SessionAttributes}, and needs to be accessed again in another
+	 * request later without further binding.
+	 * <p>By default, this is set to {@code true} in which case data binding applies.
 	 * Set this to {@code false} to disable data binding.
 	 * @since 4.3
 	 */

@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2018 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,10 +18,11 @@ package org.springframework.core.io.support;
 
 import java.util.Locale;
 
+import org.jspecify.annotations.Nullable;
+
 import org.springframework.core.io.DefaultResourceLoader;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.ResourceLoader;
-import org.springframework.lang.Nullable;
 import org.springframework.util.Assert;
 
 /**
@@ -82,7 +83,7 @@ public class LocalizedResourceHelper {
 	 * <p>If none of the specific files can be found, a resource
 	 * descriptor for the default location will be returned.
 	 * @param name the name of the file, without localization part nor extension
-	 * @param extension the file extension (e.g. ".xls")
+	 * @param extension the file extension (for example, ".xls")
 	 * @param locale the current locale (may be {@code null})
 	 * @return the most specific localized resource found
 	 * @see java.util.ResourceBundle
@@ -99,20 +100,20 @@ public class LocalizedResourceHelper {
 			String variant = locale.getVariant();
 
 			// Check for file with language, country and variant localization.
-			if (variant.length() > 0) {
+			if (!variant.isEmpty()) {
 				String location =
 						name + this.separator + lang + this.separator + country + this.separator + variant + extension;
 				resource = this.resourceLoader.getResource(location);
 			}
 
 			// Check for file with language and country localization.
-			if ((resource == null || !resource.exists()) && country.length() > 0) {
+			if ((resource == null || !resource.exists()) && !country.isEmpty()) {
 				String location = name + this.separator + lang + this.separator + country + extension;
 				resource = this.resourceLoader.getResource(location);
 			}
 
 			// Check for document with language localization.
-			if ((resource == null || !resource.exists()) && lang.length() > 0) {
+			if ((resource == null || !resource.exists()) && !lang.isEmpty()) {
 				String location = name + this.separator + lang + extension;
 				resource = this.resourceLoader.getResource(location);
 			}

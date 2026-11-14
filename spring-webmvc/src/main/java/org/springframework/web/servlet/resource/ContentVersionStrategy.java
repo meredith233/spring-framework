@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2018 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -24,7 +24,7 @@ import org.springframework.util.FileCopyUtils;
 
 /**
  * A {@code VersionStrategy} that calculates a Hex MD5 hash from the content
- * of the resource and appends it to the file name, e.g.
+ * of the resource and appends it to the file name, for example,
  * {@code "styles/main-e36d2e05253c6c7085a91522ce43a0b4.css"}.
  *
  * @author Brian Clozel

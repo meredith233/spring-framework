@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -219,7 +219,7 @@ class WebUtilsTests {
 		}
 		request.addHeader(HttpHeaders.ORIGIN, originHeader);
 
-		HttpServletRequest requestToUse = adaptFromForwardedHeaders(request);
+		HttpServletRequest requestToUse = adaptFromForwardedHeaders(request, false);
 		ServerHttpRequest httpRequest = new ServletServerHttpRequest(requestToUse);
 
 		assertThat(WebUtils.isSameOrigin(httpRequest)).isTrue();
@@ -236,16 +236,18 @@ class WebUtilsTests {
 		request.addHeader("Forwarded", forwardedHeader);
 		request.addHeader(HttpHeaders.ORIGIN, originHeader);
 
-		HttpServletRequest requestToUse = adaptFromForwardedHeaders(request);
+		HttpServletRequest requestToUse = adaptFromForwardedHeaders(request, true);
 		ServerHttpRequest httpRequest = new ServletServerHttpRequest(requestToUse);
 
 		assertThat(WebUtils.isSameOrigin(httpRequest)).isTrue();
 	}
 
 	// SPR-16668
-	private HttpServletRequest adaptFromForwardedHeaders(HttpServletRequest request) throws Exception {
+	private HttpServletRequest adaptFromForwardedHeaders(
+			HttpServletRequest request, boolean useStandardForwardedHeader) throws Exception {
+
 		MockFilterChain chain = new MockFilterChain();
-		new ForwardedHeaderFilter().doFilter(request, new MockHttpServletResponse(), chain);
+		new ForwardedHeaderFilter(useStandardForwardedHeader).doFilter(request, new MockHttpServletResponse(), chain);
 		return (HttpServletRequest) chain.getRequest();
 	}
 

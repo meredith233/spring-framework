@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2023 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,10 +16,12 @@
 
 package org.springframework.web.service.invoker;
 
+import java.util.Optional;
+
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 
 import org.springframework.http.HttpMethod;
-import org.springframework.lang.Nullable;
 import org.springframework.web.service.annotation.GetExchange;
 import org.springframework.web.service.annotation.HttpExchange;
 
@@ -68,12 +70,37 @@ class HttpMethodArgumentResolverTests {
 		assertThatIllegalArgumentException().isThrownBy(() -> this.service.execute(null));
 	}
 
-	@Nullable
-	private HttpMethod getActualMethod() {
+	@Test
+	void nullHttpMethodWithNullable() {
+		this.service.executeNullableHttpMethod(null);
+		assertThat(getActualMethod()).isEqualTo(HttpMethod.GET);
+	}
+
+	@Test
+	void nullHttpMethodWithOptional() {
+		this.service.executeOptionalHttpMethod(null);
+		assertThat(getActualMethod()).isEqualTo(HttpMethod.GET);
+	}
+
+	@Test
+	void emptyOptionalHttpMethod() {
+		this.service.executeOptionalHttpMethod(Optional.empty());
+		assertThat(getActualMethod()).isEqualTo(HttpMethod.GET);
+	}
+
+	@Test
+	void optionalHttpMethod() {
+		this.service.executeOptionalHttpMethod(Optional.of(HttpMethod.POST));
+		assertThat(getActualMethod()).isEqualTo(HttpMethod.POST);
+	}
+
+
+	private @Nullable HttpMethod getActualMethod() {
 		return this.client.getRequestValues().getHttpMethod();
 	}
 
 
+	@SuppressWarnings("OptionalUsedAsFieldOrParameterType")
 	private interface Service {
 
 		@HttpExchange
@@ -84,6 +111,12 @@ class HttpMethodArgumentResolverTests {
 
 		@GetExchange
 		void executeNotHttpMethod(String test);
+
+		@GetExchange
+		void executeNullableHttpMethod(@Nullable HttpMethod method);
+
+		@GetExchange
+		void executeOptionalHttpMethod(Optional<HttpMethod> method);
 
 	}
 

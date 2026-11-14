@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -25,7 +25,9 @@ import static org.assertj.core.api.Assertions.assertThat;
  *
  * @author Juergen Hoeller
  * @author Chris Beams
+ * @author Sam Brannen
  */
+@SuppressWarnings("removal")
 class PropertyAccessorUtilsTests {
 
 	@Test
@@ -49,12 +51,24 @@ class PropertyAccessorUtilsTests {
 	void getFirstNestedPropertySeparatorIndex() {
 		assertThat(PropertyAccessorUtils.getFirstNestedPropertySeparatorIndex("[user]")).isEqualTo(-1);
 		assertThat(PropertyAccessorUtils.getFirstNestedPropertySeparatorIndex("user.name")).isEqualTo(4);
+		assertThat(PropertyAccessorUtils.getFirstNestedPropertySeparatorIndex("map[key[0]].name")).isEqualTo(11);
+
+		// A dot nested two (unclosed) bracket levels deep must not be mistaken
+		// for a top-level separator, even though the net number of brackets
+		// seen so far is even.
+		assertThat(PropertyAccessorUtils.getFirstNestedPropertySeparatorIndex("a[b[c.d]]")).isEqualTo(-1);
 	}
 
 	@Test
 	void getLastNestedPropertySeparatorIndex() {
 		assertThat(PropertyAccessorUtils.getLastNestedPropertySeparatorIndex("[user]")).isEqualTo(-1);
 		assertThat(PropertyAccessorUtils.getLastNestedPropertySeparatorIndex("user.address.street")).isEqualTo(12);
+		assertThat(PropertyAccessorUtils.getLastNestedPropertySeparatorIndex("map[key[0]].name")).isEqualTo(11);
+
+		// Symmetric case to the one above, but scanning from the end: a dot
+		// preceded (from the right) by two unmatched closing brackets must
+		// not be mistaken for a top-level separator.
+		assertThat(PropertyAccessorUtils.getLastNestedPropertySeparatorIndex("d.c]b]a")).isEqualTo(-1);
 	}
 
 	@Test
@@ -65,6 +79,13 @@ class PropertyAccessorUtilsTests {
 
 		assertThat(PropertyAccessorUtils.matchesProperty("user", "user")).isTrue();
 		assertThat(PropertyAccessorUtils.matchesProperty("user[name]", "user")).isTrue();
+	}
+
+	@Test  // gh-37275
+	void matchesPropertyNeverThrowsForMalformedInput() {
+		// Non-throwing, best-effort contract, same as canonicalPropertyName.
+		assertThat(PropertyAccessorUtils.matchesProperty("map[key1]other", "map")).isFalse();
+		assertThat(PropertyAccessorUtils.matchesProperty("map", "map[key1]other")).isFalse();
 	}
 
 	@Test
@@ -79,6 +100,17 @@ class PropertyAccessorUtilsTests {
 		assertThat(PropertyAccessorUtils.canonicalPropertyName("map[key1].name")).isEqualTo("map[key1].name");
 		assertThat(PropertyAccessorUtils.canonicalPropertyName("map['key1'].name")).isEqualTo("map[key1].name");
 		assertThat(PropertyAccessorUtils.canonicalPropertyName("map[\"key1\"].name")).isEqualTo("map[key1].name");
+		assertThat(PropertyAccessorUtils.canonicalPropertyName("map['key1]")).isEqualTo("map['key1]");
+		assertThat(PropertyAccessorUtils.canonicalPropertyName("map[\"key1]")).isEqualTo("map[\"key1]");
+		assertThat(PropertyAccessorUtils.canonicalPropertyName("map[']")).isEqualTo("map[']");
+		assertThat(PropertyAccessorUtils.canonicalPropertyName("map[\"]")).isEqualTo("map[\"]");
+
+		// Keys that themselves contain bracket characters must be resolved
+		// using depth-aware parsing, consistent with how the property
+		// accessor resolves the same paths during actual data binding.
+		assertThat(PropertyAccessorUtils.canonicalPropertyName("map[\"key[0]\"]")).isEqualTo("map[key[0]]");
+		assertThat(PropertyAccessorUtils.canonicalPropertyName("map['key[0]'].name")).isEqualTo("map[key[0]].name");
+		assertThat(PropertyAccessorUtils.canonicalPropertyName("users['admin[0]']")).isEqualTo("users[admin[0]]");
 	}
 
 	@Test

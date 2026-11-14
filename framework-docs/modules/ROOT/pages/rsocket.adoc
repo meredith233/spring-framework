@@ -44,8 +44,6 @@ and {reactor-github-org}/reactor-netty[Reactor Netty] for the transport. That me
 signals from Reactive Streams Publishers in your application propagate transparently
 through RSocket across the network.
 
-
-
 [[rsocket-protocol]]
 === The Protocol
 
@@ -100,8 +98,6 @@ Protocol extensions define common metadata formats for use in applications:
   independently formatted metadata entries.
 * {rsocket-protocol-extensions}/Routing.md[Routing] -- the route for a request.
 
-
-
 [[rsocket-java]]
 === Java Implementation
 
@@ -113,7 +109,7 @@ a natural fit to use `Flux` and `Mono` with declarative operators and transparen
 pressure support.
 
 The API in RSocket Java is intentionally minimal and basic. It focuses on protocol
-features and leaves the application programming model (e.g. RPC codegen vs other) as a
+features and leaves the application programming model (for example, RPC codegen vs other) as a
 higher level, independent concern.
 
 The main contract
@@ -130,18 +126,16 @@ with RSocket independent of Spring. The RSocket Java repository contains a numbe
 {rsocket-java-code}/rsocket-examples[sample apps] that
 demonstrate its API and protocol features.
 
-
-
 [[rsocket-spring]]
 === Spring Support
 
 The `spring-messaging` module contains the following:
 
-* xref:rsocket.adoc#rsocket-requester[RSocketRequester] -- fluent API to make requests
+* <<rsocket-requester,RSocketRequester>> -- fluent API to make requests
 through an `io.rsocket.RSocket` with data and metadata encoding/decoding.
-* xref:rsocket.adoc#rsocket-annot-responders[Annotated Responders] -- `@MessageMapping`
+* <<rsocket-annot-responders,Annotated Responders>> -- `@MessageMapping`
   and `@RSocketExchange` annotated handler methods for responding.
-* xref:rsocket.adoc#rsocket-interface[RSocket Interface] -- RSocket service declaration
+* <<rsocket-interface,RSocket Interface>> -- RSocket service declaration
 as Java interface with `@RSocketExchange` methods, for use as requester or responder.
 
 The `spring-web` module contains `Encoder` and `Decoder` implementations such as Jackson
@@ -163,14 +157,12 @@ clients and servers. See the Spring Integration Reference Manual for more detail
 Spring Cloud Gateway supports RSocket connections.
 
 
-
 [[rsocket-requester]]
 == RSocketRequester
 
 `RSocketRequester` provides a fluent API to perform RSocket requests, accepting and
 returning objects for data and metadata instead of low level data buffers. It can be used
 symmetrically, to make requests from clients and to make requests from servers.
-
 
 [[rsocket-requester-client]]
 === Client Requester
@@ -186,7 +178,7 @@ This is the most basic way to connect with default settings:
 ======
 Java::
 +
-[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+[source,java,indent=0,subs="verbatim,quotes"]
 ----
 	RSocketRequester requester = RSocketRequester.builder().tcp("localhost", 7000);
 
@@ -196,18 +188,17 @@ Java::
 
 Kotlin::
 +
-[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+[source,kotlin,indent=0,subs="verbatim,quotes"]
 ----
 	val requester = RSocketRequester.builder().tcp("localhost", 7000)
 
-	URI url = URI.create("https://example.org:8080/rsocket");
+	val url = URI.create("https://example.org:8080/rsocket")
 	val requester = RSocketRequester.builder().webSocket(url)
 ----
 ======
 
 The above does not connect immediately. When requests are made, a shared connection is
 established transparently and used.
-
 
 [[rsocket-requester-client-setup]]
 ==== Connection Setup
@@ -226,10 +217,9 @@ metadata, the default mime type is
 metadata value and mime type pairs per request. Typically both don't need to be changed.
 
 Data and metadata in the `SETUP` frame is optional. On the server side,
-xref:rsocket.adoc#rsocket-annot-connectmapping[@ConnectMapping] methods can be used to handle the start of a
-connection and the content of the `SETUP` frame. Metadata may be used for connection
-level security.
-
+<<rsocket-annot-connectmapping,@ConnectMapping>> methods can be used to
+handle the start of a connection and the content of the `SETUP` frame. Metadata may be
+used for connection level security.
 
 [[rsocket-requester-client-strategies]]
 ==== Strategies
@@ -244,11 +234,11 @@ can be registered as follows:
 ======
 Java::
 +
-[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+[source,java,indent=0,subs="verbatim,quotes"]
 ----
 	RSocketStrategies strategies = RSocketStrategies.builder()
-		.encoders(encoders -> encoders.add(new Jackson2CborEncoder()))
-		.decoders(decoders -> decoders.add(new Jackson2CborDecoder()))
+		.encoders(encoders -> encoders.add(new JacksonCborEncoder()))
+		.decoders(decoders -> decoders.add(new JacksonCborDecoder()))
 		.build();
 
 	RSocketRequester requester = RSocketRequester.builder()
@@ -258,11 +248,11 @@ Java::
 
 Kotlin::
 +
-[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+[source,kotlin,indent=0,subs="verbatim,quotes"]
 ----
 	val strategies = RSocketStrategies.builder()
-			.encoders { it.add(Jackson2CborEncoder()) }
-			.decoders { it.add(Jackson2CborDecoder()) }
+			.encoders { it.add(JacksonCborEncoder()) }
+			.decoders { it.add(JacksonCborDecoder()) }
 			.build()
 
 	val requester = RSocketRequester.builder()
@@ -271,9 +261,8 @@ Kotlin::
 ----
 ======
 
-`RSocketStrategies` is designed for re-use. In some scenarios, e.g. client and server in
+`RSocketStrategies` is designed for re-use. In some scenarios, for example, client and server in
 the same application, it may be preferable to declare it in Spring configuration.
-
 
 [[rsocket-requester-client-responder]]
 ==== Client Responders
@@ -288,7 +277,7 @@ infrastructure that's used on a server, but registered programmatically as follo
 ======
 Java::
 +
-[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+[source,java,indent=0,subs="verbatim,quotes"]
 ----
 	RSocketStrategies strategies = RSocketStrategies.builder()
 		.routeMatcher(new PathPatternRouteMatcher())  // <1>
@@ -308,14 +297,14 @@ Java::
 
 Kotlin::
 +
-[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+[source,kotlin,indent=0,subs="verbatim,quotes"]
 ----
 	val strategies = RSocketStrategies.builder()
 			.routeMatcher(PathPatternRouteMatcher())  // <1>
 			.build()
 
 	val responder =
-		RSocketMessageHandler.responder(strategies, new ClientHandler()); // <2>
+		RSocketMessageHandler.responder(strategies, ClientHandler()) // <2>
 
 	val requester = RSocketRequester.builder()
 			.rsocketConnector { it.acceptor(responder) } // <3>
@@ -335,7 +324,7 @@ you can still declare `RSocketMessageHandler` as a Spring bean and then apply as
 ======
 Java::
 +
-[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+[source,java,indent=0,subs="verbatim,quotes"]
 ----
 	ApplicationContext context = ... ;
 	RSocketMessageHandler handler = context.getBean(RSocketMessageHandler.class);
@@ -347,7 +336,7 @@ Java::
 
 Kotlin::
 +
-[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+[source,kotlin,indent=0,subs="verbatim,quotes"]
 ----
 	import org.springframework.beans.factory.getBean
 
@@ -361,13 +350,12 @@ Kotlin::
 ======
 
 For the above you may also need to use `setHandlerPredicate` in `RSocketMessageHandler` to
-switch to a different strategy for detecting client responders, e.g. based on a custom
+switch to a different strategy for detecting client responders, for example, based on a custom
 annotation such as `@RSocketClientResponder` vs the default `@Controller`. This
 is necessary in scenarios with client and server, or multiple clients in the same
 application.
 
-See also xref:rsocket.adoc#rsocket-annot-responders[Annotated Responders], for more on the programming model.
-
+See also <<rsocket-annot-responders,Annotated Responders>>, for more on the programming model.
 
 [[rsocket-requester-client-advanced]]
 ==== Advanced
@@ -381,7 +369,7 @@ at that level as follows:
 ======
 Java::
 +
-[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+[source,java,indent=0,subs="verbatim,quotes"]
 ----
 	RSocketRequester requester = RSocketRequester.builder()
 		.rsocketConnector(connector -> {
@@ -392,7 +380,7 @@ Java::
 
 Kotlin::
 +
-[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+[source,kotlin,indent=0,subs="verbatim,quotes"]
 ----
 	val requester = RSocketRequester.builder()
 			.rsocketConnector {
@@ -402,14 +390,13 @@ Kotlin::
 ----
 ======
 
-
 [[rsocket-requester-server]]
 === Server Requester
 
 To make requests from a server to connected clients is a matter of obtaining the
 requester for the connected client from the server.
 
-In xref:rsocket.adoc#rsocket-annot-responders[Annotated Responders], `@ConnectMapping` and `@MessageMapping` methods support an
+In <<rsocket-annot-responders,Annotated Responders>>, `@ConnectMapping` and `@MessageMapping` methods support an
 `RSocketRequester` argument. Use it to access the requester for the connection. Keep in
 mind that `@ConnectMapping` methods are essentially handlers of the `SETUP` frame which
 must be handled before requests can begin. Therefore, requests at the very start must be
@@ -419,7 +406,7 @@ decoupled from handling. For example:
 ======
 Java::
 +
-[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+[source,java,indent=0,subs="verbatim,quotes"]
 ----
 	@ConnectMapping
 	Mono<Void> handle(RSocketRequester requester) {
@@ -436,7 +423,7 @@ Java::
 
 Kotlin::
 +
-[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+[source,kotlin,indent=0,subs="verbatim,quotes"]
 ----
 	@ConnectMapping
 	suspend fun handle(requester: RSocketRequester) {
@@ -452,19 +439,17 @@ Kotlin::
 <2> Perform handling in the suspending function.
 ======
 
-
-
 [[rsocket-requester-requests]]
 === Requests
 
-Once you have a xref:rsocket.adoc#rsocket-requester-client[client] or
-xref:rsocket.adoc#rsocket-requester-server[server] requester, you can make requests as follows:
+Once you have a <<rsocket-requester-client,client>> or
+<<rsocket-requester-server,server>> requester, you can make requests as follows:
 
 [tabs]
 ======
 Java::
 +
-[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+[source,java,indent=0,subs="verbatim,quotes"]
 ----
 	ViewBox viewBox = ... ;
 
@@ -479,7 +464,7 @@ Java::
 
 Kotlin::
 +
-[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+[source,kotlin,indent=0,subs="verbatim,quotes"]
 ----
 	val viewBox: ViewBox = ...
 
@@ -516,15 +501,15 @@ The `data(Object)` step is optional. Skip it for requests that don't send data:
 ======
 Java::
 +
-[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+[source,java,indent=0,subs="verbatim,quotes"]
 ----
-	Mono<AirportLocation> location = requester.route("find.radar.EWR"))
+	Mono<AirportLocation> location = requester.route("find.radar.EWR")
 		.retrieveMono(AirportLocation.class);
 ----
 
 Kotlin::
 +
-[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+[source,kotlin,indent=0,subs="verbatim,quotes"]
 ----
 	import org.springframework.messaging.rsocket.retrieveAndAwait
 
@@ -541,7 +526,7 @@ values are supported by a registered `Encoder`. For example:
 ======
 Java::
 +
-[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+[source,java,indent=0,subs="verbatim,quotes"]
 ----
 	String securityToken = ... ;
 	ViewBox viewBox = ... ;
@@ -555,7 +540,7 @@ Java::
 
 Kotlin::
 +
-[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+[source,kotlin,indent=0,subs="verbatim,quotes"]
 ----
 	import org.springframework.messaging.rsocket.retrieveFlow
 
@@ -578,7 +563,6 @@ indicates only that the message was successfully sent, and not that it was handl
 For `Metadata-Push` use the `sendMetadata()` method with a `Mono<Void>` return value.
 
 
-
 [[rsocket-annot-responders]]
 == Annotated Responders
 
@@ -586,8 +570,6 @@ RSocket responders can be implemented as `@MessageMapping` and `@ConnectMapping`
 `@MessageMapping` methods handle individual requests while `@ConnectMapping` methods handle
 connection-level events (setup and metadata push). Annotated responders are supported
 symmetrically, for responding from the server side and for responding from the client side.
-
-
 
 [[rsocket-annot-responders-server]]
 === Server Responders
@@ -600,7 +582,7 @@ methods:
 ======
 Java::
 +
-[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+[source,java,indent=0,subs="verbatim,quotes"]
 ----
 	@Configuration
 	static class ServerConfig {
@@ -616,7 +598,7 @@ Java::
 
 Kotlin::
 +
-[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+[source,kotlin,indent=0,subs="verbatim,quotes"]
 ----
 	@Configuration
 	class ServerConfig {
@@ -636,7 +618,7 @@ Then start an RSocket server through the Java RSocket API and plug the
 ======
 Java::
 +
-[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+[source,java,indent=0,subs="verbatim,quotes"]
 ----
 	ApplicationContext context = ... ;
 	RSocketMessageHandler handler = context.getBean(RSocketMessageHandler.class);
@@ -649,7 +631,7 @@ Java::
 
 Kotlin::
 +
-[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+[source,kotlin,indent=0,subs="verbatim,quotes"]
 ----
 	import org.springframework.beans.factory.getBean
 
@@ -665,7 +647,7 @@ Kotlin::
 `RSocketMessageHandler` supports
 {rsocket-protocol-extensions}/CompositeMetadata.md[composite] and
 {rsocket-protocol-extensions}/Routing.md[routing] metadata by default. You can set its
-xref:rsocket.adoc#rsocket-metadata-extractor[MetadataExtractor] if you need to switch to a
+<<rsocket-metadata-extractor,MetadataExtractor>> if you need to switch to a
 different mime type or register additional metadata mime types.
 
 You'll need to set the `Encoder` and `Decoder` instances required for metadata and data
@@ -684,7 +666,7 @@ you need to share configuration between a client and a server in the same proces
 ======
 Java::
 +
-[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+[source,java,indent=0,subs="verbatim,quotes"]
 ----
 	@Configuration
 	static class ServerConfig {
@@ -699,8 +681,8 @@ Java::
 		@Bean
 		public RSocketStrategies rsocketStrategies() {
 			return RSocketStrategies.builder()
-				.encoders(encoders -> encoders.add(new Jackson2CborEncoder()))
-				.decoders(decoders -> decoders.add(new Jackson2CborDecoder()))
+				.encoders(encoders -> encoders.add(new JacksonCborEncoder()))
+				.decoders(decoders -> decoders.add(new JacksonCborDecoder()))
 				.routeMatcher(new PathPatternRouteMatcher())
 				.build();
 		}
@@ -709,7 +691,7 @@ Java::
 
 Kotlin::
 +
-[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+[source,kotlin,indent=0,subs="verbatim,quotes"]
 ----
 	@Configuration
 	class ServerConfig {
@@ -721,37 +703,33 @@ Kotlin::
 
 		@Bean
 		fun rsocketStrategies() = RSocketStrategies.builder()
-				.encoders { it.add(Jackson2CborEncoder()) }
-				.decoders { it.add(Jackson2CborDecoder()) }
+				.encoders { it.add(JacksonCborEncoder()) }
+				.decoders { it.add(JacksonCborDecoder()) }
 				.routeMatcher(PathPatternRouteMatcher())
 				.build()
 	}
 ----
 ======
 
-
-
 [[rsocket-annot-responders-client]]
 === Client Responders
 
 Annotated responders on the client side need to be configured in the
 `RSocketRequester.Builder`. For details, see
-xref:rsocket.adoc#rsocket-requester-client-responder[Client Responders].
-
-
+<<rsocket-requester-client-responder,Client Responders>>.
 
 [[rsocket-annot-messagemapping]]
 === @MessageMapping
 
-Once xref:rsocket.adoc#rsocket-annot-responders-server[server] or
-xref:rsocket.adoc#rsocket-annot-responders-client[client] responder configuration is in place,
+Once <<rsocket-annot-responders-server,server>> or
+<<rsocket-annot-responders-client,client>> responder configuration is in place,
 `@MessageMapping` methods can be used as follows:
 
 [tabs]
 ======
 Java::
 +
-[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+[source,java,indent=0,subs="verbatim,quotes"]
 ----
 	@Controller
 	public class RadarsController {
@@ -765,7 +743,7 @@ Java::
 
 Kotlin::
 +
-[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+[source,kotlin,indent=0,subs="verbatim,quotes"]
 ----
 @Controller
 class RadarsController {
@@ -798,14 +776,14 @@ use the following method arguments:
 | Requester for making requests to the remote end.
 
 | `@DestinationVariable`
-| Value extracted from the route based on variables in the mapping pattern, e.g.
+| Value extracted from the route based on variables in the mapping pattern, for example,
   pass:q[`@MessageMapping("find.radar.{id}")`].
 
 | `@Header`
-| Metadata value registered for extraction as described in xref:rsocket.adoc#rsocket-metadata-extractor[MetadataExtractor].
+| Metadata value registered for extraction as described in <<rsocket-metadata-extractor,MetadataExtractor>>.
 
 | `@Headers Map<String, Object>`
-| All metadata values registered for extraction as described in xref:rsocket.adoc#rsocket-metadata-extractor[MetadataExtractor].
+| All metadata values registered for extraction as described in <<rsocket-metadata-extractor,MetadataExtractor>>.
 
 |===
 
@@ -863,14 +841,12 @@ interaction type(s):
 
 |===
 
-
-
 [[rsocket-annot-rsocketexchange]]
 === @RSocketExchange
 
 As an alternative to  `@MessageMapping`, you can also handle requests with
 `@RSocketExchange` methods. Such methods are declared on an
-xref:rsocket-interface[RSocket Interface] and can be used as a requester via
+<<rsocket-interface,RSocket Interface>> and can be used as a requester via
 `RSocketServiceProxyFactory` or implemented by a responder.
 
 For example, to handle requests as a responder:
@@ -879,7 +855,7 @@ For example, to handle requests as a responder:
 ======
 Java::
 +
-[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+[source,java,indent=0,subs="verbatim,quotes"]
 ----
 	public interface RadarsService {
 
@@ -898,7 +874,7 @@ Java::
 
 Kotlin::
 +
-[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+[source,kotlin,indent=0,subs="verbatim,quotes"]
 ----
 	interface RadarsService {
 
@@ -921,12 +897,11 @@ former needs to remain suitable for requester and responder use. For example, wh
 `@MessageMapping` can be declared to handle any number of routes and each route can
 be a pattern, `@RSocketExchange` must be declared with a single, concrete route. There are
 also small differences in the supported method parameters related to metadata, see
-xref:rsocket-annot-messagemapping[@MessageMapping] and
-xref:rsocket-interface[RSocket Interface] for a list of supported parameters.
+<<rsocket-annot-messagemapping,@MessageMapping>> and
+<<rsocket-interface,RSocket Interface>> for a list of supported parameters.
 
 `@RSocketExchange` can be used at the type level to specify a common prefix for all routes
 for a given RSocket service interface.
-
 
 [[rsocket-annot-connectmapping]]
 === @ConnectMapping
@@ -936,7 +911,7 @@ any subsequent metadata push notifications through the `METADATA_PUSH` frame, i.
 `metadataPush(Payload)` in `io.rsocket.RSocket`.
 
 `@ConnectMapping` methods support the same arguments as
-xref:rsocket.adoc#rsocket-annot-messagemapping[@MessageMapping] but based on metadata and data from the `SETUP` and
+<<rsocket-annot-messagemapping,@MessageMapping>> but based on metadata and data from the `SETUP` and
 `METADATA_PUSH` frames. `@ConnectMapping` can have a pattern to narrow handling to
 specific connections that have a route in the metadata, or if no patterns are declared
 then all connections match.
@@ -945,9 +920,7 @@ then all connections match.
 `Mono<Void>` as the return value. If handling returns an error for a new
 connection then the connection is rejected. Handling must not be held up to make
 requests to the `RSocketRequester` for the connection. See
-xref:rsocket.adoc#rsocket-requester-server[Server Requester] for details.
-
-
+<<rsocket-requester-server,Server Requester>> for details.
 
 
 [[rsocket-metadata-extractor]]
@@ -955,7 +928,7 @@ xref:rsocket.adoc#rsocket-requester-server[Server Requester] for details.
 
 Responders must interpret metadata.
 {rsocket-protocol-extensions}/CompositeMetadata.md[Composite metadata] allows independently
-formatted metadata values (e.g. for routing, security, tracing) each with its own mime
+formatted metadata values (for example, for routing, security, tracing) each with its own mime
 type. Applications need a way to configure metadata mime types to support, and a way
 to access extracted values.
 
@@ -973,7 +946,7 @@ a `Decoder` and register the mime type as follows:
 ======
 Java::
 +
-[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+[source,java,indent=0,subs="verbatim,quotes"]
 ----
 	DefaultMetadataExtractor extractor = new DefaultMetadataExtractor(metadataDecoders);
 	extractor.metadataToExtract(fooMimeType, Foo.class, "foo");
@@ -981,7 +954,7 @@ Java::
 
 Kotlin::
 +
-[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+[source,kotlin,indent=0,subs="verbatim,quotes"]
 ----
 	import org.springframework.messaging.rsocket.metadataToExtract
 
@@ -999,7 +972,7 @@ map. Here is an example where JSON is used for metadata:
 ======
 Java::
 +
-[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+[source,java,indent=0,subs="verbatim,quotes"]
 ----
 	DefaultMetadataExtractor extractor = new DefaultMetadataExtractor(metadataDecoders);
 	extractor.metadataToExtract(
@@ -1012,7 +985,7 @@ Java::
 
 Kotlin::
 +
-[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+[source,kotlin,indent=0,subs="verbatim,quotes"]
 ----
 	import org.springframework.messaging.rsocket.metadataToExtract
 
@@ -1031,7 +1004,7 @@ simply use a callback to customize registrations as follows:
 ======
 Java::
 +
-[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+[source,java,indent=0,subs="verbatim,quotes"]
 ----
 	RSocketStrategies strategies = RSocketStrategies.builder()
 		.metadataExtractorRegistry(registry -> {
@@ -1043,7 +1016,7 @@ Java::
 
 Kotlin::
 +
-[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+[source,kotlin,indent=0,subs="verbatim,quotes"]
 ----
 	import org.springframework.messaging.rsocket.metadataToExtract
 
@@ -1057,15 +1030,13 @@ Kotlin::
 ======
 
 
-
-
 [[rsocket-interface]]
 == RSocket Interface
 
 The Spring Framework lets you define an RSocket service as a Java interface with
 `@RSocketExchange` methods. You can pass such an interface to `RSocketServiceProxyFactory`
 to create a proxy which performs requests through an
-xref:rsocket.adoc#rsocket-requester[RSocketRequester]. You can also implement the
+<<rsocket-requester,RSocketRequester>>. You can also implement the
 interface as a responder that handles requests.
 
 Start by creating the interface with `@RSocketExchange` methods:
@@ -1093,9 +1064,7 @@ Now you can create a proxy that performs requests when methods are called:
 ----
 
 You can also implement the interface to handle requests as a responder.
-See xref:rsocket.adoc#rsocket-annot-rsocketexchange[Annotated Responders].
-
-
+See <<rsocket-annot-rsocketexchange,Annotated Responders>>.
 
 [[rsocket-interface-method-parameters]]
 === Method Parameters
@@ -1115,7 +1084,9 @@ method parameters:
 | `@Payload`
 | Set the input payload(s) for the request. This can be a concrete value, or any producer
   of values that can be adapted to a Reactive Streams `Publisher` via
-  `ReactiveAdapterRegistry`
+  `ReactiveAdapterRegistry`. A payload must be provided unless the `required` attribute
+  is set to `false`, or the parameter is marked optional as determined by
+  {spring-framework-api}/core/MethodParameter.html#isOptional()[`MethodParameter#isOptional`].
 
 | `Object`, if followed by `MimeType`
 | The value for a metadata entry in the input payload. This can be any `Object` as long
@@ -1129,7 +1100,6 @@ method parameters:
 
 |===
 
-
 [[rsocket-interface-return-values]]
 === Return Values
 
@@ -1142,4 +1112,3 @@ signature depends on response timeout settings of the underlying RSocket `Client
 as well as RSocket keep-alive settings. `RSocketServiceProxyFactory.Builder` does expose a
 `blockTimeout` option that also lets you configure the maximum time to block for a response,
 but we recommend configuring timeout values at the RSocket level for more control.
-

@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -57,7 +57,7 @@ public abstract class AbstractMarshallerTests<M extends Marshaller> {
 	protected Object flights;
 
 	@BeforeEach
-	public final void setUp() throws Exception {
+	final void setUp() throws Exception {
 		marshaller = createMarshaller();
 		flights = createFlights();
 	}
@@ -96,8 +96,7 @@ public abstract class AbstractMarshallerTests<M extends Marshaller> {
 		DocumentBuilder builder = documentBuilderFactory.newDocumentBuilder();
 		DOMResult domResult = new DOMResult();
 		marshaller.marshal(flights, domResult);
-		boolean condition = domResult.getNode() instanceof Document;
-		assertThat(condition).as("DOMResult does not contain a Document").isTrue();
+		assertThat(domResult.getNode()).as("DOMResult does not contain a Document").isInstanceOf(Document.class);
 		Document result = (Document) domResult.getNode();
 		Document expected = builder.newDocument();
 		Element flightsElement = expected.createElementNS("http://samples.springframework.org/flight", "tns:flights");

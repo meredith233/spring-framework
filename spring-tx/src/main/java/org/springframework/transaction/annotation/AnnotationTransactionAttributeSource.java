@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,7 +23,8 @@ import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.Set;
 
-import org.springframework.lang.Nullable;
+import org.jspecify.annotations.Nullable;
+
 import org.springframework.transaction.interceptor.AbstractFallbackTransactionAttributeSource;
 import org.springframework.transaction.interceptor.RollbackRuleAttribute;
 import org.springframework.transaction.interceptor.RuleBasedTransactionAttribute;
@@ -59,22 +60,21 @@ import org.springframework.util.CollectionUtils;
 public class AnnotationTransactionAttributeSource extends AbstractFallbackTransactionAttributeSource
 		implements Serializable {
 
-	private static final boolean jtaPresent;
+	private static final boolean JTA_PRESENT;
 
-	private static final boolean ejb3Present;
+	private static final boolean EJB_3_PRESENT;
 
 	static {
 		ClassLoader classLoader = AnnotationTransactionAttributeSource.class.getClassLoader();
-		jtaPresent = ClassUtils.isPresent("jakarta.transaction.Transactional", classLoader);
-		ejb3Present = ClassUtils.isPresent("jakarta.ejb.TransactionAttribute", classLoader);
+		JTA_PRESENT = ClassUtils.isPresent("jakarta.transaction.Transactional", classLoader);
+		EJB_3_PRESENT = ClassUtils.isPresent("jakarta.ejb.TransactionAttribute", classLoader);
 	}
 
 	private final Set<TransactionAnnotationParser> annotationParsers;
 
 	private boolean publicMethodsOnly = true;
 
-	@Nullable
-	private Set<RollbackRuleAttribute> defaultRollbackRules;
+	private @Nullable Set<RollbackRuleAttribute> defaultRollbackRules;
 
 
 	/**
@@ -83,13 +83,13 @@ public class AnnotationTransactionAttributeSource extends AbstractFallbackTransa
 	 * or the EJB3 {@link jakarta.ejb.TransactionAttribute} annotation.
 	 */
 	public AnnotationTransactionAttributeSource() {
-		if (jtaPresent || ejb3Present) {
+		if (JTA_PRESENT || EJB_3_PRESENT) {
 			this.annotationParsers = CollectionUtils.newLinkedHashSet(3);
 			this.annotationParsers.add(new SpringTransactionAnnotationParser());
-			if (jtaPresent) {
+			if (JTA_PRESENT) {
 				this.annotationParsers.add(new JtaTransactionAnnotationParser());
 			}
-			if (ejb3Present) {
+			if (EJB_3_PRESENT) {
 				this.annotationParsers.add(new Ejb3TransactionAnnotationParser());
 			}
 		}
@@ -149,7 +149,7 @@ public class AnnotationTransactionAttributeSource extends AbstractFallbackTransa
 	 * but not on checked exceptions. A default rule may override this
 	 * while still respecting any custom rules in the transaction attribute.
 	 * @param rollbackRule a rollback rule overriding the default behavior,
-	 * e.g. {@link RollbackRuleAttribute#ROLLBACK_ON_ALL_EXCEPTIONS}
+	 * for example, {@link RollbackRuleAttribute#ROLLBACK_ON_ALL_EXCEPTIONS}
 	 * @since 6.2
 	 * @see RuleBasedTransactionAttribute#getRollbackRules()
 	 * @see EnableTransactionManagement#rollbackOn()
@@ -175,14 +175,12 @@ public class AnnotationTransactionAttributeSource extends AbstractFallbackTransa
 	}
 
 	@Override
-	@Nullable
-	protected TransactionAttribute findTransactionAttribute(Class<?> clazz) {
+	protected @Nullable TransactionAttribute findTransactionAttribute(Class<?> clazz) {
 		return determineTransactionAttribute(clazz);
 	}
 
 	@Override
-	@Nullable
-	protected TransactionAttribute findTransactionAttribute(Method method) {
+	protected @Nullable TransactionAttribute findTransactionAttribute(Method method) {
 		return determineTransactionAttribute(method);
 	}
 
@@ -196,8 +194,7 @@ public class AnnotationTransactionAttributeSource extends AbstractFallbackTransa
 	 * @param element the annotated method or class
 	 * @return the configured transaction attribute, or {@code null} if none was found
 	 */
-	@Nullable
-	protected TransactionAttribute determineTransactionAttribute(AnnotatedElement element) {
+	protected @Nullable TransactionAttribute determineTransactionAttribute(AnnotatedElement element) {
 		for (TransactionAnnotationParser parser : this.annotationParsers) {
 			TransactionAttribute attr = parser.parseTransactionAnnotation(element);
 			if (attr != null) {

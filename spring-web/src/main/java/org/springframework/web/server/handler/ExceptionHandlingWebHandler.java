@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2023 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -91,7 +91,7 @@ public class ExceptionHandlingWebHandler extends WebHandlerDecorator {
 	/**
 	 * WebExceptionHandler to insert a checkpoint with current URL information.
 	 * Must be the first in order to ensure we catch the error signal before
-	 * the exception is handled and e.g. turned into an error response.
+	 * the exception is handled and, for example, turned into an error response.
 	 * @since 5.2
  	 */
 	private static class CheckpointInsertingHandler implements WebExceptionHandler {

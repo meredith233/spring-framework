@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -26,6 +26,7 @@ import io.micrometer.observation.Observation;
 import io.micrometer.observation.ObservationHandler;
 import io.micrometer.observation.tck.TestObservationRegistry;
 import io.micrometer.observation.tck.TestObservationRegistryAssert;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -39,7 +40,6 @@ import org.springframework.http.client.ClientHttpRequestFactory;
 import org.springframework.http.client.ClientHttpResponse;
 import org.springframework.http.client.observation.ClientRequestObservationContext;
 import org.springframework.http.converter.HttpMessageConverter;
-import org.springframework.lang.Nullable;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
@@ -55,6 +55,7 @@ import static org.springframework.http.HttpMethod.GET;
  * Tests for the client HTTP observations with {@link RestTemplate}.
  * @author Brian Clozel
  */
+@SuppressWarnings("removal")
 class RestTemplateObservationTests {
 
 
@@ -149,7 +150,7 @@ class RestTemplateObservationTests {
 	}
 
 	@Test
-	void executeWithIoExceptionAddsUnknownOutcome() throws Exception {
+	void executeWithIOExceptionAddsUnknownOutcome() throws Exception {
 		String url = "https://example.org/resource";
 		mockSentRequest(GET, url);
 		given(request.execute()).willThrow(new IOException("Socket failure"));
@@ -214,8 +215,7 @@ class RestTemplateObservationTests {
 
 
 	private TestObservationRegistryAssert.TestObservationRegistryAssertReturningObservationContextAssert assertThatHttpObservation() {
-		return TestObservationRegistryAssert.assertThat(this.observationRegistry)
-				.hasObservationWithNameEqualTo("http.client.requests").that();
+		return assertThat(this.observationRegistry).hasObservationWithNameEqualTo("http.client.requests").that();
 	}
 
 	static class ContextAssertionObservationHandler implements ObservationHandler<ClientRequestObservationContext> {
@@ -235,20 +235,19 @@ class RestTemplateObservationTests {
 
 		final TestObservationRegistry observationRegistry;
 
-		@Nullable
-		Observation currentObservation;
+		@Nullable Observation currentObservation;
 
-		public ObservationErrorHandler(TestObservationRegistry observationRegistry) {
+		ObservationErrorHandler(TestObservationRegistry observationRegistry) {
 			this.observationRegistry = observationRegistry;
 		}
 
 		@Override
-		public boolean hasError(ClientHttpResponse response) throws IOException {
+		public boolean hasError(ClientHttpResponse response) {
 			return true;
 		}
 
 		@Override
-		public void handleError(ClientHttpResponse response) throws IOException {
+		public void handleError(URI uri, HttpMethod httpMethod, ClientHttpResponse response) {
 			currentObservation = this.observationRegistry.getCurrentObservation();
 		}
 	}

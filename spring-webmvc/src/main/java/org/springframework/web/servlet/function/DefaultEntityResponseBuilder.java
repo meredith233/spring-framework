@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2023 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -34,6 +34,7 @@ import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpServletResponseWrapper;
+import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
@@ -41,6 +42,7 @@ import org.reactivestreams.Subscription;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.core.ReactiveAdapter;
 import org.springframework.core.ReactiveAdapterRegistry;
+import org.springframework.core.ResolvableType;
 import org.springframework.core.io.InputStreamResource;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.support.ResourceRegion;
@@ -54,8 +56,9 @@ import org.springframework.http.InvalidMediaTypeException;
 import org.springframework.http.MediaType;
 import org.springframework.http.converter.GenericHttpMessageConverter;
 import org.springframework.http.converter.HttpMessageConverter;
+import org.springframework.http.converter.SmartHttpMessageConverter;
+import org.springframework.http.server.ServletServerHttpRequest;
 import org.springframework.http.server.ServletServerHttpResponse;
-import org.springframework.lang.Nullable;
 import org.springframework.util.Assert;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
@@ -163,14 +166,8 @@ final class DefaultEntityResponseBuilder<T> implements EntityResponse.Builder<T>
 	}
 
 	@Override
-	public EntityResponse.Builder<T> eTag(String etag) {
-		if (!etag.startsWith("\"") && !etag.startsWith("W/\"")) {
-			etag = "\"" + etag;
-		}
-		if (!etag.endsWith("\"")) {
-			etag = etag + "\"";
-		}
-		this.headers.setETag(etag);
+	public EntityResponse.Builder<T> eTag(String tag) {
+		this.headers.setETag(tag);
 		return this;
 	}
 
@@ -215,7 +212,7 @@ final class DefaultEntityResponseBuilder<T> implements EntityResponse.Builder<T>
 			return new CompletionStageEntityResponse(this.status, this.headers, this.cookies,
 					completionStage, this.entityType);
 		}
-		else if (DefaultAsyncServerResponse.reactiveStreamsPresent) {
+		else if (DefaultAsyncServerResponse.REACTIVE_STREAMS_PRESENT) {
 			ReactiveAdapter adapter = ReactiveAdapterRegistry.getSharedInstance().getAdapter(this.entity.getClass());
 			if (adapter != null) {
 				Publisher<T> publisher = adapter.toPublisher(this.entity);
@@ -264,8 +261,7 @@ final class DefaultEntityResponseBuilder<T> implements EntityResponse.Builder<T>
 		}
 
 		@Override
-		@Nullable
-		protected ModelAndView writeToInternal(HttpServletRequest servletRequest,
+		protected @Nullable ModelAndView writeToInternal(HttpServletRequest servletRequest,
 				HttpServletResponse servletResponse, Context context)
 				throws ServletException, IOException {
 
@@ -289,11 +285,14 @@ final class DefaultEntityResponseBuilder<T> implements EntityResponse.Builder<T>
 				if (rangeHeader != null) {
 					Resource resource = (Resource) entity;
 					try {
-						List<HttpRange> httpRanges = HttpRange.parseRanges(rangeHeader);
-						serverResponse.getServletResponse().setStatus(HttpStatus.PARTIAL_CONTENT.value());
-						entity = HttpRange.toResourceRegions(httpRanges, resource);
-						entityClass = entity.getClass();
-						entityType = RESOURCE_REGION_LIST_TYPE;
+						List<HttpRange> httpRanges = HttpRange.resolveRanges(
+								new ServletServerHttpRequest(request).getHeaders(), serverResponse.getHeaders());
+						if (!httpRanges.isEmpty()) {
+							serverResponse.getServletResponse().setStatus(HttpStatus.PARTIAL_CONTENT.value());
+							entity = HttpRange.toResourceRegions(httpRanges, resource);
+							entityClass = entity.getClass();
+							entityType = RESOURCE_REGION_LIST_TYPE;
+						}
 					}
 					catch (IllegalArgumentException ex) {
 						serverResponse.getHeaders().set(HttpHeaders.CONTENT_RANGE, "bytes */" + resource.contentLength());
@@ -309,7 +308,14 @@ final class DefaultEntityResponseBuilder<T> implements EntityResponse.Builder<T>
 						return;
 					}
 				}
-				if (messageConverter.canWrite(entityClass, contentType)) {
+				else if (messageConverter instanceof SmartHttpMessageConverter smartMessageConverter) {
+					ResolvableType resolvableType = ResolvableType.forType(entityType);
+					if (smartMessageConverter.canWrite(resolvableType, entityClass, contentType)) {
+						smartMessageConverter.write(entity, resolvableType, contentType, serverResponse, null);
+						return;
+					}
+				}
+				else if (messageConverter.canWrite(entityClass, contentType)) {
 					((HttpMessageConverter<Object>) messageConverter).write(entity, contentType, serverResponse);
 					return;
 				}
@@ -319,8 +325,7 @@ final class DefaultEntityResponseBuilder<T> implements EntityResponse.Builder<T>
 			throw new HttpMediaTypeNotAcceptableException(producibleMediaTypes);
 		}
 
-		@Nullable
-		private static MediaType getContentType(HttpServletResponse response) {
+		private static @Nullable MediaType getContentType(HttpServletResponse response) {
 			try {
 				return MediaType.parseMediaType(response.getContentType()).removeQualityValue();
 			}
@@ -364,8 +369,7 @@ final class DefaultEntityResponseBuilder<T> implements EntityResponse.Builder<T>
 		}
 
 		@Override
-		@Nullable
-		protected ModelAndView writeToInternal(HttpServletRequest servletRequest, HttpServletResponse servletResponse,
+		protected @Nullable ModelAndView writeToInternal(HttpServletRequest servletRequest, HttpServletResponse servletResponse,
 				Context context) throws ServletException, IOException {
 
 			DeferredResult<ServerResponse> deferredResult = createDeferredResult(servletRequest, servletResponse, context);
@@ -418,8 +422,7 @@ final class DefaultEntityResponseBuilder<T> implements EntityResponse.Builder<T>
 		}
 
 		@Override
-		@Nullable
-		protected ModelAndView writeToInternal(HttpServletRequest servletRequest, HttpServletResponse servletResponse,
+		protected @Nullable ModelAndView writeToInternal(HttpServletRequest servletRequest, HttpServletResponse servletResponse,
 				Context context) throws ServletException, IOException {
 
 			DeferredResult<?> deferredResult = new DeferredResult<>();
@@ -440,8 +443,7 @@ final class DefaultEntityResponseBuilder<T> implements EntityResponse.Builder<T>
 
 			private final DeferredResult<?> deferredResult;
 
-			@Nullable
-			private Subscription subscription;
+			private @Nullable Subscription subscription;
 
 
 			public DeferredResultSubscriber(HttpServletRequest servletRequest,

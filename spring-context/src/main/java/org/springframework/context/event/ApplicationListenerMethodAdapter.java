@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,6 +16,7 @@
 
 package org.springframework.context.event;
 
+import java.lang.reflect.InaccessibleObjectException;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
@@ -29,6 +30,7 @@ import java.util.concurrent.CompletionStage;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
 
@@ -46,7 +48,7 @@ import org.springframework.core.ReactiveAdapterRegistry;
 import org.springframework.core.ResolvableType;
 import org.springframework.core.annotation.AnnotatedElementUtils;
 import org.springframework.core.annotation.Order;
-import org.springframework.lang.Nullable;
+import org.springframework.lang.Contract;
 import org.springframework.util.Assert;
 import org.springframework.util.ClassUtils;
 import org.springframework.util.ObjectUtils;
@@ -72,7 +74,7 @@ import org.springframework.util.StringUtils;
  */
 public class ApplicationListenerMethodAdapter implements GenericApplicationListener {
 
-	private static final boolean reactiveStreamsPresent = ClassUtils.isPresent(
+	private static final boolean REACTIVE_STREAMS_PRESENT = ClassUtils.isPresent(
 			"org.reactivestreams.Publisher", ApplicationListenerMethodAdapter.class.getClassLoader());
 
 
@@ -88,21 +90,17 @@ public class ApplicationListenerMethodAdapter implements GenericApplicationListe
 
 	private final List<ResolvableType> declaredEventTypes;
 
-	@Nullable
-	private final String condition;
+	private final @Nullable String condition;
 
 	private final boolean defaultExecution;
 
 	private final int order;
 
-	@Nullable
-	private volatile String listenerId;
+	private volatile @Nullable String listenerId;
 
-	@Nullable
-	private ApplicationContext applicationContext;
+	private @Nullable ApplicationContext applicationContext;
 
-	@Nullable
-	private EventExpressionEvaluator evaluator;
+	private @Nullable EventExpressionEvaluator evaluator;
 
 
 	/**
@@ -128,10 +126,10 @@ public class ApplicationListenerMethodAdapter implements GenericApplicationListe
 	}
 
 	private static List<ResolvableType> resolveDeclaredEventTypes(Method method, @Nullable EventListener ann) {
-		int count = (KotlinDetector.isSuspendingFunction(method) ? method.getParameterCount() - 1 : method.getParameterCount());
+		int count = (KotlinDetector.isSuspendingFunction(method) ? method.getParameterCount() - 1 :
+				method.getParameterCount());
 		if (count > 1) {
-			throw new IllegalStateException(
-					"Maximum one parameter is allowed for event listener method: " + method);
+			throw new IllegalStateException("Maximum one parameter is allowed for event listener method: " + method);
 		}
 
 		if (ann != null) {
@@ -159,6 +157,35 @@ public class ApplicationListenerMethodAdapter implements GenericApplicationListe
 
 
 	/**
+	 * Return the target listener method.
+	 * @since 7.0.7 in public form (with protected visibility since 5.3)
+	 */
+	public final Method getTargetMethod() {
+		return this.targetMethod;
+	}
+
+	/**
+	 * Return the condition to use.
+	 * <p>Matches the {@code condition} attribute of the {@link EventListener}
+	 * annotation or any matching attribute on a composed annotation that
+	 * is meta-annotated with {@code @EventListener}.
+	 */
+	protected final @Nullable String getCondition() {
+		return this.condition;
+	}
+
+	/**
+	 * Return whether default execution is applicable for the target listener.
+	 * @since 6.2
+	 * @see #onApplicationEvent
+	 * @see EventListener#defaultExecution()
+	 */
+	protected final boolean isDefaultExecution() {
+		return this.defaultExecution;
+	}
+
+
+	/**
 	 * Initialize this instance.
 	 */
 	void init(ApplicationContext applicationContext, @Nullable EventExpressionEvaluator evaluator) {
@@ -169,7 +196,7 @@ public class ApplicationListenerMethodAdapter implements GenericApplicationListe
 
 	@Override
 	public void onApplicationEvent(ApplicationEvent event) {
-		if (isDefaultExecution()) {
+		if (this.defaultExecution) {
 			processEvent(event);
 		}
 	}
@@ -224,22 +251,11 @@ public class ApplicationListenerMethodAdapter implements GenericApplicationListe
 	 * @see #getListenerId()
 	 */
 	protected String getDefaultListenerId() {
-		Method method = getTargetMethod();
 		StringJoiner sj = new StringJoiner(",", "(", ")");
-		for (Class<?> paramType : method.getParameterTypes()) {
+		for (Class<?> paramType : this.targetMethod.getParameterTypes()) {
 			sj.add(paramType.getName());
 		}
-		return ClassUtils.getQualifiedMethodName(method) + sj;
-	}
-
-	/**
-	 * Return whether default execution is applicable for the target listener.
-	 * @since 6.2
-	 * @see #onApplicationEvent
-	 * @see EventListener#defaultExecution()
-	 */
-	protected boolean isDefaultExecution() {
-		return this.defaultExecution;
+		return ClassUtils.getQualifiedMethodName(this.targetMethod) + sj;
 	}
 
 
@@ -249,7 +265,7 @@ public class ApplicationListenerMethodAdapter implements GenericApplicationListe
 	 * @param event the event to process through the listener method
 	 */
 	public void processEvent(ApplicationEvent event) {
-		Object[] args = resolveArguments(event);
+		@Nullable Object[] args = resolveArguments(event);
 		if (shouldHandle(event, args)) {
 			Object result = doInvoke(args);
 			if (result != null) {
@@ -271,15 +287,15 @@ public class ApplicationListenerMethodAdapter implements GenericApplicationListe
 		return shouldHandle(event, resolveArguments(event));
 	}
 
-	private boolean shouldHandle(ApplicationEvent event, @Nullable Object[] args) {
+	@Contract("_, null -> false")
+	private boolean shouldHandle(ApplicationEvent event, @Nullable Object @Nullable [] args) {
 		if (args == null) {
 			return false;
 		}
-		String condition = getCondition();
-		if (StringUtils.hasText(condition)) {
+		if (StringUtils.hasText(this.condition)) {
 			Assert.notNull(this.evaluator, "EventExpressionEvaluator must not be null");
 			return this.evaluator.condition(
-					condition, event, this.targetMethod, this.methodKey, args);
+					this.condition, event, this.targetMethod, this.methodKey, args);
 		}
 		return true;
 	}
@@ -290,8 +306,7 @@ public class ApplicationListenerMethodAdapter implements GenericApplicationListe
 	 * Can return {@code null} to indicate that no suitable arguments could be resolved
 	 * and therefore the method should not be invoked at all for the specified event.
 	 */
-	@Nullable
-	protected Object[] resolveArguments(ApplicationEvent event) {
+	protected @Nullable Object @Nullable [] resolveArguments(ApplicationEvent event) {
 		ResolvableType declaredEventType = getResolvableType(event);
 		if (declaredEventType == null) {
 			return null;
@@ -310,9 +325,8 @@ public class ApplicationListenerMethodAdapter implements GenericApplicationListe
 		return new Object[] {event};
 	}
 
-	@SuppressWarnings({"deprecation", "unchecked"})
 	protected void handleResult(Object result) {
-		if (reactiveStreamsPresent && new ReactiveResultHandler().subscribeToPublisher(result)) {
+		if (REACTIVE_STREAMS_PRESENT && new ReactiveResultHandler().subscribeToPublisher(result)) {
 			if (logger.isTraceEnabled()) {
 				logger.trace("Adapted to reactive result: " + result);
 			}
@@ -326,9 +340,6 @@ public class ApplicationListenerMethodAdapter implements GenericApplicationListe
 					publishEvents(event);
 				}
 			});
-		}
-		else if (result instanceof org.springframework.util.concurrent.ListenableFuture<?> listenableFuture) {
-			listenableFuture.addCallback(this::publishEvents, this::handleAsyncError);
 		}
 		else {
 			publishEvents(result);
@@ -366,16 +377,15 @@ public class ApplicationListenerMethodAdapter implements GenericApplicationListe
 	/**
 	 * Invoke the event listener method with the given argument values.
 	 */
-	@Nullable
-	protected Object doInvoke(@Nullable Object... args) {
+	protected @Nullable Object doInvoke(@Nullable Object... args) {
 		Object bean = getTargetBean();
 		// Detect package-protected NullBean instance through equals(null) check
 		if (bean.equals(null)) {
 			return null;
 		}
 
-		ReflectionUtils.makeAccessible(this.method);
 		try {
+			ReflectionUtils.makeAccessible(this.method);
 			if (KotlinDetector.isSuspendingFunction(this.method)) {
 				return CoroutinesUtils.invokeSuspendingFunction(this.method, bean, args);
 			}
@@ -385,7 +395,7 @@ public class ApplicationListenerMethodAdapter implements GenericApplicationListe
 			assertTargetBean(this.method, bean, args);
 			throw new IllegalStateException(getInvocationErrorMessage(bean, ex.getMessage(), args), ex);
 		}
-		catch (IllegalAccessException ex) {
+		catch (IllegalAccessException | InaccessibleObjectException ex) {
 			throw new IllegalStateException(getInvocationErrorMessage(bean, ex.getMessage(), args), ex);
 		}
 		catch (InvocationTargetException ex) {
@@ -410,32 +420,13 @@ public class ApplicationListenerMethodAdapter implements GenericApplicationListe
 	}
 
 	/**
-	 * Return the target listener method.
-	 * @since 5.3
-	 */
-	protected Method getTargetMethod() {
-		return this.targetMethod;
-	}
-
-	/**
-	 * Return the condition to use.
-	 * <p>Matches the {@code condition} attribute of the {@link EventListener}
-	 * annotation or any matching attribute on a composed annotation that
-	 * is meta-annotated with {@code @EventListener}.
-	 */
-	@Nullable
-	protected String getCondition() {
-		return this.condition;
-	}
-
-	/**
 	 * Add additional details such as the bean type and method signature to
 	 * the given error message.
 	 * @param message error message to append the HandlerMethod details to
 	 */
 	protected String getDetailedErrorMessage(Object bean, @Nullable String message) {
 		StringBuilder sb = (StringUtils.hasLength(message) ? new StringBuilder(message).append('\n') : new StringBuilder());
-		sb.append("HandlerMethod details: \n");
+		sb.append("ApplicationListenerMethodAdapter details: \n");
 		sb.append("Bean [").append(bean.getClass().getName()).append("]\n");
 		sb.append("Method [").append(this.method.toGenericString()).append("]\n");
 		return sb.toString();
@@ -455,13 +446,12 @@ public class ApplicationListenerMethodAdapter implements GenericApplicationListe
 			String msg = "The event listener method class '" + methodDeclaringClass.getName() +
 					"' is not an instance of the actual bean class '" +
 					targetBeanClass.getName() + "'. If the bean requires proxying " +
-					"(e.g. due to @Transactional), please use class-based proxying.";
+					"(for example, due to @Transactional), please use class-based proxying.";
 			throw new IllegalStateException(getInvocationErrorMessage(targetBean, msg, args));
 		}
 	}
 
-	@SuppressWarnings("NullAway")
-	private String getInvocationErrorMessage(Object bean, @Nullable String message, @Nullable Object[] resolvedArgs) {
+	private String getInvocationErrorMessage(Object bean, @Nullable String message, @Nullable Object [] resolvedArgs) {
 		StringBuilder sb = new StringBuilder(getDetailedErrorMessage(bean, message));
 		sb.append("Resolved arguments: \n");
 		for (int i = 0; i < resolvedArgs.length; i++) {
@@ -477,8 +467,7 @@ public class ApplicationListenerMethodAdapter implements GenericApplicationListe
 		return sb.toString();
 	}
 
-	@Nullable
-	private ResolvableType getResolvableType(ApplicationEvent event) {
+	private @Nullable ResolvableType getResolvableType(ApplicationEvent event) {
 		ResolvableType payloadType = null;
 		if (event instanceof PayloadApplicationEvent<?> payloadEvent) {
 			ResolvableType eventType = payloadEvent.getResolvableType();

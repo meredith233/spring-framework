@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,11 +16,8 @@
 
 package org.springframework.web.servlet.mvc.condition;
 
-import java.util.Collection;
-
 import org.junit.jupiter.api.Test;
 
-import org.springframework.web.servlet.mvc.condition.ParamsRequestCondition.ParamExpression;
 import org.springframework.web.testfixture.servlet.MockHttpServletRequest;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -149,8 +146,7 @@ class ParamsRequestConditionTests {
 		ParamsRequestCondition condition2 = new ParamsRequestCondition("foo=baz");
 
 		ParamsRequestCondition result = condition1.combine(condition2);
-		Collection<ParamExpression> conditions = result.getContent();
-		assertThat(conditions).hasSize(2);
+		assertThat(result.getContent()).hasSize(2);
 	}
 
 }

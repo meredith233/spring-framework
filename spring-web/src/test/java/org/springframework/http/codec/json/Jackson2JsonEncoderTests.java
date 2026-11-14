@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -49,27 +49,25 @@ import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 import static org.springframework.http.MediaType.APPLICATION_JSON;
 import static org.springframework.http.MediaType.APPLICATION_NDJSON;
 import static org.springframework.http.MediaType.APPLICATION_OCTET_STREAM;
-import static org.springframework.http.MediaType.APPLICATION_STREAM_JSON;
 import static org.springframework.http.MediaType.APPLICATION_XML;
-import static org.springframework.http.codec.json.Jackson2CodecSupport.JSON_VIEW_HINT;
 
 /**
+ * Tests for {@link Jackson2JsonEncoder}.
  * @author Sebastien Deleuze
  */
+@SuppressWarnings("removal")
 class Jackson2JsonEncoderTests extends AbstractEncoderTests<Jackson2JsonEncoder> {
 
-	public Jackson2JsonEncoderTests() {
+	Jackson2JsonEncoderTests() {
 		super(new Jackson2JsonEncoder());
 	}
 
 	@Override
 	@Test
-	@SuppressWarnings("deprecation")
-	public void canEncode() {
+	protected void canEncode() {
 		ResolvableType pojoType = ResolvableType.forClass(Pojo.class);
 		assertThat(this.encoder.canEncode(pojoType, APPLICATION_JSON)).isTrue();
 		assertThat(this.encoder.canEncode(pojoType, APPLICATION_NDJSON)).isTrue();
-		assertThat(this.encoder.canEncode(pojoType, APPLICATION_STREAM_JSON)).isTrue();
 		assertThat(this.encoder.canEncode(pojoType, null)).isTrue();
 
 		assertThat(this.encoder.canEncode(ResolvableType.forClass(Pojo.class),
@@ -89,12 +87,12 @@ class Jackson2JsonEncoderTests extends AbstractEncoderTests<Jackson2JsonEncoder>
 	@Override
 	@Test
 	@SuppressWarnings("deprecation")
-	public void encode() throws Exception {
+	protected void encode() throws Exception {
 		Flux<Object> input = Flux.just(new Pojo("foo", "bar"),
 				new Pojo("foofoo", "barbar"),
 				new Pojo("foofoofoo", "barbarbar"));
 
-		testEncodeAll(input, ResolvableType.forClass(Pojo.class), APPLICATION_STREAM_JSON, null, step -> step
+		testEncodeAll(input, ResolvableType.forClass(Pojo.class), APPLICATION_NDJSON, null, step -> step
 				.consumeNextWith(expectString("{\"foo\":\"foo\",\"bar\":\"bar\"}\n"))
 				.consumeNextWith(expectString("{\"foo\":\"foofoo\",\"bar\":\"barbar\"}\n"))
 				.consumeNextWith(expectString("{\"foo\":\"foofoofoo\",\"bar\":\"barbarbar\"}\n"))
@@ -103,7 +101,7 @@ class Jackson2JsonEncoderTests extends AbstractEncoderTests<Jackson2JsonEncoder>
 	}
 
 	@Test  // SPR-15866
-	public void canEncodeWithCustomMimeType() {
+	void canEncodeWithCustomMimeType() {
 		MimeType textJavascript = new MimeType("text", "javascript", StandardCharsets.UTF_8);
 		Jackson2JsonEncoder encoder = new Jackson2JsonEncoder(new ObjectMapper(), textJavascript);
 
@@ -152,7 +150,7 @@ class Jackson2JsonEncoderTests extends AbstractEncoderTests<Jackson2JsonEncoder>
 				.verifyComplete());
 	}
 
-	@Test // gh-29038
+	@Test  // gh-29038
 	void encodeNonStreamWithErrorAsFirstSignal() {
 		String message = "I'm a teapot";
 		Flux<Object> input = Flux.error(new IllegalStateException(message));
@@ -176,7 +174,7 @@ class Jackson2JsonEncoderTests extends AbstractEncoderTests<Jackson2JsonEncoder>
 
 
 	@Test  // SPR-15727
-	public void encodeStreamWithCustomStreamingType() {
+	void encodeStreamWithCustomStreamingType() {
 		MediaType fooMediaType = new MediaType("application", "foo");
 		MediaType barMediaType = new MediaType("application", "bar");
 		this.encoder.setStreamingMediaTypes(Arrays.asList(fooMediaType, barMediaType));
@@ -203,7 +201,8 @@ class Jackson2JsonEncoderTests extends AbstractEncoderTests<Jackson2JsonEncoder>
 		Mono<JacksonViewBean> input = Mono.just(bean);
 
 		ResolvableType type = ResolvableType.forClass(JacksonViewBean.class);
-		Map<String, Object> hints = singletonMap(JSON_VIEW_HINT, MyJacksonView1.class);
+		Map<String, Object> hints = singletonMap(org.springframework.http.codec.json.Jackson2CodecSupport.JSON_VIEW_HINT,
+				MyJacksonView1.class);
 
 		testEncode(input, type, null, hints, step -> step
 				.consumeNextWith(expectString("{\"withView1\":\"with\"}"))
@@ -220,7 +219,8 @@ class Jackson2JsonEncoderTests extends AbstractEncoderTests<Jackson2JsonEncoder>
 		Mono<JacksonViewBean> input = Mono.just(bean);
 
 		ResolvableType type = ResolvableType.forClass(JacksonViewBean.class);
-		Map<String, Object> hints = singletonMap(JSON_VIEW_HINT, MyJacksonView3.class);
+		Map<String, Object> hints = singletonMap(org.springframework.http.codec.json.Jackson2CodecSupport.JSON_VIEW_HINT,
+				MyJacksonView3.class);
 
 		testEncode(input, type, null, hints, step -> step
 				.consumeNextWith(expectString("{\"withoutView\":\"without\"}"))
@@ -247,7 +247,7 @@ class Jackson2JsonEncoderTests extends AbstractEncoderTests<Jackson2JsonEncoder>
 	}
 
 	@Test  // gh-28045
-	public void jacksonValueUnwrappedBeforeObjectMapperSelection() {
+	void jacksonValueUnwrappedBeforeObjectMapperSelection() {
 		JacksonViewBean bean = new JacksonViewBean();
 		bean.setWithView1("with");
 		bean.setWithView2("with");
@@ -262,16 +262,17 @@ class Jackson2JsonEncoderTests extends AbstractEncoderTests<Jackson2JsonEncoder>
 		ObjectMapper mapper = new ObjectMapper().configure(SerializationFeature.INDENT_OUTPUT, true);
 		this.encoder.registerObjectMappersForType(JacksonViewBean.class, map -> map.put(halMediaType, mapper));
 
-		String ls = System.lineSeparator();  // output below is different between Unix and Windows
 		testEncode(Mono.just(jacksonValue), type, halMediaType, Collections.emptyMap(), step -> step
-				.consumeNextWith(expectString("{" + ls + "  \"withView1\" : \"with\"" + ls + "}")
-						)
+				.consumeNextWith(expectString("""
+					{
+					\s "withView1" : "with"
+					}"""))
 				.verifyComplete()
 		);
 	}
 
 	@Test  // gh-22771
-	public void encodeWithFlushAfterWriteOff() {
+	void encodeWithFlushAfterWriteOff() {
 		ObjectMapper mapper = new ObjectMapper();
 		mapper.configure(SerializationFeature.FLUSH_AFTER_WRITE_VALUE, false);
 		Jackson2JsonEncoder encoder = new Jackson2JsonEncoder(mapper);

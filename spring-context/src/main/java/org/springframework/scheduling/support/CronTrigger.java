@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,9 +19,11 @@ package org.springframework.scheduling.support;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
+import java.util.Objects;
 import java.util.TimeZone;
 
-import org.springframework.lang.Nullable;
+import org.jspecify.annotations.Nullable;
+
 import org.springframework.scheduling.Trigger;
 import org.springframework.scheduling.TriggerContext;
 import org.springframework.util.Assert;
@@ -45,8 +47,7 @@ public class CronTrigger implements Trigger {
 
 	private final CronExpression expression;
 
-	@Nullable
-	private final ZoneId zoneId;
+	private final @Nullable ZoneId zoneId;
 
 
 	/**
@@ -112,11 +113,10 @@ public class CronTrigger implements Trigger {
 	 * previous execution; therefore, overlapping executions won't occur.
 	 */
 	@Override
-	@Nullable
-	public Instant nextExecution(TriggerContext triggerContext) {
+	public @Nullable Instant nextExecution(TriggerContext triggerContext) {
 		Instant timestamp = determineLatestTimestamp(triggerContext);
 		ZoneId zone = (this.zoneId != null ? this.zoneId : triggerContext.getClock().getZone());
-		ZonedDateTime zonedTimestamp = ZonedDateTime.ofInstant(timestamp, zone);
+		ZonedDateTime zonedTimestamp = timestamp.atZone(zone);
 		ZonedDateTime nextTimestamp = this.expression.next(zonedTimestamp);
 		return (nextTimestamp != null ? nextTimestamp.toInstant() : null);
 	}
@@ -146,12 +146,13 @@ public class CronTrigger implements Trigger {
 	@Override
 	public boolean equals(@Nullable Object other) {
 		return (this == other || (other instanceof CronTrigger that &&
-				this.expression.equals(that.expression)));
+				this.expression.equals(that.expression) &&
+				Objects.equals(this.zoneId, that.zoneId)));
 	}
 
 	@Override
 	public int hashCode() {
-		return this.expression.hashCode();
+		return Objects.hash(this.expression, this.zoneId);
 	}
 
 	@Override

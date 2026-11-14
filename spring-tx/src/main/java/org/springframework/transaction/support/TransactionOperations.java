@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2019 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,7 +18,8 @@ package org.springframework.transaction.support;
 
 import java.util.function.Consumer;
 
-import org.springframework.lang.Nullable;
+import org.jspecify.annotations.Nullable;
+
 import org.springframework.transaction.TransactionException;
 import org.springframework.transaction.TransactionStatus;
 
@@ -45,8 +46,7 @@ public interface TransactionOperations {
 	 * @throws RuntimeException if thrown by the TransactionCallback
 	 * @see #executeWithoutResult(Consumer)
 	 */
-	@Nullable
-	<T> T execute(TransactionCallback<T> action) throws TransactionException;
+	<T extends @Nullable Object> T execute(TransactionCallback<T> action) throws TransactionException;
 
 	/**
 	 * Execute the action specified by the given {@link Runnable} within a transaction.
@@ -54,8 +54,8 @@ public interface TransactionOperations {
 	 * {@link org.springframework.transaction.TransactionStatus} from within the callback,
 	 * use {@link #execute(TransactionCallback)} instead.
 	 * <p>This variant is analogous to using a {@link TransactionCallbackWithoutResult}
-	 * but with a simplified signature for common cases - and conveniently usable with
-	 * Java 8 lambda expressions.
+	 * but with a simplified signature for common cases and conveniently usable with
+	 * lambda expressions.
 	 * @param action the Runnable that specifies the transactional action
 	 * @throws TransactionException in case of initialization, rollback, or system errors
 	 * @throws RuntimeException if thrown by the Runnable
@@ -64,7 +64,7 @@ public interface TransactionOperations {
 	 * @see TransactionCallbackWithoutResult
 	 */
 	default void executeWithoutResult(Consumer<TransactionStatus> action) throws TransactionException {
-		execute(status -> {
+		this.<@Nullable Object> execute(status -> {
 			action.accept(status);
 			return null;
 		});

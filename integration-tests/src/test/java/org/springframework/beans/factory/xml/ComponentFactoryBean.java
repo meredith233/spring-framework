@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -35,7 +35,7 @@ public class ComponentFactoryBean implements FactoryBean<Component> {
 
 	@Override
 	public Component getObject() {
-		if (this.children != null && this.children.size() > 0) {
+		if (this.children != null && !this.children.isEmpty()) {
 			for (Component child : children) {
 				this.parent.addComponent(child);
 			}

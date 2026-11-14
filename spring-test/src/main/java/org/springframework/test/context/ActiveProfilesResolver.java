@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2023 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -30,7 +30,8 @@ package org.springframework.test.context;
  * @author Sam Brannen
  * @author Michail Nikolaev
  * @since 4.0
- * @see ActiveProfiles
+ * @see ActiveProfiles @ActiveProfiles
+ * @see org.springframework.test.context.support.DefaultActiveProfilesResolver DefaultActiveProfilesResolver
  */
 @FunctionalInterface
 public interface ActiveProfilesResolver {
@@ -41,7 +42,7 @@ public interface ActiveProfilesResolver {
 	 * @param testClass the test class for which the profiles should be resolved;
 	 * never {@code null}
 	 * @return the bean definition profiles to use when loading the
-	 * {@code ApplicationContext}; never {@code null}
+	 * {@code ApplicationContext}; never {@code null} but potentially empty
 	 * @see ActiveProfiles#resolver
 	 * @see ActiveProfiles#inheritProfiles
 	 */

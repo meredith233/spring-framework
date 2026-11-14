@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2022 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,7 +18,8 @@ package org.springframework.test.context.web.socket;
 
 import java.util.List;
 
-import org.springframework.lang.Nullable;
+import org.jspecify.annotations.Nullable;
+
 import org.springframework.test.context.ContextConfigurationAttributes;
 import org.springframework.test.context.ContextCustomizer;
 import org.springframework.test.context.ContextCustomizerFactory;
@@ -37,16 +38,15 @@ import org.springframework.util.ClassUtils;
  */
 class MockServerContainerContextCustomizerFactory implements ContextCustomizerFactory {
 
-	private static final boolean webSocketPresent = ClassUtils.isPresent("jakarta.websocket.server.ServerContainer",
+	private static final boolean WEB_SOCKET_PRESENT = ClassUtils.isPresent("jakarta.websocket.server.ServerContainer",
 			MockServerContainerContextCustomizerFactory.class.getClassLoader());
 
 
 	@Override
-	@Nullable
-	public ContextCustomizer createContextCustomizer(Class<?> testClass,
+	public @Nullable ContextCustomizer createContextCustomizer(Class<?> testClass,
 			List<ContextConfigurationAttributes> configAttributes) {
 
-		if (webSocketPresent && isAnnotatedWithWebAppConfiguration(testClass)) {
+		if (WEB_SOCKET_PRESENT && isAnnotatedWithWebAppConfiguration(testClass)) {
 			return new MockServerContainerContextCustomizer();
 		}
 		// Else, nothing to customize

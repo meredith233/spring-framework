@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2023 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,8 +16,9 @@
 
 package org.springframework.beans.factory.support;
 
+import org.jspecify.annotations.Nullable;
+
 import org.springframework.beans.factory.config.BeanDefinition;
-import org.springframework.lang.Nullable;
 import org.springframework.util.ObjectUtils;
 
 /**
@@ -27,7 +28,7 @@ import org.springframework.util.ObjectUtils;
  * parent bean definition can be flexibly configured through the "parentName" property.
  *
  * <p>In general, use this {@code GenericBeanDefinition} class for the purpose of
- * registering declarative bean definitions (e.g. XML definitions which a bean
+ * registering declarative bean definitions (for example, XML definitions which a bean
  * post-processor might operate on, potentially even reconfiguring the parent name).
  * Use {@code RootBeanDefinition}/{@code ChildBeanDefinition} where parent/child
  * relationships happen to be pre-determined, and prefer {@link RootBeanDefinition}
@@ -40,10 +41,10 @@ import org.springframework.util.ObjectUtils;
  * @see ChildBeanDefinition
  */
 @SuppressWarnings("serial")
-public class GenericBeanDefinition extends AbstractBeanDefinition {
+public class
+GenericBeanDefinition extends AbstractBeanDefinition {
 
-	@Nullable
-	private String parentName;
+	private @Nullable String parentName;
 
 
 	/**
@@ -55,7 +56,6 @@ public class GenericBeanDefinition extends AbstractBeanDefinition {
 	 * @see #setPropertyValues
 	 */
 	public GenericBeanDefinition() {
-		super();
 	}
 
 	/**
@@ -74,8 +74,7 @@ public class GenericBeanDefinition extends AbstractBeanDefinition {
 	}
 
 	@Override
-	@Nullable
-	public String getParentName() {
+	public @Nullable String getParentName() {
 		return this.parentName;
 	}
 

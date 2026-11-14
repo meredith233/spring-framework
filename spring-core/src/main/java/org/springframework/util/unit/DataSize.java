@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2023 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,14 +20,14 @@ import java.io.Serializable;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import org.springframework.lang.Nullable;
+import org.jspecify.annotations.Nullable;
+
 import org.springframework.util.Assert;
 import org.springframework.util.StringUtils;
 
 /**
- * A data size, such as '12MB'.
- *
- * <p>This class models data size in terms of bytes and is immutable and thread-safe.
+ * A data size, such as '12MB'. This class models data size in terms of
+ * bytes and is immutable and thread-safe.
  *
  * <p>The terms and units used in this class are based on
  * <a href="https://en.wikipedia.org/wiki/Binary_prefix">binary prefixes</a>
@@ -138,14 +138,19 @@ public final class DataSize implements Comparable<DataSize>, Serializable {
 	}
 
 	/**
-	 * Obtain a {@link DataSize} from a text string such as {@code 12MB} using
+	 * Obtain a {@link DataSize} from a text string such as {@code "5MB"} using
 	 * {@link DataUnit#BYTES} if no unit is specified.
-	 * <p>Examples:
-	 * <pre>
-	 * "12KB" -- parses as "12 kilobytes"
-	 * "5MB"  -- parses as "5 megabytes"
-	 * "20"   -- parses as "20 bytes"
-	 * </pre>
+	 * <h4>Examples</h4>
+	 * <table border="1">
+	 * <tr><th>Text</th><th>Parsed As</th><th>Size in Bytes</th></tr>
+	 * <tr><td>"20"</td><td>20 bytes</td><td>20</td></tr>
+	 * <tr><td>"20B"</td><td>20 bytes</td><td>20</td></tr>
+	 * <tr><td>"12KB"</td><td>12 kilobytes</td><td>12,288</td></tr>
+	 * <tr><td>"5MB"</td><td>5 megabytes</td><td>5,242,880</td></tr>
+	 * </table>
+	 * <p>Note that the terms and units used in the above examples are based on
+	 * <a href="https://en.wikipedia.org/wiki/Binary_prefix">binary prefixes</a>.
+	 * Consult the {@linkplain DataSize class-level Javadoc} for details.
 	 * @param text the text to parse
 	 * @return the parsed {@code DataSize}
 	 * @see #parse(CharSequence, DataUnit)
@@ -155,19 +160,24 @@ public final class DataSize implements Comparable<DataSize>, Serializable {
 	}
 
 	/**
-	 * Obtain a {@link DataSize} from a text string such as {@code 12MB} using
+	 * Obtain a {@link DataSize} from a text string such as {@code "5MB"} using
 	 * the specified default {@link DataUnit} if no unit is specified.
 	 * <p>The string starts with a number followed optionally by a unit matching
 	 * one of the supported {@linkplain DataUnit suffixes}.
 	 * <p>If neither a unit nor a default {@code DataUnit} is specified,
 	 * {@link DataUnit#BYTES} will be inferred.
-	 * <p>Examples:
-	 * <pre>
-	 * "12KB" -- parses as "12 kilobytes"
-	 * "5MB"  -- parses as "5 megabytes"
-	 * "20"   -- parses as "20 kilobytes" (where the {@code defaultUnit} is {@link DataUnit#KILOBYTES})
-	 * "20"   -- parses as "20 bytes" (if the {@code defaultUnit} is {@code null})
-	 * </pre>
+	 * <h4>Examples</h4>
+	 * <table border="1">
+	 * <tr><th>Text</th><th>Default Unit</th><th>Parsed As</th><th>Size in Bytes</th></tr>
+	 * <tr><td>"20"</td><td>{@code null}</td><td>20 bytes</td><td>20</td></tr>
+	 * <tr><td>"20"</td><td>{@link DataUnit#KILOBYTES KILOBYTES}</td><td>20 kilobytes</td><td>20,480</td></tr>
+	 * <tr><td>"20B"</td><td>N/A</td><td>20 bytes</td><td>20</td></tr>
+	 * <tr><td>"12KB"</td><td>N/A</td><td>12 kilobytes</td><td>12,288</td></tr>
+	 * <tr><td>"5MB"</td><td>N/A</td><td>5 megabytes</td><td>5,242,880</td></tr>
+	 * </table>
+	 * <p>Note that the terms and units used in the above examples are based on
+	 * <a href="https://en.wikipedia.org/wiki/Binary_prefix">binary prefixes</a>.
+	 * Consult the {@linkplain DataSize class-level Javadoc} for details.
 	 * @param text the text to parse
 	 * @param defaultUnit the default {@code DataUnit} to use
 	 * @return the parsed {@code DataSize}
@@ -247,14 +257,14 @@ public final class DataSize implements Comparable<DataSize>, Serializable {
 
 
 	@Override
-	public boolean equals(@Nullable Object obj) {
-		if (this == obj) {
+	public boolean equals(@Nullable Object other) {
+		if (this == other) {
 			return true;
 		}
-		if (obj == null || getClass() != obj.getClass()) {
+		if (other == null || getClass() != other.getClass()) {
 			return false;
 		}
-		DataSize that = (DataSize) obj;
+		DataSize that = (DataSize) other;
 		return (this.bytes == that.bytes);
 	}
 
@@ -279,7 +289,6 @@ public final class DataSize implements Comparable<DataSize>, Serializable {
 			DataUnit defaultUnitToUse = (defaultUnit != null ? defaultUnit : DataUnit.BYTES);
 			return (StringUtils.hasLength(suffix) ? DataUnit.fromSuffix(suffix) : defaultUnitToUse);
 		}
-
 	}
 
 }

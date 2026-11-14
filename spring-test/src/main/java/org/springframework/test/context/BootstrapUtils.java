@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2023 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,15 +19,21 @@ package org.springframework.test.context;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Constructor;
 import java.util.LinkedHashSet;
+import java.util.Map;
 import java.util.Set;
+import java.util.TreeMap;
+import java.util.stream.Collectors;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.jspecify.annotations.Nullable;
 
 import org.springframework.beans.BeanUtils;
+import org.springframework.core.annotation.MergedAnnotation;
+import org.springframework.core.annotation.MergedAnnotationPredicates;
+import org.springframework.core.annotation.MergedAnnotations;
+import org.springframework.core.annotation.MergedAnnotations.SearchStrategy;
 import org.springframework.core.log.LogMessage;
-import org.springframework.lang.Nullable;
-import org.springframework.test.context.TestContextAnnotationUtils.AnnotationDescriptor;
 import org.springframework.util.ClassUtils;
 
 /**
@@ -60,7 +66,7 @@ public abstract class BootstrapUtils {
 	private static final String WEB_APP_CONFIGURATION_ANNOTATION_CLASS_NAME =
 			"org.springframework.test.context.web.WebAppConfiguration";
 
-	private static final Class<? extends Annotation> webAppConfigurationClass = loadWebAppConfigurationClass();
+	private static final Class<? extends Annotation> WEB_APP_CONFIGURATION_CLASS = loadWebAppConfigurationClass();
 
 	private static final Log logger = LogFactory.getLog(BootstrapUtils.class);
 
@@ -168,27 +174,34 @@ public abstract class BootstrapUtils {
 		}
 	}
 
-	@Nullable
-	private static Class<?> resolveExplicitTestContextBootstrapper(Class<?> testClass) {
-		Set<BootstrapWith> annotations = new LinkedHashSet<>();
-		AnnotationDescriptor<BootstrapWith> descriptor =
-				TestContextAnnotationUtils.findAnnotationDescriptor(testClass, BootstrapWith.class);
-		while (descriptor != null) {
-			annotations.addAll(descriptor.findAllLocalMergedAnnotations());
-			descriptor = descriptor.next();
-		}
+	private static @Nullable Class<?> resolveExplicitTestContextBootstrapper(Class<?> testClass) {
+		Map<Integer, Set<BootstrapWith>> distanceToAnnotationsMap = MergedAnnotations.search(SearchStrategy.TYPE_HIERARCHY)
+				.withEnclosingClasses(TestContextAnnotationUtils::searchEnclosingClass)
+				.from(testClass)
+				.stream(BootstrapWith.class)
+				// The following effectively filters out annotations in the type and
+				// enclosing class hierarchies once annotations have already been found
+				// on a particular class or interface.
+				.filter(MergedAnnotationPredicates.firstRunOf(MergedAnnotation::getAggregateIndex))
+				// Grouping by "meta-distance" enables us to allow a directly-present
+				// annotation to override annotations that are meta-present.
+				// Collecting synthesized annotations for each meta-distance enables
+				// us to filter out duplicates.
+				.collect(Collectors.groupingBy(MergedAnnotation::getDistance, TreeMap::new,
+						Collectors.mapping(MergedAnnotation::synthesize, Collectors.toCollection(LinkedHashSet::new))));
 
-		if (annotations.isEmpty()) {
+		if (distanceToAnnotationsMap.isEmpty()) {
 			return null;
 		}
-		if (annotations.size() == 1) {
-			return annotations.iterator().next().value();
-		}
 
-		// Allow directly-present annotation to override annotations that are meta-present.
-		BootstrapWith bootstrapWith = testClass.getDeclaredAnnotation(BootstrapWith.class);
-		if (bootstrapWith != null) {
-			return bootstrapWith.value();
+		Set<BootstrapWith> annotations = new LinkedHashSet<>();
+		for (Set<BootstrapWith> currentAnnotations: distanceToAnnotationsMap.values()) {
+			// If we have found a single, non-competing @BootstrapWith annotation, return it.
+			if (annotations.isEmpty() && currentAnnotations.size() == 1) {
+				return currentAnnotations.iterator().next().value();
+			}
+			// Otherwise, track all discovered annotations for error reporting.
+			annotations.addAll(currentAnnotations);
 		}
 
 		throw new IllegalStateException(String.format(
@@ -197,7 +210,7 @@ public abstract class BootstrapUtils {
 	}
 
 	private static Class<?> resolveDefaultTestContextBootstrapper(Class<?> testClass) throws Exception {
-		boolean webApp = TestContextAnnotationUtils.hasAnnotation(testClass, webAppConfigurationClass);
+		boolean webApp = TestContextAnnotationUtils.hasAnnotation(testClass, WEB_APP_CONFIGURATION_CLASS);
 		String bootstrapperClassName = (webApp ? DEFAULT_WEB_TEST_CONTEXT_BOOTSTRAPPER_CLASS_NAME :
 				DEFAULT_TEST_CONTEXT_BOOTSTRAPPER_CLASS_NAME);
 		return ClassUtils.forName(bootstrapperClassName, BootstrapUtils.class.getClassLoader());

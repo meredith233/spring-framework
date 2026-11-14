@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2023 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -24,8 +24,9 @@ import java.lang.reflect.Type;
 import jakarta.json.bind.Jsonb;
 import jakarta.json.bind.JsonbBuilder;
 import jakarta.json.bind.JsonbConfig;
+import org.jspecify.annotations.Nullable;
 
-import org.springframework.lang.Nullable;
+import org.springframework.http.MediaType;
 import org.springframework.util.Assert;
 
 /**
@@ -41,7 +42,8 @@ import org.springframework.util.Assert;
  * @since 5.0
  * @see jakarta.json.bind.Jsonb
  * @see jakarta.json.bind.JsonbBuilder
- * @see #setJsonb
+ * @see #JsonbHttpMessageConverter(Jsonb)
+ * @see #JsonbHttpMessageConverter(JsonbConfig)
  */
 public class JsonbHttpMessageConverter extends AbstractJsonHttpMessageConverter {
 
@@ -111,7 +113,14 @@ public class JsonbHttpMessageConverter extends AbstractJsonHttpMessageConverter 
 	}
 
 	@Override
+	public boolean canWriteRepeatedly(Object o, @Nullable MediaType contentType) {
+		return true;
+	}
+
+	@Override
+	@SuppressWarnings("removal")
 	protected boolean supportsRepeatableWrites(Object o) {
 		return true;
 	}
+
 }

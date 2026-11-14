@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2023 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,15 +16,16 @@
 
 package org.springframework.format.support;
 
+import org.jspecify.annotations.Nullable;
+
 import org.springframework.core.convert.support.DefaultConversionService;
 import org.springframework.format.FormatterRegistry;
-import org.springframework.format.datetime.DateFormatterRegistrar;
+import org.springframework.format.datetime.DateTimeFormatAnnotationFormatterFactory;
 import org.springframework.format.datetime.standard.DateTimeFormatterRegistrar;
 import org.springframework.format.number.NumberFormatAnnotationFormatterFactory;
 import org.springframework.format.number.money.CurrencyUnitFormatter;
 import org.springframework.format.number.money.Jsr354NumberFormatAnnotationFormatterFactory;
 import org.springframework.format.number.money.MonetaryAmountFormatter;
-import org.springframework.lang.Nullable;
 import org.springframework.util.ClassUtils;
 import org.springframework.util.StringValueResolver;
 
@@ -46,11 +47,11 @@ import org.springframework.util.StringValueResolver;
  */
 public class DefaultFormattingConversionService extends FormattingConversionService {
 
-	private static final boolean jsr354Present;
+	private static final boolean JSR_354_PRESENT;
 
 	static {
 		ClassLoader classLoader = DefaultFormattingConversionService.class.getClassLoader();
-		jsr354Present = ClassUtils.isPresent("javax.money.MonetaryAmount", classLoader);
+		JSR_354_PRESENT = ClassUtils.isPresent("javax.money.MonetaryAmount", classLoader);
 	}
 
 	/**
@@ -97,7 +98,7 @@ public class DefaultFormattingConversionService extends FormattingConversionServ
 
 	/**
 	 * Add formatters appropriate for most environments: including number formatters,
-	 * JSR-354 Money &amp; Currency formatters, JSR-310 Date-Time and/or Joda-Time formatters,
+	 * JSR-354 Money &amp; Currency formatters, and JSR-310 Date-Time formatters,
 	 * depending on the presence of the corresponding API on the classpath.
 	 * @param formatterRegistry the service to register default formatters with
 	 */
@@ -106,7 +107,7 @@ public class DefaultFormattingConversionService extends FormattingConversionServ
 		formatterRegistry.addFormatterForFieldAnnotation(new NumberFormatAnnotationFormatterFactory());
 
 		// Default handling of monetary values
-		if (jsr354Present) {
+		if (JSR_354_PRESENT) {
 			formatterRegistry.addFormatter(new CurrencyUnitFormatter());
 			formatterRegistry.addFormatter(new MonetaryAmountFormatter());
 			formatterRegistry.addFormatterForFieldAnnotation(new Jsr354NumberFormatAnnotationFormatterFactory());
@@ -114,11 +115,12 @@ public class DefaultFormattingConversionService extends FormattingConversionServ
 
 		// Default handling of date-time values
 
-		// just handling JSR-310 specific date and time types
+		// Handling of JSR-310 specific date and time types, along with the legacy
+		// Date/Calendar/Long converters (see DateTimeConverters).
 		new DateTimeFormatterRegistrar().registerFormatters(formatterRegistry);
 
-		// regular DateFormat-based Date, Calendar, Long converters
-		new DateFormatterRegistrar().registerFormatters(formatterRegistry);
+		// Support for the @DateTimeFormat annotation on legacy Date/Calendar fields
+		formatterRegistry.addFormatterForFieldAnnotation(new DateTimeFormatAnnotationFormatterFactory());
 	}
 
 }

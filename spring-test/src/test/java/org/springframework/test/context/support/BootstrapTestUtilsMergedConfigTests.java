@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,7 +21,6 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
-import org.assertj.core.api.AssertionsForClassTypes;
 import org.junit.jupiter.api.Test;
 
 import org.springframework.context.annotation.Configuration;
@@ -36,7 +35,6 @@ import org.springframework.test.context.web.WebDelegatingSmartContextLoader;
 import org.springframework.test.context.web.WebMergedContextConfiguration;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatIllegalStateException;
 
 /**
  * Tests for {@link BootstrapTestUtils} involving {@link MergedContextConfiguration}.
@@ -59,10 +57,14 @@ class BootstrapTestUtilsMergedConfigTests extends AbstractContextConfigurationUt
 	 */
 	@Test
 	void buildMergedConfigWithContextConfigurationWithoutLocationsClassesOrInitializers() {
-		assertThatIllegalStateException().isThrownBy(() ->
-				buildMergedContextConfiguration(MissingContextAttributesTestCase.class))
-			.withMessageStartingWith("DelegatingSmartContextLoader was unable to detect defaults, "
-					+ "and no ApplicationContextInitializers or ContextCustomizers were declared for context configuration attributes");
+		Class<?> testClass = MissingContextAttributesTestCase.class;
+		MergedContextConfiguration mergedConfig = buildMergedContextConfiguration(testClass);
+
+		assertMergedConfig(mergedConfig, testClass, EMPTY_STRING_ARRAY, EMPTY_CLASS_ARRAY, DelegatingSmartContextLoader.class);
+		assertThat(mergedConfig.getContextCustomizers())
+				.map(Object::getClass)
+				.map(Class::getSimpleName)
+				.containsOnly("DynamicPropertiesContextCustomizer");
 	}
 
 	@Test
@@ -207,7 +209,7 @@ class BootstrapTestUtilsMergedConfigTests extends AbstractContextConfigurationUt
 	 * @since 5.3
 	 */
 	@Test
-	public void buildMergedConfigForNestedTestClassWithInheritedConfig() {
+	void buildMergedConfigForNestedTestClassWithInheritedConfig() {
 		Class<?> testClass = OuterTestCase.NestedTestCaseWithInheritedConfig.class;
 		Class<?>[] expectedClasses = array(FooConfig.class);
 		MergedContextConfiguration mergedConfig = buildMergedContextConfiguration(testClass);
@@ -220,7 +222,7 @@ class BootstrapTestUtilsMergedConfigTests extends AbstractContextConfigurationUt
 	 * @since 5.3
 	 */
 	@Test
-	public void buildMergedConfigForNestedTestClassWithMergedInheritedConfig() {
+	void buildMergedConfigForNestedTestClassWithMergedInheritedConfig() {
 		Class<?> testClass = OuterTestCase.NestedTestCaseWithMergedInheritedConfig.class;
 		Class<?>[] expectedClasses = array(FooConfig.class, BarConfig.class);
 		MergedContextConfiguration mergedConfig = buildMergedContextConfiguration(testClass);
@@ -233,7 +235,7 @@ class BootstrapTestUtilsMergedConfigTests extends AbstractContextConfigurationUt
 	 * @since 5.3
 	 */
 	@Test
-	public void buildMergedConfigForNestedTestClassWithOverriddenConfig() {
+	void buildMergedConfigForNestedTestClassWithOverriddenConfig() {
 		Class<?> testClass = OuterTestCase.NestedTestCaseWithOverriddenConfig.class;
 		Class<?>[] expectedClasses = array(BarConfig.class);
 		MergedContextConfiguration mergedConfig = buildMergedContextConfiguration(testClass);
@@ -246,7 +248,7 @@ class BootstrapTestUtilsMergedConfigTests extends AbstractContextConfigurationUt
 	 * @since 5.3
 	 */
 	@Test
-	public void buildMergedConfigForDoubleNestedTestClassWithInheritedOverriddenConfig() {
+	void buildMergedConfigForDoubleNestedTestClassWithInheritedOverriddenConfig() {
 		Class<?> testClass = OuterTestCase.NestedTestCaseWithOverriddenConfig.DoubleNestedTestCaseWithInheritedOverriddenConfig.class;
 		Class<?>[] expectedClasses = array(BarConfig.class);
 		MergedContextConfiguration mergedConfig = buildMergedContextConfiguration(testClass);
@@ -259,7 +261,7 @@ class BootstrapTestUtilsMergedConfigTests extends AbstractContextConfigurationUt
 	 * @since 5.3
 	 */
 	@Test
-	public void buildMergedConfigForContextHierarchy() {
+	void buildMergedConfigForContextHierarchy() {
 		Class<?> testClass = ContextHierarchyOuterTestCase.class;
 		Class<?>[] expectedClasses = array(BarConfig.class);
 
@@ -268,10 +270,7 @@ class BootstrapTestUtilsMergedConfigTests extends AbstractContextConfigurationUt
 
 		MergedContextConfiguration parent = mergedConfig.getParent();
 		assertThat(parent).as("parent config").isNotNull();
-		// The following does not work -- at least not in Eclipse.
-		// assertThat(parent.getClasses())...
-		// So we use AssertionsForClassTypes directly.
-		AssertionsForClassTypes.assertThat(parent.getClasses()).containsExactly(FooConfig.class);
+		assertThat(parent.getClasses()).containsExactly(FooConfig.class);
 
 		assertMergedConfig(mergedConfig, testClass, EMPTY_STRING_ARRAY, expectedClasses,
 			AnnotationConfigContextLoader.class);
@@ -281,7 +280,7 @@ class BootstrapTestUtilsMergedConfigTests extends AbstractContextConfigurationUt
 	 * @since 5.3
 	 */
 	@Test
-	public void buildMergedConfigForNestedTestClassWithInheritedConfigForContextHierarchy() {
+	void buildMergedConfigForNestedTestClassWithInheritedConfigForContextHierarchy() {
 		Class<?> enclosingTestClass = ContextHierarchyOuterTestCase.class;
 		Class<?> testClass = ContextHierarchyOuterTestCase.NestedTestCaseWithInheritedConfig.class;
 		Class<?>[] expectedClasses = array(BarConfig.class);
@@ -291,7 +290,7 @@ class BootstrapTestUtilsMergedConfigTests extends AbstractContextConfigurationUt
 
 		MergedContextConfiguration parent = mergedConfig.getParent();
 		assertThat(parent).as("parent config").isNotNull();
-		AssertionsForClassTypes.assertThat(parent.getClasses()).containsExactly(FooConfig.class);
+		assertThat(parent.getClasses()).containsExactly(FooConfig.class);
 
 		assertMergedConfig(mergedConfig, enclosingTestClass, EMPTY_STRING_ARRAY, expectedClasses,
 			AnnotationConfigContextLoader.class);
@@ -301,7 +300,7 @@ class BootstrapTestUtilsMergedConfigTests extends AbstractContextConfigurationUt
 	 * @since 5.3
 	 */
 	@Test
-	public void buildMergedConfigForNestedTestClassWithMergedInheritedConfigForContextHierarchy() {
+	void buildMergedConfigForNestedTestClassWithMergedInheritedConfigForContextHierarchy() {
 		Class<?> testClass = ContextHierarchyOuterTestCase.NestedTestCaseWithMergedInheritedConfig.class;
 		Class<?>[] expectedClasses = array(BarConfig.class, BazConfig.class);
 
@@ -310,7 +309,7 @@ class BootstrapTestUtilsMergedConfigTests extends AbstractContextConfigurationUt
 
 		MergedContextConfiguration parent = mergedConfig.getParent();
 		assertThat(parent).as("parent config").isNotNull();
-		AssertionsForClassTypes.assertThat(parent.getClasses()).containsExactly(FooConfig.class);
+		assertThat(parent.getClasses()).containsExactly(FooConfig.class);
 
 		assertMergedConfig(mergedConfig, testClass, EMPTY_STRING_ARRAY, expectedClasses,
 			AnnotationConfigContextLoader.class);
@@ -320,7 +319,7 @@ class BootstrapTestUtilsMergedConfigTests extends AbstractContextConfigurationUt
 	 * @since 5.3
 	 */
 	@Test
-	public void buildMergedConfigForNestedTestClassWithOverriddenConfigForContextHierarchy() {
+	void buildMergedConfigForNestedTestClassWithOverriddenConfigForContextHierarchy() {
 		Class<?> testClass = ContextHierarchyOuterTestCase.NestedTestCaseWithOverriddenConfig.class;
 		MergedContextConfiguration mergedConfig = buildMergedContextConfiguration(testClass);
 		assertThat(mergedConfig).as("merged config").isNotNull();

@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,23 +16,52 @@
 
 package org.springframework.core.io.support;
 
+import java.io.File;
 import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.io.StringWriter;
 import java.io.UncheckedIOException;
+import java.net.JarURLConnection;
+import java.net.URISyntaxException;
 import java.net.URL;
 import java.net.URLClassLoader;
+import java.net.URLConnection;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Arrays;
+import java.util.Enumeration;
 import java.util.List;
+import java.util.jar.Attributes;
+import java.util.jar.Attributes.Name;
+import java.util.jar.JarEntry;
+import java.util.jar.JarFile;
+import java.util.jar.JarOutputStream;
+import java.util.jar.Manifest;
 import java.util.stream.Collectors;
+import java.util.zip.ZipEntry;
 
+import org.apache.commons.logging.LogFactory;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 import org.springframework.core.io.DefaultResourceLoader;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.core.io.Resource;
+import org.springframework.core.io.UrlResource;
+import org.springframework.core.testfixture.ide.IdeUtils;
+import org.springframework.util.ClassUtils;
+import org.springframework.util.FileCopyUtils;
+import org.springframework.util.FileSystemUtils;
+import org.springframework.util.ResourceUtils;
+import org.springframework.util.StreamUtils;
 import org.springframework.util.StringUtils;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -58,7 +87,8 @@ class PathMatchingResourcePatternResolverTests {
 
 	private static final String[] TEST_CLASSES_IN_CORE_IO_SUPPORT = {"PathMatchingResourcePatternResolverTests.class"};
 
-	private static final String[] CLASSES_IN_REACTOR_UTIL_ANNOTATION = {"NonNull.class", "NonNullApi.class", "Nullable.class"};
+	private static final String[] CLASSES_IN_REACTOR_UTIL_ANNOTATION =
+			{"Incubating.class", "NonNull.class", "NonNullApi.class", "Nullable.class"};
 
 
 	private PathMatchingResourcePatternResolver resolver = new PathMatchingResourcePatternResolver();
@@ -70,6 +100,50 @@ class PathMatchingResourcePatternResolverTests {
 		@Test
 		void invalidPrefixWithPatternElementInItThrowsException() {
 			assertThatExceptionOfType(FileNotFoundException.class).isThrownBy(() -> resolver.getResources("xx**:**/*.xy"));
+		}
+	}
+
+
+	@Nested
+	class ClassPathAll {
+
+		@Test
+		void getResourcesVsGetResource() throws IOException {
+			StringBuilder content1 = new StringBuilder(200000);
+			long length1 = 0;
+			Resource[] resources1 = resolver.getResources("classpath*:META-INF/MANIFEST.MF");
+			for (Resource resource : resources1) {
+				assertThat(resource.exists()).as("%s exists", resource).isTrue();
+				assertThat(resource.isReadable()).as("%s is readable", resource).isTrue();
+				if (!IdeUtils.runningInEclipse()) {
+					assertThat(resource.isFile()).as("%s is a file", resource).isFalse();
+				}
+				length1 += resource.contentLength();
+				resource.consumeContent(inputStream ->
+						content1.append(FileCopyUtils.copyToString(new InputStreamReader(inputStream))));
+			}
+			String content = content1.toString();
+
+			StringBuilder content2 = new StringBuilder(200000);
+			Resource resource2 = resolver.getResource("classpath*:META-INF/MANIFEST.MF");
+			assertThat(resource2.exists()).isTrue();
+			assertThat(resource2.isReadable()).isTrue();
+			assertThat(resource2.isFile()).isFalse();
+			resource2.consumeContent(inputStream ->
+					content2.append(FileCopyUtils.copyToString(new InputStreamReader(inputStream))));
+			assertThat(content.contentEquals(content2)).isTrue();
+			assertThat(resource2.contentLength()).isEqualTo(length1);
+
+			String content3 = FileCopyUtils.copyToString(new InputStreamReader(resource2.getInputStream()));
+			assertThat(content.contentEquals(content3)).isTrue();
+
+			String content4 = new EncodedResource(resource2).getContentAsString();
+			assertThat(content.contentEquals(content4)).isTrue();
+
+			StringWriter content5 = new StringWriter(200000);
+			EncodedResource resource5 = new EncodedResource(resource2);
+			resource5.consumeContent(reader -> FileCopyUtils.copy(reader, content5));
+			assertThat(content.contentEquals(content5.getBuffer())).isTrue();
 		}
 	}
 
@@ -104,12 +178,15 @@ class PathMatchingResourcePatternResolverTests {
 		}
 
 		@Test
+		@SuppressWarnings("deprecation")  // for deprecated URL constructor on JDK 20
 		void encodedHashtagInPath() throws IOException {
 			Path rootDir = Paths.get("src/test/resources/custom%23root").toAbsolutePath();
 			URL root = new URL("file:" + rootDir + "/");
 			resolver = new PathMatchingResourcePatternResolver(new DefaultResourceLoader(new URLClassLoader(new URL[] {root})));
+			resolver.setUseCaches(false);
 			assertExactFilenames("classpath*:scanned/*.txt", "resource#test1.txt", "resource#test2.txt");
 		}
+
 
 		@Nested
 		class WithHashtagsInTheirFilenames {
@@ -272,8 +349,176 @@ class PathMatchingResourcePatternResolverTests {
 		@Test
 		void rootPatternRetrievalInJarFiles() throws IOException {
 			assertThat(resolver.getResources("classpath*:aspectj*.dtd")).extracting(Resource::getFilename)
-				.as("Could not find aspectj_1_5_0.dtd in the root of the aspectjweaver jar")
-				.containsExactly("aspectj_1_5_0.dtd");
+					.as("Could not find aspectj_1_5_0.dtd in the root of the aspectjweaver jar")
+					.containsExactly("aspectj_1_5_0.dtd");
+		}
+	}
+
+
+	@Nested
+	class ClassPathManifestEntries {
+
+		@TempDir
+		Path temp;
+
+		@BeforeAll
+		static void suppressJarCaches() {
+			URLConnection.setDefaultUseCaches("jar", false);
+		}
+
+		@AfterAll
+		static void restoreJarCaches() {
+			URLConnection.setDefaultUseCaches("jar", true);
+		}
+
+		@Test
+		void javaDashJarFindsClassPathManifestEntries() throws Exception {
+			Path lib = this.temp.resolve("lib");
+			Files.createDirectories(lib);
+			writeAssetJar(lib.resolve("asset.jar"));
+			writeApplicationJar(this.temp.resolve("app.jar"));
+			String java = ProcessHandle.current().info().command().get();
+			Process process = new ProcessBuilder(java, "-jar", "app.jar")
+					.directory(this.temp.toFile())
+					.start();
+			assertThat(process.waitFor()).isZero();
+			String result = StreamUtils.copyToString(process.getInputStream(), StandardCharsets.UTF_8);
+			assertThat(result.replace("\\", "/")).contains("!!!!").contains("/lib/asset.jar!/assets/file.txt");
+		}
+
+		@Test
+		void javaDashJarFindsAbsoluteClassPathManifestEntries() throws Exception {
+			Path assetJar = this.temp.resolve("dependency").resolve("asset.jar");
+			Files.createDirectories(assetJar.getParent());
+			writeAssetJar(assetJar);
+			writeApplicationJarWithAbsolutePath(this.temp.resolve("app.jar"), assetJar);
+			String java = ProcessHandle.current().info().command().get();
+			Process process = new ProcessBuilder(java, "-jar", "app.jar")
+					.directory(this.temp.toFile())
+					.start();
+			assertThat(process.waitFor()).isZero();
+			String result = StreamUtils.copyToString(process.getInputStream(), StandardCharsets.UTF_8);
+			assertThat(result.replace("\\", "/")).contains("!!!!").contains("asset.jar!/assets/file.txt");
+		}
+
+		private void writeAssetJar(Path path) throws Exception {
+			try (JarOutputStream jar = new JarOutputStream(new FileOutputStream(path.toFile()))) {
+				jar.putNextEntry(new ZipEntry("assets/"));
+				jar.closeEntry();
+				jar.putNextEntry(new ZipEntry("assets/file.txt"));
+				StreamUtils.copy("test", StandardCharsets.UTF_8, jar);
+				jar.closeEntry();
+			}
+
+			assertThat(new FileSystemResource(path).exists()).isTrue();
+			assertThat(new UrlResource(ResourceUtils.JAR_URL_PREFIX + ResourceUtils.FILE_URL_PREFIX + path + ResourceUtils.JAR_URL_SEPARATOR).exists()).isTrue();
+			assertThat(new UrlResource(ResourceUtils.JAR_URL_PREFIX + ResourceUtils.FILE_URL_PREFIX + path + ResourceUtils.JAR_URL_SEPARATOR + "assets/file.txt").exists()).isTrue();
+			assertThat(new UrlResource(ResourceUtils.JAR_URL_PREFIX + ResourceUtils.FILE_URL_PREFIX + path + ResourceUtils.JAR_URL_SEPARATOR + "assets/none.txt").exists()).isFalse();
+			assertThat(new UrlResource(ResourceUtils.JAR_URL_PREFIX + ResourceUtils.FILE_URL_PREFIX + "X" + path + ResourceUtils.JAR_URL_SEPARATOR).exists()).isFalse();
+			assertThat(new UrlResource(ResourceUtils.JAR_URL_PREFIX + ResourceUtils.FILE_URL_PREFIX + "X" + path + ResourceUtils.JAR_URL_SEPARATOR + "assets/file.txt").exists()).isFalse();
+			assertThat(new UrlResource(ResourceUtils.JAR_URL_PREFIX + ResourceUtils.FILE_URL_PREFIX + "X" + path + ResourceUtils.JAR_URL_SEPARATOR + "assets/none.txt").exists()).isFalse();
+
+			Resource resource = new UrlResource(ResourceUtils.JAR_URL_PREFIX + ResourceUtils.FILE_URL_PREFIX + path + ResourceUtils.JAR_URL_SEPARATOR + "assets/file.txt");
+			try (InputStream is = resource.getInputStream()) {
+				assertThat(resource.exists()).isTrue();
+				assertThat(resource.createRelative("file.txt").exists()).isTrue();
+				assertThat(new UrlResource(ResourceUtils.JAR_URL_PREFIX + ResourceUtils.FILE_URL_PREFIX + path + ResourceUtils.JAR_URL_SEPARATOR).exists()).isTrue();
+				is.readAllBytes();
+			}
+		}
+
+		private void writeApplicationJar(Path path) throws Exception {
+			Manifest manifest = new Manifest();
+			Attributes mainAttributes = manifest.getMainAttributes();
+			mainAttributes.put(Name.CLASS_PATH, buildSpringClassPath() + "lib/asset.jar");
+			mainAttributes.put(Name.MAIN_CLASS, ClassPathManifestEntriesTestApplication.class.getName());
+			mainAttributes.put(Name.MANIFEST_VERSION, "1.0");
+			try (JarOutputStream jar = new JarOutputStream(new FileOutputStream(path.toFile()), manifest)) {
+				String appClassResource = ClassUtils.convertClassNameToResourcePath(
+						ClassPathManifestEntriesTestApplication.class.getName()) + ClassUtils.CLASS_FILE_SUFFIX;
+				String folder = "";
+				for (String name : appClassResource.split("/")) {
+					if (!name.endsWith(ClassUtils.CLASS_FILE_SUFFIX)) {
+						folder += name + "/";
+						jar.putNextEntry(new ZipEntry(folder));
+						jar.closeEntry();
+					}
+					else {
+						jar.putNextEntry(new ZipEntry(folder + name));
+						try (InputStream in = getClass().getResourceAsStream(name)) {
+							in.transferTo(jar);
+						}
+						jar.closeEntry();
+					}
+				}
+			}
+			assertThat(new FileSystemResource(path).exists()).isTrue();
+			assertThat(new UrlResource(ResourceUtils.JAR_URL_PREFIX + ResourceUtils.FILE_URL_PREFIX + path + ResourceUtils.JAR_URL_SEPARATOR).exists()).isTrue();
+		}
+
+		private void writeApplicationJarWithAbsolutePath(Path path, Path assetJar) throws Exception {
+			Manifest manifest = new Manifest();
+			Attributes mainAttributes = manifest.getMainAttributes();
+			mainAttributes.put(Name.CLASS_PATH, buildSpringClassPath() + assetJar.toAbsolutePath());
+			mainAttributes.put(Name.MAIN_CLASS, ClassPathManifestEntriesTestApplication.class.getName());
+			mainAttributes.put(Name.MANIFEST_VERSION, "1.0");
+			try (JarOutputStream jar = new JarOutputStream(new FileOutputStream(path.toFile()), manifest)) {
+				String appClassResource = ClassUtils.convertClassNameToResourcePath(
+						ClassPathManifestEntriesTestApplication.class.getName()) + ClassUtils.CLASS_FILE_SUFFIX;
+				String folder = "";
+				for (String name : appClassResource.split("/")) {
+					if (!name.endsWith(ClassUtils.CLASS_FILE_SUFFIX)) {
+						folder += name + "/";
+						jar.putNextEntry(new ZipEntry(folder));
+						jar.closeEntry();
+					}
+					else {
+						jar.putNextEntry(new ZipEntry(folder + name));
+						try (InputStream in = getClass().getResourceAsStream(name)) {
+							in.transferTo(jar);
+						}
+						jar.closeEntry();
+					}
+				}
+			}
+			assertThat(new FileSystemResource(path).exists()).isTrue();
+			assertThat(new UrlResource(ResourceUtils.JAR_URL_PREFIX + ResourceUtils.FILE_URL_PREFIX + path + ResourceUtils.JAR_URL_SEPARATOR).exists()).isTrue();
+		}
+
+		private String buildSpringClassPath() throws Exception {
+			return copyClasses(PathMatchingResourcePatternResolver.class, "spring-core") +
+					copyClasses(LogFactory.class, "commons-logging");
+		}
+
+		@SuppressWarnings("deprecation")  // for deprecated URL constructor on JDK 20
+		private String copyClasses(Class<?> sourceClass, String destinationName) throws URISyntaxException, IOException {
+			Path destination = this.temp.resolve(destinationName);
+			String resourcePath = ClassUtils.convertClassNameToResourcePath(
+					sourceClass.getName()) + ClassUtils.CLASS_FILE_SUFFIX;
+			URL resource = getClass().getClassLoader().getResource(resourcePath);
+			URL url = new URL(resource.toString().replace(resourcePath, ""));
+			URLConnection connection = url.openConnection();
+			if (connection instanceof JarURLConnection jarUrlConnection) {
+				try (JarFile jarFile = jarUrlConnection.getJarFile()) {
+					Enumeration<JarEntry> entries = jarFile.entries();
+					while (entries.hasMoreElements()) {
+						JarEntry entry = entries.nextElement();
+						if (!entry.isDirectory()) {
+							Path entryPath = destination.resolve(entry.getName());
+							try (InputStream in = jarFile.getInputStream(entry)) {
+								Files.createDirectories(entryPath.getParent());
+								Files.copy(in, destination.resolve(entry.getName()));
+							}
+						}
+					}
+				}
+			}
+			else {
+				File source = new File(url.toURI());
+				Files.createDirectories(destination);
+				FileSystemUtils.copyRecursively(source, destination.toFile());
+			}
+			return destinationName + "/ ";
 		}
 	}
 

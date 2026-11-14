@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,7 +20,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.function.Supplier;
 
-import org.springframework.lang.Nullable;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Expressions are executed in an evaluation context. It is in this context that
@@ -38,6 +38,26 @@ import org.springframework.lang.Nullable;
  * manually.</li>
  * </ul>
  *
+ * <p><strong>WARNING</strong>: Special security considerations apply to the
+ * evaluation of SpEL expressions, particularly those obtained from an untrusted
+ * source. See the
+ * <a href="https://docs.spring.io/spring-framework/reference/core/expressions/evaluation.html#expressions-evaluation-context-security"
+ * >Security Considerations</a> section of the Spring Framework reference
+ * documentation for details, as well as the class-level documentation for
+ * {@code StandardEvaluationContext} and {@code SimpleEvaluationContext}.
+ *
+ * <p>An {@code EvaluationContext} is designed to be built once and reused across
+ * many evaluations, potentially of many different {@link Expression} instances. A
+ * single {@link Expression}, in turn, may cache accessor and executor state resolved
+ * against a particular {@code EvaluationContext} configuration. Reusing an
+ * {@code Expression} across {@code EvaluationContext} instances of the same type and
+ * with equivalent configuration is supported; reusing an {@code Expression} across
+ * contexts with different security implications &mdash; for example, first against a
+ * {@code StandardEvaluationContext} and later against a
+ * {@code SimpleEvaluationContext} &mdash; is not, since cached state from the more
+ * permissive evaluation may be reused during the more restrictive one. See
+ * {@link Expression} for details.
+ *
  * @author Andy Clement
  * @author Juergen Hoeller
  * @author Sam Brannen
@@ -47,15 +67,18 @@ public interface EvaluationContext {
 
 	/**
 	 * Return the default root context object against which unqualified
-	 * properties/methods/etc should be resolved. This can be overridden
-	 * when evaluating an expression.
+	 * properties, methods, etc. should be resolved.
+	 * <p>This can be overridden when evaluating an expression.
 	 */
 	TypedValue getRootObject();
 
 	/**
 	 * Return a list of accessors that will be asked in turn to read/write a property.
+	 * <p>The default implementation returns an empty list.
 	 */
-	List<PropertyAccessor> getPropertyAccessors();
+	default List<PropertyAccessor> getPropertyAccessors() {
+		return Collections.emptyList();
+	}
 
 	/**
 	 * Return a list of index accessors that will be asked in turn to access or
@@ -69,19 +92,24 @@ public interface EvaluationContext {
 
 	/**
 	 * Return a list of resolvers that will be asked in turn to locate a constructor.
+	 * <p>The default implementation returns an empty list.
 	 */
-	List<ConstructorResolver> getConstructorResolvers();
+	default List<ConstructorResolver> getConstructorResolvers() {
+		return Collections.emptyList();
+	}
 
 	/**
 	 * Return a list of resolvers that will be asked in turn to locate a method.
+	 * <p>The default implementation returns an empty list.
 	 */
-	List<MethodResolver> getMethodResolvers();
+	default List<MethodResolver> getMethodResolvers() {
+		return Collections.emptyList();
+	}
 
 	/**
 	 * Return a bean resolver that can look up beans by name.
 	 */
-	@Nullable
-	BeanResolver getBeanResolver();
+	@Nullable BeanResolver getBeanResolver();
 
 	/**
 	 * Return a type locator that can be used to find types, either by short or
@@ -141,7 +169,42 @@ public interface EvaluationContext {
 	 * @param name the name of the variable to look up
 	 * @return the value of the variable, or {@code null} if not found
 	 */
-	@Nullable
-	Object lookupVariable(String name);
+	@Nullable Object lookupVariable(String name);
+
+	/**
+	 * Determine if assignment is enabled within expressions evaluated by this evaluation
+	 * context.
+	 * <p>If this method returns {@code false}, the assignment ({@code =}), increment
+	 * ({@code ++}), and decrement ({@code --}) operators are disabled.
+	 * <p>By default, this method returns {@code true}. Concrete implementations may override
+	 * this <em>default</em> method to disable assignment.
+	 * @return {@code true} if assignment is enabled; {@code false} otherwise
+	 * @since 5.3.38
+	 */
+	default boolean isAssignmentEnabled() {
+		return true;
+	}
+
+	/**
+	 * Determine if compilation is supported within expressions evaluated by this evaluation
+	 * context.
+	 * <p>This flag is orthogonal to whether compilation has been enabled via
+	 * {@link org.springframework.expression.spel.SpelParserConfiguration} or the
+	 * {@value org.springframework.expression.spel.SpelParserConfiguration#SPRING_EXPRESSION_COMPILER_MODE_PROPERTY_NAME}
+	 * system property. Both must permit compilation for a given expression to be compiled.
+	 * <p>If this method returns {@code false}, the SpEL compiler will not compile
+	 * expressions evaluated within this context, regardless of the compiler mode
+	 * configured in the associated {@code SpelParserConfiguration} or system property.
+	 * Furthermore, if a compiled form of the expression already exists, it will not be
+	 * used; instead, interpreted evaluation will be performed.
+	 * <p>By default, this method returns {@code true}. Concrete implementations may override
+	 * this <em>default</em> method to indicate that compilation is not supported.
+	 * @return {@code true} if compilation is supported; {@code false} otherwise
+	 * @since 7.0.9
+	 * @see org.springframework.expression.spel.support.SimpleEvaluationContext.Builder#withCompilationSupported()
+	 */
+	default boolean isCompilationSupported() {
+		return true;
+	}
 
 }

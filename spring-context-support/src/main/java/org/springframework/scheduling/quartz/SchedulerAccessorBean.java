@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2021 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,6 +16,7 @@
 
 package org.springframework.scheduling.quartz;
 
+import org.jspecify.annotations.Nullable;
 import org.quartz.Scheduler;
 import org.quartz.SchedulerException;
 import org.quartz.impl.SchedulerRepository;
@@ -24,14 +25,13 @@ import org.springframework.beans.factory.BeanFactory;
 import org.springframework.beans.factory.BeanFactoryAware;
 import org.springframework.beans.factory.InitializingBean;
 import org.springframework.beans.factory.ListableBeanFactory;
-import org.springframework.lang.Nullable;
 import org.springframework.util.Assert;
 
 /**
  * Spring bean-style class for accessing a Quartz Scheduler, i.e. for registering jobs,
  * triggers and listeners on a given {@link org.quartz.Scheduler} instance.
  *
- * <p>Compatible with Quartz 2.1.4 and higher, as of Spring 4.1.
+ * <p>Compatible with Quartz 2.1.4 and higher.
  *
  * @author Juergen Hoeller
  * @since 2.5.6
@@ -40,21 +40,18 @@ import org.springframework.util.Assert;
  */
 public class SchedulerAccessorBean extends SchedulerAccessor implements BeanFactoryAware, InitializingBean {
 
-	@Nullable
-	private String schedulerName;
+	private @Nullable String schedulerName;
 
-	@Nullable
-	private Scheduler scheduler;
+	private @Nullable Scheduler scheduler;
 
-	@Nullable
-	private BeanFactory beanFactory;
+	private @Nullable BeanFactory beanFactory;
 
 
 	/**
 	 * Specify the Quartz {@link Scheduler} to operate on via its scheduler name in the Spring
 	 * application context or also in the Quartz {@link org.quartz.impl.SchedulerRepository}.
 	 * <p>Schedulers can be registered in the repository through custom bootstrapping,
-	 * e.g. via the {@link org.quartz.impl.StdSchedulerFactory} or
+	 * for example, via the {@link org.quartz.impl.StdSchedulerFactory} or
 	 * {@link org.quartz.impl.DirectSchedulerFactory} factory classes.
 	 * However, in general, it's preferable to use Spring's {@link SchedulerFactoryBean}
 	 * which includes the job/trigger/listener capabilities of this accessor as well.

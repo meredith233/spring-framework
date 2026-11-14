@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2016 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,7 +20,7 @@ import java.lang.reflect.Method;
 import java.util.List;
 
 /**
- * MethodFilter instances allow SpEL users to fine tune the behaviour of the method
+ * MethodFilter instances allow SpEL users to fine tune the behavior of the method
  * resolution process. Method resolution (which translates from a method name in an
  * expression to a real method to invoke) will normally retrieve candidate methods for
  * invocation via a simple call to 'Class.getMethods()' and will choose the first one that

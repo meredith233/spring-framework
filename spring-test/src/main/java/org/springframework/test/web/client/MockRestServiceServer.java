@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2023 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -33,9 +33,9 @@ import org.springframework.web.client.support.RestGatewaySupport;
 
 /**
  * <strong>Main entry point for client-side REST testing</strong>. Used for tests
- * that involve direct or indirect use of the {@link RestTemplate}. Provides a
+ * that involve direct or indirect use of the {@link RestClient}. Provides a
  * way to set up expected requests that will be performed through the
- * {@code RestTemplate} as well as mock responses to send back thus removing the
+ * {@code RestClient} as well as mock responses to send back thus removing the
  * need for an actual server.
  *
  * <p>Below is an example that assumes static imports from
@@ -43,13 +43,14 @@ import org.springframework.web.client.support.RestGatewaySupport;
  * and {@code ExpectedCount}:
  *
  * <pre class="code">
- * RestTemplate restTemplate = new RestTemplate()
- * MockRestServiceServer server = MockRestServiceServer.bindTo(restTemplate).build();
+ * RestClient.Builder clientBuilder = RestClient.builder();
+ * MockRestServiceServer server = MockRestServiceServer.bindTo(clientBuilder).build();
+ * RestClient restClient = clientBuilder.build();
  *
  * server.expect(manyTimes(), requestTo("/hotels/42")).andExpect(method(HttpMethod.GET))
  *     .andRespond(withSuccess("{ \"id\" : \"42\", \"name\" : \"Holiday Inn\"}", MediaType.APPLICATION_JSON));
  *
- * Hotel hotel = restTemplate.getForObject("/hotels/{id}", Hotel.class, 42);
+ * Hotel hotel = restClient.get().uri("/hotels/{id}", 42).retrieve().body(Hotel.class);
  * &#47;&#47; Use the hotel instance...
  *
  * // Verify all expectations met
@@ -151,7 +152,10 @@ public final class MockRestServiceServer {
 	 * Return a builder for a {@code MockRestServiceServer} that should be used
 	 * to reply to the given {@code RestTemplate}.
 	 * @since 4.3
+	 * @deprecated as of 7.1 in favor of {@link #bindTo(RestClient.Builder)}.
 	 */
+	@Deprecated(since = "7.1", forRemoval = true)
+	@SuppressWarnings("removal")
 	public static MockRestServiceServerBuilder bindTo(RestTemplate restTemplate) {
 		return new RestTemplateMockRestServiceServerBuilder(restTemplate);
 	}
@@ -160,7 +164,10 @@ public final class MockRestServiceServer {
 	 * Return a builder for a {@code MockRestServiceServer} that should be used
 	 * to reply to the {@code RestTemplate} for the given {@code RestGatewaySupport}.
 	 * @since 4.3
+	 * @deprecated as of 7.1 in favor of {@link #bindTo(RestClient.Builder)}.
 	 */
+	@Deprecated(since = "7.1", forRemoval = true)
+	@SuppressWarnings("removal")
 	public static MockRestServiceServerBuilder bindTo(RestGatewaySupport restGatewaySupport) {
 		Assert.notNull(restGatewaySupport, "'restGatewaySupport' must not be null");
 		return new RestTemplateMockRestServiceServerBuilder(restGatewaySupport.getRestTemplate());
@@ -168,10 +175,23 @@ public final class MockRestServiceServer {
 
 
 	/**
+	 * A shortcut for {@code bindTo(clientBuilder).build()}.
+	 * @param clientBuilder the RestClient builder to set up for mock testing
+	 * @return the mock server
+	 * @since 7.0.7
+	 */
+	public static MockRestServiceServer createServer(RestClient.Builder clientBuilder) {
+		return bindTo(clientBuilder).build();
+	}
+
+	/**
 	 * A shortcut for {@code bindTo(restTemplate).build()}.
 	 * @param restTemplate the RestTemplate to set up for mock testing
 	 * @return the mock server
+	 * @deprecated as of 7.1 in favor of {@link #bindTo(RestClient.Builder)}.
 	 */
+	@Deprecated(since = "7.1", forRemoval = true)
+	@SuppressWarnings("removal")
 	public static MockRestServiceServer createServer(RestTemplate restTemplate) {
 		return bindTo(restTemplate).build();
 	}
@@ -180,7 +200,10 @@ public final class MockRestServiceServer {
 	 * A shortcut for {@code bindTo(restGateway).build()}.
 	 * @param restGateway the REST gateway to set up for mock testing
 	 * @return the mock server
+	 * @deprecated as of 7.1 in favor of {@link #bindTo(RestClient.Builder)}.
 	 */
+	@Deprecated(since = "7.1", forRemoval = true)
+	@SuppressWarnings("removal")
 	public static MockRestServiceServer createServer(RestGatewaySupport restGateway) {
 		return bindTo(restGateway).build();
 	}
@@ -244,6 +267,10 @@ public final class MockRestServiceServer {
 			return this;
 		}
 
+		protected boolean shouldBufferContent() {
+			return this.bufferContent;
+		}
+
 		@Override
 		public MockRestServiceServer build() {
 			if (this.ignoreExpectOrder) {
@@ -258,9 +285,6 @@ public final class MockRestServiceServer {
 		public MockRestServiceServer build(RequestExpectationManager manager) {
 			MockRestServiceServer server = new MockRestServiceServer(manager);
 			ClientHttpRequestFactory factory = server.new MockClientHttpRequestFactory();
-			if (this.bufferContent) {
-				factory = new BufferingClientHttpRequestFactory(factory);
-			}
 			injectRequestFactory(factory);
 			return server;
 		}
@@ -281,11 +305,14 @@ public final class MockRestServiceServer {
 
 		@Override
 		protected void injectRequestFactory(ClientHttpRequestFactory requestFactory) {
+			if (shouldBufferContent()) {
+				this.restClientBuilder.bufferContent((uri, httpMethod) -> true);
+			}
 			this.restClientBuilder.requestFactory(requestFactory);
 		}
 	}
 
-
+	@SuppressWarnings("removal")
 	private static class RestTemplateMockRestServiceServerBuilder extends AbstractMockRestServiceServerBuilder {
 
 		private final RestTemplate restTemplate;
@@ -297,6 +324,9 @@ public final class MockRestServiceServer {
 
 		@Override
 		protected void injectRequestFactory(ClientHttpRequestFactory requestFactory) {
+			if (shouldBufferContent()) {
+				this.restTemplate.setBufferingPredicate((uri, httpMethod) -> true);
+			}
 			this.restTemplate.setRequestFactory(requestFactory);
 		}
 	}

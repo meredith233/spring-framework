@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -31,6 +31,7 @@ import org.springframework.web.util.ContentCachingResponseWrapper;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
 import static org.junit.jupiter.api.Named.named;
 import static org.springframework.http.HttpHeaders.CONTENT_LENGTH;
 import static org.springframework.http.HttpHeaders.CONTENT_TYPE;
@@ -232,6 +233,54 @@ class ContentCachingResponseWrapperTests {
 		assertHeader(response, CONTENT_LENGTH, null);
 		assertThat(response.getContentAsByteArray()).isEqualTo(responseBody);
 	}
+
+	@Test
+	void setContentLengthAbove2GbViaSetContentLengthLong() {
+		MockHttpServletResponse response = new MockHttpServletResponse();
+
+		ContentCachingResponseWrapper responseWrapper = new ContentCachingResponseWrapper(response);
+		long overflow = (long) Integer.MAX_VALUE + 1;
+		assertThatIllegalArgumentException()
+				.isThrownBy(() -> responseWrapper.setContentLengthLong(overflow))
+				.withMessageContaining("Content-Length exceeds ContentCachingResponseWrapper's maximum")
+				.withMessageContaining(String.valueOf(overflow));
+	}
+
+	@Test
+	void setContentLengthAbove2GbViaAddHeader() {
+		MockHttpServletResponse response = new MockHttpServletResponse();
+
+		ContentCachingResponseWrapper responseWrapper = new ContentCachingResponseWrapper(response);
+		String overflow = String.valueOf((long) Integer.MAX_VALUE + 1);
+		assertThatIllegalArgumentException()
+				.isThrownBy(() -> responseWrapper.addHeader(CONTENT_LENGTH, overflow))
+				.withMessageContaining("Content-Length exceeds ContentCachingResponseWrapper's maximum")
+				.withMessageContaining(overflow);
+	}
+
+	@Test
+	void setContentLengthAbove2GbViaSetHeader() {
+		MockHttpServletResponse response = new MockHttpServletResponse();
+
+		ContentCachingResponseWrapper responseWrapper = new ContentCachingResponseWrapper(response);
+		String overflow = String.valueOf((long) Integer.MAX_VALUE + 1);
+		assertThatIllegalArgumentException()
+				.isThrownBy(() -> responseWrapper.setHeader(CONTENT_LENGTH, overflow))
+				.withMessageContaining("Content-Length exceeds ContentCachingResponseWrapper's maximum")
+				.withMessageContaining(overflow);
+	}
+
+	@Test
+	void setContentLengthNull() {
+		MockHttpServletResponse response = new MockHttpServletResponse();
+		ContentCachingResponseWrapper responseWrapper = new ContentCachingResponseWrapper(response);
+		responseWrapper.setContentLength(1024);
+		responseWrapper.setHeader(CONTENT_LENGTH, null);
+
+		assertThat(response.getHeaderNames()).doesNotContain(CONTENT_LENGTH);
+		assertThat(responseWrapper.getHeader(CONTENT_LENGTH)).isNull();
+	}
+
 
 	private void assertHeader(HttpServletResponse response, String header, int value) {
 		assertHeader(response, header, Integer.toString(value));

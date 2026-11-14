@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2014 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,11 +16,11 @@
 
 package org.springframework.context.annotation.componentscan.importing;
 
-import org.springframework.context.annotation.ComponentScanAndImportAnnotationInteractionTests;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Import;
+import org.springframework.context.annotation.ImportedConfig;
 
 @Configuration
-@Import(ComponentScanAndImportAnnotationInteractionTests.ImportedConfig.class)
+@Import(ImportedConfig.class)
 public class ImportingConfig {
 }

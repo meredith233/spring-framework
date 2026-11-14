@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2023 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -65,7 +65,7 @@ public class TransactionalEventPublisher {
 	 * Publish an event created through the given function which maps the transaction
 	 * source object (the {@link TransactionContext}) to the event instance.
 	 * @param eventCreationFunction a function mapping the source object to the event instance,
-	 * e.g. {@code source -> new PayloadApplicationEvent&lt;&gt;(source, "myPayload")}
+	 * for example, {@code source -> new PayloadApplicationEvent&lt;&gt;(source, "myPayload")}
 	 * @return the Reactor {@link Mono} for the transactional event publication
 	 */
 	public Mono<Void> publishEvent(Function<TransactionContext, ApplicationEvent> eventCreationFunction) {

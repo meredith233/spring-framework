@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,9 +22,11 @@ import java.io.InputStream;
 import java.net.URI;
 import java.util.Arrays;
 import java.util.Queue;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.LinkedBlockingDeque;
 
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 
 import org.springframework.core.task.SyncTaskExecutor;
@@ -32,7 +34,6 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.client.ClientHttpResponse;
-import org.springframework.lang.Nullable;
 import org.springframework.messaging.Message;
 import org.springframework.messaging.MessageHeaders;
 import org.springframework.messaging.simp.stomp.StompCommand;
@@ -49,7 +50,7 @@ import org.springframework.web.socket.CloseStatus;
 import org.springframework.web.socket.TextMessage;
 import org.springframework.web.socket.WebSocketHandler;
 import org.springframework.web.socket.WebSocketSession;
-import org.springframework.web.socket.sockjs.frame.Jackson2SockJsMessageCodec;
+import org.springframework.web.socket.sockjs.frame.JacksonJsonSockJsMessageCodec;
 import org.springframework.web.socket.sockjs.frame.SockJsFrame;
 import org.springframework.web.socket.sockjs.transport.TransportType;
 
@@ -66,9 +67,10 @@ import static org.mockito.Mockito.verifyNoMoreInteractions;
  *
  * @author Rossen Stoyanchev
  */
+@SuppressWarnings("removal")
 class RestTemplateXhrTransportTests {
 
-	private static final Jackson2SockJsMessageCodec CODEC = new Jackson2SockJsMessageCodec();
+	private static final JacksonJsonSockJsMessageCodec CODEC = new JacksonJsonSockJsMessageCodec();
 
 	private final WebSocketHandler webSocketHandler = mock();
 
@@ -113,7 +115,7 @@ class RestTemplateXhrTransportTests {
 		Message<byte[]> message = MessageBuilder.createMessage("body".getBytes(UTF_8), headers);
 		byte[] bytes = new StompEncoder().encode(message);
 		TextMessage textMessage = new TextMessage(bytes);
-		SockJsFrame frame = SockJsFrame.messageFrame(new Jackson2SockJsMessageCodec(), textMessage.getPayload());
+		SockJsFrame frame = SockJsFrame.messageFrame(new JacksonJsonSockJsMessageCodec(), textMessage.getPayload());
 
 		String body = """
 				o
@@ -129,26 +131,17 @@ class RestTemplateXhrTransportTests {
 	}
 
 	@Test
-	@SuppressWarnings("deprecation")
 	void connectFailure() {
 		final HttpServerErrorException expected = new HttpServerErrorException(HttpStatus.INTERNAL_SERVER_ERROR);
 		RestOperations restTemplate = mock();
 		given(restTemplate.execute(any(), eq(HttpMethod.POST), any(), any())).willThrow(expected);
 
 		final CountDownLatch latch = new CountDownLatch(1);
-		connect(restTemplate).addCallback(
-				new org.springframework.util.concurrent.ListenableFutureCallback<>() {
-					@Override
-					public void onSuccess(WebSocketSession result) {
-					}
-					@Override
-					public void onFailure(Throwable ex) {
-						if (ex == expected) {
-							latch.countDown();
-						}
-					}
-				}
-		);
+		connect(restTemplate).whenComplete((result, ex) -> {
+			if (ex == expected) {
+				latch.countDown();
+			}
+		});
 		verifyNoMoreInteractions(this.webSocketHandler);
 	}
 
@@ -178,16 +171,11 @@ class RestTemplateXhrTransportTests {
 		verify(response).close();
 	}
 
-	@SuppressWarnings("deprecation")
-	private org.springframework.util.concurrent.ListenableFuture<WebSocketSession> connect(
-			ClientHttpResponse... responses) {
+	private CompletableFuture<WebSocketSession> connect(ClientHttpResponse... responses) {
 		return connect(new TestRestTemplate(responses));
 	}
 
-	@SuppressWarnings("deprecation")
-	private org.springframework.util.concurrent.ListenableFuture<WebSocketSession> connect(
-			RestOperations restTemplate, ClientHttpResponse... responses) {
-
+	private CompletableFuture<WebSocketSession> connect(RestOperations restTemplate) {
 		RestTemplateXhrTransport transport = new RestTemplateXhrTransport(restTemplate);
 		transport.setTaskExecutor(new SyncTaskExecutor());
 
@@ -197,7 +185,7 @@ class RestTemplateXhrTransportTests {
 		TransportRequest request = new DefaultTransportRequest(urlInfo, headers, headers,
 				transport, TransportType.XHR, CODEC);
 
-		return transport.connect(request, this.webSocketHandler);
+		return transport.connectAsync(request, this.webSocketHandler);
 	}
 
 	private ClientHttpResponse response(HttpStatus status, String body) throws IOException {
@@ -214,10 +202,10 @@ class RestTemplateXhrTransportTests {
 	}
 
 
+	@SuppressWarnings({"deprecation", "removal"})
 	private static class TestRestTemplate extends RestTemplate {
 
 		private Queue<ClientHttpResponse> responses = new LinkedBlockingDeque<>();
-
 
 		private TestRestTemplate(ClientHttpResponse... responses) {
 			this.responses.addAll(Arrays.asList(responses));

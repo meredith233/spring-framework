@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -120,7 +120,7 @@ class RequestAttributeMethodArgumentResolverTests {
 
 		assertThat(mono.block()).isNotNull();
 		assertThat(mono.block().getClass()).isEqualTo(Optional.class);
-		assertThat(((Optional<?>) mono.block())).isNotPresent();
+		assertThat((Optional<?>) mono.block()).isNotPresent();
 
 		ConfigurableWebBindingInitializer initializer = new ConfigurableWebBindingInitializer();
 		initializer.setConversionService(new DefaultFormattingConversionService());
@@ -138,7 +138,7 @@ class RequestAttributeMethodArgumentResolverTests {
 	}
 
 	@Test  // SPR-16158
-	public void resolveMonoParameter() {
+	void resolveMonoParameter() {
 		MethodParameter param = this.testMethod.annot(requestAttribute().noName()).arg(Mono.class, Foo.class);
 
 		// Mono attribute
@@ -154,8 +154,7 @@ class RequestAttributeMethodArgumentResolverTests {
 		this.exchange.getAttributes().put("fooMono", singleMono);
 		mono = this.resolver.resolveArgument(param, new BindingContext(), this.exchange);
 		Object value = mono.block(Duration.ZERO);
-		boolean condition = value instanceof Mono;
-		assertThat(condition).isTrue();
+		assertThat(value).isInstanceOf(Mono.class);
 		assertThat(((Mono<?>) value).block(Duration.ZERO)).isSameAs(foo);
 
 		// No attribute --> Mono.empty

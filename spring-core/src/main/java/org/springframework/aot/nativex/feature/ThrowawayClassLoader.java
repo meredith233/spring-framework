@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2022 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -54,7 +54,11 @@ class ThrowawayClassLoader extends ClassLoader {
 				return super.loadClass(name, true);
 			}
 			catch (ClassNotFoundException ex) {
-				return loadClassFromResource(name);
+				Class<?> loadedFromResource = loadClassFromResource(name);
+				if (loadedFromResource == null) {
+					throw ex;
+				}
+				return loadedFromResource;
 			}
 		}
 	}
@@ -65,12 +69,11 @@ class ThrowawayClassLoader extends ClassLoader {
 		if (inputStream == null) {
 			return null;
 		}
-		try {
+		try (inputStream) {
 			ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
 			inputStream.transferTo(outputStream);
 			byte[] bytes = outputStream.toByteArray();
 			return defineClass(name, bytes, 0, bytes.length);
-
 		}
 		catch (IOException ex) {
 			throw new ClassNotFoundException("Cannot load resource for class [" + name + "]", ex);

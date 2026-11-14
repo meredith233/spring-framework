@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -78,26 +78,26 @@ class JCacheEhCacheAnnotationTests extends AbstractCacheAnnotationTests {
 	@Override
 	@Test
 	@Disabled("Multi cache manager support to be added")
-	public void testCustomCacheManager() {
+	protected void customCacheManager() {
 	}
 
 	@Test
-	void testEvictWithTransaction() {
+	void evictWithTransaction() {
 		txTemplate.executeWithoutResult(s -> testEvict(this.cs, false));
 	}
 
 	@Test
-	void testEvictEarlyWithTransaction() {
+	void evictEarlyWithTransaction() {
 		txTemplate.executeWithoutResult(s -> testEvictEarly(this.cs));
 	}
 
 	@Test
-	void testEvictAllWithTransaction() {
+	void evictAllWithTransaction() {
 		txTemplate.executeWithoutResult(s -> testEvictAll(this.cs, false));
 	}
 
 	@Test
-	void testEvictAllEarlyWithTransaction() {
+	void evictAllEarlyWithTransaction() {
 		txTemplate.executeWithoutResult(s -> testEvictAllEarly(this.cs));
 	}
 

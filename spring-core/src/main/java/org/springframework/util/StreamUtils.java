@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2023 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -25,13 +25,14 @@ import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.nio.charset.Charset;
 
-import org.springframework.lang.Contract;
-import org.springframework.lang.Nullable;
+import org.jspecify.annotations.Nullable;
 
 /**
- * Simple utility methods for dealing with streams. The copy methods of this class are
- * similar to those defined in {@link FileCopyUtils} except that all affected streams are
- * left open when done. All copy methods use a block size of 8192 bytes.
+ * Simple utility methods for dealing with streams.
+ *
+ * <p>The copy methods of this class are similar to those defined in
+ * {@link FileCopyUtils} except that all affected streams are left open when done.
+ * All copy methods use a block size of {@value #BUFFER_SIZE} bytes.
  *
  * <p>Mainly for use within the framework, but also useful for application code.
  *
@@ -178,33 +179,30 @@ public abstract class StreamUtils {
 		long bytesToCopy = end - start + 1;
 		byte[] buffer = new byte[(int) Math.min(StreamUtils.BUFFER_SIZE, bytesToCopy)];
 		while (bytesToCopy > 0) {
-			int bytesRead = in.read(buffer);
+			int bytesRead = (bytesToCopy < buffer.length ? in.read(buffer, 0, (int) bytesToCopy) :
+					in.read(buffer));
 			if (bytesRead == -1) {
 				break;
 			}
-			else if (bytesRead <= bytesToCopy) {
-				out.write(buffer, 0, bytesRead);
-				bytesToCopy -= bytesRead;
-			}
-			else {
-				out.write(buffer, 0, (int) bytesToCopy);
-				bytesToCopy = 0;
-			}
+			out.write(buffer, 0, bytesRead);
+			bytesToCopy -= bytesRead;
 		}
 		return (end - start + 1 - bytesToCopy);
 	}
 
 	/**
-	 * Drain the remaining content of the given InputStream.
-	 * <p>Leaves the InputStream open when done.
-	 * @param in the InputStream to drain
-	 * @return the number of bytes read
+	 * Drain the remaining content of the given {@link InputStream}.
+	 * <p>Leaves the {@code InputStream} open when done.
+	 * @param in the {@code InputStream} to drain
+	 * @return the number of bytes read, or {@code 0} if the supplied
+	 * {@code InputStream} is {@code null} or empty
 	 * @throws IOException in case of I/O errors
 	 * @since 4.3
 	 */
-	@Contract("null -> fail")
 	public static int drain(@Nullable InputStream in) throws IOException {
-		Assert.notNull(in, "No InputStream specified");
+		if (in == null) {
+			return 0;
+		}
 		return (int) in.transferTo(OutputStream.nullOutputStream());
 	}
 
@@ -223,9 +221,13 @@ public abstract class StreamUtils {
 	 * Return a variant of the given {@link InputStream} where calling
 	 * {@link InputStream#close() close()} has no effect.
 	 * @param in the InputStream to decorate
-	 * @return a version of the InputStream that ignores calls to close
+	 * @return a version of the InputStream that ignores calls to close,
+	 * or the given InputStream if it is non-closing already
 	 */
 	public static InputStream nonClosing(InputStream in) {
+		if (in instanceof NonClosingInputStream) {
+			return in;
+		}
 		Assert.notNull(in, "No InputStream specified");
 		return new NonClosingInputStream(in);
 	}
@@ -234,11 +236,34 @@ public abstract class StreamUtils {
 	 * Return a variant of the given {@link OutputStream} where calling
 	 * {@link OutputStream#close() close()} has no effect.
 	 * @param out the OutputStream to decorate
-	 * @return a version of the OutputStream that ignores calls to close
+	 * @return a version of the OutputStream that ignores calls to close,
+	 * or the given OutputStream if it is non-closing already
+	 * @see #nonFlushing(OutputStream)
 	 */
 	public static OutputStream nonClosing(OutputStream out) {
+		if (out instanceof NonClosingOutputStream) {
+			return out;
+		}
 		Assert.notNull(out, "No OutputStream specified");
 		return new NonClosingOutputStream(out);
+	}
+
+	/**
+	 * Return a variant of the given {@link OutputStream} where calling
+	 * {@link OutputStream#flush() flush()} and/or
+	 * {@link OutputStream#close() close()} has no effect.
+	 * @param out the OutputStream to decorate
+	 * @return a version of the OutputStream that ignores calls to flush/close,
+	 * or the given OutputStream if it is non-flushing already
+	 * @since 7.0.6
+	 * @see #nonClosing(OutputStream)
+	 */
+	public static OutputStream nonFlushing(OutputStream out) {
+		if (out instanceof NonFlushingOutputStream) {
+			return out;
+		}
+		Assert.notNull(out, "No OutputStream specified");
+		return new NonFlushingOutputStream(out);
 	}
 
 
@@ -250,6 +275,26 @@ public abstract class StreamUtils {
 
 		@Override
 		public void close() throws IOException {
+		}
+
+		@Override
+		public byte[] readAllBytes() throws IOException {
+			return in.readAllBytes();
+		}
+
+		@Override
+		public byte[] readNBytes(int len) throws IOException {
+			return in.readNBytes(len);
+		}
+
+		@Override
+		public int readNBytes(byte[] b, int off, int len) throws IOException {
+			return in.readNBytes(b, off, len);
+		}
+
+		@Override
+		public long transferTo(OutputStream out) throws IOException {
+			return in.transferTo(out);
 		}
 	}
 
@@ -268,6 +313,18 @@ public abstract class StreamUtils {
 
 		@Override
 		public void close() throws IOException {
+		}
+	}
+
+
+	private static class NonFlushingOutputStream extends NonClosingOutputStream {
+
+		public NonFlushingOutputStream(OutputStream out) {
+			super(out);
+		}
+
+		@Override
+		public void flush() throws IOException {
 		}
 	}
 

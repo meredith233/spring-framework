@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2023 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,6 +22,7 @@ import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatIllegalStateException;
 
 
 /**
@@ -76,6 +77,28 @@ class CacheControlTests {
 	void noStore() {
 		CacheControl cc = CacheControl.noStore();
 		assertThat(cc.getHeaderValue()).isEqualTo("no-store");
+	}
+
+	@Test
+	void mustUnderstand() {
+		CacheControl cc = CacheControl.noStore().mustUnderstand();
+		assertThat(cc.getHeaderValue()).isEqualTo("no-store, must-understand");
+	}
+
+	@Test
+	void mustUnderstandWithoutNoStoreRejected() {
+		assertThatIllegalStateException().isThrownBy(() -> CacheControl.maxAge(1, TimeUnit.HOURS).mustUnderstand());
+	}
+
+	@Test
+	void cachePublicAndCachePrivateRejected() {
+		assertThatIllegalStateException().isThrownBy(() -> CacheControl.empty().cachePrivate().cachePublic());
+		assertThatIllegalStateException().isThrownBy(() -> CacheControl.empty().cachePublic().cachePrivate());
+	}
+
+	@Test
+	void cachePublicWithNoStoreRejected() {
+		assertThatIllegalStateException().isThrownBy(() -> CacheControl.noStore().cachePublic());
 	}
 
 	@Test

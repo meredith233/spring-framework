@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,6 +22,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.jspecify.annotations.Nullable;
 
 import org.springframework.beans.ConversionNotSupportedException;
 import org.springframework.beans.TypeMismatchException;
@@ -30,7 +31,6 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.http.converter.HttpMessageNotWritableException;
-import org.springframework.lang.Nullable;
 import org.springframework.validation.method.MethodValidationException;
 import org.springframework.web.ErrorResponse;
 import org.springframework.web.HttpMediaTypeNotAcceptableException;
@@ -44,6 +44,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.context.request.async.AsyncRequestNotUsableException;
 import org.springframework.web.context.request.async.AsyncRequestTimeoutException;
+import org.springframework.web.filter.ServerHttpObservationFilter;
 import org.springframework.web.method.annotation.HandlerMethodValidationException;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.multipart.support.MissingServletRequestPartException;
@@ -51,6 +52,7 @@ import org.springframework.web.servlet.ModelAndView;
 import org.springframework.web.servlet.NoHandlerFoundException;
 import org.springframework.web.servlet.handler.AbstractHandlerExceptionResolver;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
+import org.springframework.web.util.DisconnectedClientHelper;
 import org.springframework.web.util.WebUtils;
 
 /**
@@ -166,6 +168,13 @@ public class DefaultHandlerExceptionResolver extends AbstractHandlerExceptionRes
 	protected static final Log pageNotFoundLogger = LogFactory.getLog(PAGE_NOT_FOUND_LOG_CATEGORY);
 
 
+	private static final String DISCONNECTED_CLIENT_LOG_CATEGORY =
+			"org.springframework.web.servlet.handler.DisconnectedClient";
+
+	private static final DisconnectedClientHelper disconnectedClientHelper =
+			new DisconnectedClientHelper(DISCONNECTED_CLIENT_LOG_CATEGORY);
+
+
 	/**
 	 * Sets the {@linkplain #setOrder(int) order} to {@link #LOWEST_PRECEDENCE}.
 	 */
@@ -176,8 +185,7 @@ public class DefaultHandlerExceptionResolver extends AbstractHandlerExceptionRes
 
 
 	@Override
-	@Nullable
-	protected ModelAndView doResolveException(
+	protected @Nullable ModelAndView doResolveException(
 			HttpServletRequest request, HttpServletResponse response, @Nullable Object handler, Exception ex) {
 
 		try {
@@ -246,6 +254,9 @@ public class DefaultHandlerExceptionResolver extends AbstractHandlerExceptionRes
 				return handleAsyncRequestNotUsableException(
 						(AsyncRequestNotUsableException) ex, request, response, handler);
 			}
+			else if (disconnectedClientHelper.checkAndLogClientDisconnectedException(ex)) {
+				return handleDisconnectedClientException(ex, request, response, handler);
+			}
 		}
 		catch (Exception handlerEx) {
 			if (logger.isWarnEnabled()) {
@@ -269,8 +280,7 @@ public class DefaultHandlerExceptionResolver extends AbstractHandlerExceptionRes
 	 * {@code null} indicating the exception should be handled in {@link #handleErrorResponse}
 	 * @throws IOException potentially thrown from {@link HttpServletResponse#sendError}
 	 */
-	@Nullable
-	protected ModelAndView handleHttpRequestMethodNotSupported(HttpRequestMethodNotSupportedException ex,
+	protected @Nullable ModelAndView handleHttpRequestMethodNotSupported(HttpRequestMethodNotSupportedException ex,
 			HttpServletRequest request, HttpServletResponse response, @Nullable Object handler) throws IOException {
 
 		return null;
@@ -290,8 +300,7 @@ public class DefaultHandlerExceptionResolver extends AbstractHandlerExceptionRes
 	 * {@code null} indicating the exception should be handled in {@link #handleErrorResponse}
 	 * @throws IOException potentially thrown from {@link HttpServletResponse#sendError}
 	 */
-	@Nullable
-	protected ModelAndView handleHttpMediaTypeNotSupported(HttpMediaTypeNotSupportedException ex,
+	protected @Nullable ModelAndView handleHttpMediaTypeNotSupported(HttpMediaTypeNotSupportedException ex,
 			HttpServletRequest request, HttpServletResponse response, @Nullable Object handler) throws IOException {
 
 		return null;
@@ -311,8 +320,7 @@ public class DefaultHandlerExceptionResolver extends AbstractHandlerExceptionRes
 	 * {@code null} indicating the exception should be handled in {@link #handleErrorResponse}
 	 * @throws IOException potentially thrown from {@link HttpServletResponse#sendError}
 	 */
-	@Nullable
-	protected ModelAndView handleHttpMediaTypeNotAcceptable(HttpMediaTypeNotAcceptableException ex,
+	protected @Nullable ModelAndView handleHttpMediaTypeNotAcceptable(HttpMediaTypeNotAcceptableException ex,
 			HttpServletRequest request, HttpServletResponse response, @Nullable Object handler) throws IOException {
 
 		return null;
@@ -331,8 +339,7 @@ public class DefaultHandlerExceptionResolver extends AbstractHandlerExceptionRes
 	 * @throws IOException potentially thrown from {@link HttpServletResponse#sendError}
 	 * @since 4.2
 	 */
-	@Nullable
-	protected ModelAndView handleMissingPathVariable(MissingPathVariableException ex,
+	protected @Nullable ModelAndView handleMissingPathVariable(MissingPathVariableException ex,
 			HttpServletRequest request, HttpServletResponse response, @Nullable Object handler) throws IOException {
 
 		return null;
@@ -350,8 +357,7 @@ public class DefaultHandlerExceptionResolver extends AbstractHandlerExceptionRes
 	 * {@code null} indicating the exception should be handled in {@link #handleErrorResponse}
 	 * @throws IOException potentially thrown from {@link HttpServletResponse#sendError}
 	 */
-	@Nullable
-	protected ModelAndView handleMissingServletRequestParameter(MissingServletRequestParameterException ex,
+	protected @Nullable ModelAndView handleMissingServletRequestParameter(MissingServletRequestParameterException ex,
 			HttpServletRequest request, HttpServletResponse response, @Nullable Object handler) throws IOException {
 
 		return null;
@@ -368,15 +374,14 @@ public class DefaultHandlerExceptionResolver extends AbstractHandlerExceptionRes
 	 * {@code null} indicating the exception should be handled in {@link #handleErrorResponse}
 	 * @throws IOException potentially thrown from {@link HttpServletResponse#sendError}
 	 */
-	@Nullable
-	protected ModelAndView handleMissingServletRequestPartException(MissingServletRequestPartException ex,
+	protected @Nullable ModelAndView handleMissingServletRequestPartException(MissingServletRequestPartException ex,
 			HttpServletRequest request, HttpServletResponse response, @Nullable Object handler) throws IOException {
 
 		return null;
 	}
 
 	/**
-	 * Handle the case when an unrecoverable binding exception occurs - e.g.
+	 * Handle the case when an unrecoverable binding exception occurs - for example,
 	 * required header, required cookie.
 	 * <p>The default implementation returns {@code null} in which case the
 	 * exception is handled in {@link #handleErrorResponse}.
@@ -388,8 +393,7 @@ public class DefaultHandlerExceptionResolver extends AbstractHandlerExceptionRes
 	 * {@code null} indicating the exception should be handled in {@link #handleErrorResponse}
 	 * @throws IOException potentially thrown from {@link HttpServletResponse#sendError}
 	 */
-	@Nullable
-	protected ModelAndView handleServletRequestBindingException(ServletRequestBindingException ex,
+	protected @Nullable ModelAndView handleServletRequestBindingException(ServletRequestBindingException ex,
 			HttpServletRequest request, HttpServletResponse response, @Nullable Object handler) throws IOException {
 
 		return null;
@@ -407,8 +411,7 @@ public class DefaultHandlerExceptionResolver extends AbstractHandlerExceptionRes
 	 * {@code null} indicating the exception should be handled in {@link #handleErrorResponse}
 	 * @throws IOException potentially thrown from {@link HttpServletResponse#sendError}
 	 */
-	@Nullable
-	protected ModelAndView handleMethodArgumentNotValidException(MethodArgumentNotValidException ex,
+	protected @Nullable ModelAndView handleMethodArgumentNotValidException(MethodArgumentNotValidException ex,
 			HttpServletRequest request, HttpServletResponse response, @Nullable Object handler) throws IOException {
 
 		return null;
@@ -427,8 +430,7 @@ public class DefaultHandlerExceptionResolver extends AbstractHandlerExceptionRes
 	 * @throws IOException potentially thrown from {@link HttpServletResponse#sendError}
 	 * @since 6.1
 	 */
-	@Nullable
-	protected ModelAndView handleHandlerMethodValidationException(HandlerMethodValidationException ex,
+	protected @Nullable ModelAndView handleHandlerMethodValidationException(HandlerMethodValidationException ex,
 			HttpServletRequest request, HttpServletResponse response, @Nullable Object handler) throws IOException {
 
 		return null;
@@ -448,8 +450,7 @@ public class DefaultHandlerExceptionResolver extends AbstractHandlerExceptionRes
 	 * @throws IOException potentially thrown from {@link HttpServletResponse#sendError}
 	 * @since 4.0
 	 */
-	@Nullable
-	protected ModelAndView handleNoHandlerFoundException(NoHandlerFoundException ex,
+	protected @Nullable ModelAndView handleNoHandlerFoundException(NoHandlerFoundException ex,
 			HttpServletRequest request, HttpServletResponse response, @Nullable Object handler) throws IOException {
 
 		pageNotFoundLogger.warn(ex.getMessage());
@@ -469,8 +470,7 @@ public class DefaultHandlerExceptionResolver extends AbstractHandlerExceptionRes
 	 * @throws IOException potentially thrown from {@link HttpServletResponse#sendError}
 	 * @since 6.1
 	 */
-	@Nullable
-	protected ModelAndView handleNoResourceFoundException(NoResourceFoundException ex,
+	protected @Nullable ModelAndView handleNoResourceFoundException(NoResourceFoundException ex,
 			HttpServletRequest request, HttpServletResponse response, @Nullable Object handler) throws IOException {
 
 		return null;
@@ -490,8 +490,7 @@ public class DefaultHandlerExceptionResolver extends AbstractHandlerExceptionRes
 	 * @throws IOException potentially thrown from {@link HttpServletResponse#sendError}
 	 * @since 4.2.8
 	 */
-	@Nullable
-	protected ModelAndView handleAsyncRequestTimeoutException(AsyncRequestTimeoutException ex,
+	protected @Nullable ModelAndView handleAsyncRequestTimeoutException(AsyncRequestTimeoutException ex,
 			HttpServletRequest request, HttpServletResponse response, @Nullable Object handler) throws IOException {
 
 		return null;
@@ -515,11 +514,40 @@ public class DefaultHandlerExceptionResolver extends AbstractHandlerExceptionRes
 	}
 
 	/**
+	 * Handle an Exception that indicates the client has gone away as determined
+	 * via {@link DisconnectedClientHelper}.
+	 * <p>By default, as of 7.1 this method attempts to set the response status
+	 * to 500 in case the exception is due to a connection issue to a remote host,
+	 * as part of request handling, rather than to the client.
+	 * @param ex the {@code Exception} to be handled
+	 * @param request current HTTP request
+	 * @param response current HTTP response
+	 * @param handler the executed handler, or {@code null} if none chosen
+	 * at the time of the exception (for example, if multipart resolution failed)
+	 * @return an empty ModelAndView indicating the exception was handled
+	 * @since 6.2
+	 */
+	protected ModelAndView handleDisconnectedClientException(
+			Exception ex, HttpServletRequest request, HttpServletResponse response, @Nullable Object handler) {
+
+		// Attempt to send 500 in case of onward (rather than client) connection issue
+		try {
+			sendServerError(ex, request, response);
+		}
+		catch (Exception ex2) {
+			// ignore
+		}
+		return new ModelAndView();
+	}
+
+	/**
 	 * Handle an {@link ErrorResponse} exception.
 	 * <p>The default implementation sets status and the headers of the response
 	 * to those obtained from the {@code ErrorResponse}. If available, the
 	 * {@link ProblemDetail#getDetail()} is used as the message for
 	 * {@link HttpServletResponse#sendError(int, String)}.
+	 * <p>As of 7.1, if the status is a 5xx server error, the exception is also
+	 * recorded as the error of the current HTTP server observation, if any.
 	 * @param errorResponse the exception to be handled
 	 * @param request current HTTP request
 	 * @param response current HTTP response
@@ -530,6 +558,10 @@ public class DefaultHandlerExceptionResolver extends AbstractHandlerExceptionRes
 	 */
 	protected ModelAndView handleErrorResponse(ErrorResponse errorResponse,
 			HttpServletRequest request, HttpServletResponse response, @Nullable Object handler) throws IOException {
+
+		if (errorResponse.getStatusCode().is5xxServerError() && errorResponse instanceof Exception ex) {
+			ServerHttpObservationFilter.recordHandledException(request, ex);
+		}
 
 		if (!response.isCommitted()) {
 			HttpHeaders headers = errorResponse.getHeaders();
@@ -594,6 +626,8 @@ public class DefaultHandlerExceptionResolver extends AbstractHandlerExceptionRes
 	 * <p>The default implementation sends an HTTP 400 error, and returns an empty {@code ModelAndView}.
 	 * Alternatively, a fallback view could be chosen, or the HttpMessageNotReadableException could be
 	 * rethrown as-is.
+	 * <p>If the root cause suggests a "lost connection", handling is delegated instead to
+	 * {@link #handleDisconnectedClientException(Exception, HttpServletRequest, HttpServletResponse, Object)}.
 	 * @param ex the HttpMessageNotReadableException to be handled
 	 * @param request current HTTP request
 	 * @param response current HTTP response
@@ -603,6 +637,10 @@ public class DefaultHandlerExceptionResolver extends AbstractHandlerExceptionRes
 	 */
 	protected ModelAndView handleHttpMessageNotReadable(HttpMessageNotReadableException ex,
 			HttpServletRequest request, HttpServletResponse response, @Nullable Object handler) throws IOException {
+
+		if (DisconnectedClientHelper.isClientDisconnectedException(ex)) {
+			return handleDisconnectedClientException(ex, request, response, handler);
+		}
 
 		if (!response.isCommitted()) {
 			response.sendError(HttpServletResponse.SC_BAD_REQUEST);
@@ -620,6 +658,8 @@ public class DefaultHandlerExceptionResolver extends AbstractHandlerExceptionRes
 	 * <p>The default implementation sends an HTTP 500 error, and returns an empty {@code ModelAndView}.
 	 * Alternatively, a fallback view could be chosen, or the HttpMessageNotWritableException could
 	 * be rethrown as-is.
+	 * <p>If the root cause suggests a "lost connection", handling is delegated instead to
+	 * {@link #handleDisconnectedClientException(Exception, HttpServletRequest, HttpServletResponse, Object)}.
 	 * @param ex the HttpMessageNotWritableException to be handled
 	 * @param request current HTTP request
 	 * @param response current HTTP response
@@ -629,6 +669,10 @@ public class DefaultHandlerExceptionResolver extends AbstractHandlerExceptionRes
 	 */
 	protected ModelAndView handleHttpMessageNotWritable(HttpMessageNotWritableException ex,
 			HttpServletRequest request, HttpServletResponse response, @Nullable Object handler) throws IOException {
+
+		if (DisconnectedClientHelper.isClientDisconnectedException(ex)) {
+			return handleDisconnectedClientException(ex, request, response, handler);
+		}
 
 		if (!response.isCommitted()) {
 			sendServerError(ex, request, response);
@@ -641,7 +685,7 @@ public class DefaultHandlerExceptionResolver extends AbstractHandlerExceptionRes
 
 	/**
 	 * Handle the case where method validation failed on a component that is
-	 * not a web controller, e.g. on some underlying service.
+	 * not a web controller, for example, on some underlying service.
 	 * <p>The default implementation sends an HTTP 500 error, and returns an empty {@code ModelAndView}.
 	 * Alternatively, a fallback view could be chosen, or the HttpMessageNotWritableException could
 	 * be rethrown as-is.

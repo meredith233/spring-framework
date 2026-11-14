@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,6 +19,7 @@ package org.springframework.beans;
 import java.beans.IntrospectionException;
 import java.beans.PropertyDescriptor;
 import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Enumeration;
@@ -26,7 +27,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 
-import org.springframework.lang.Nullable;
+import org.jspecify.annotations.Nullable;
+
+import org.springframework.core.ResolvableType;
 import org.springframework.util.ObjectUtils;
 import org.springframework.util.StringUtils;
 
@@ -35,6 +38,7 @@ import org.springframework.util.StringUtils;
  *
  * @author Chris Beams
  * @author Juergen Hoeller
+ * @author Sam Brannen
  */
 abstract class PropertyDescriptorUtils {
 
@@ -47,6 +51,12 @@ abstract class PropertyDescriptorUtils {
 	 * <p>This just supports the basic JavaBeans conventions, without indexed
 	 * properties or any customizers, and without other BeanInfo metadata.
 	 * For standard JavaBeans introspection, use the JavaBeans Introspector.
+	 * <p>Note that, in contrast to the standard {@link java.beans.Introspector},
+	 * this method does support a static {@code set} method as the write method
+	 * for a property, resulting in a write-only property if no corresponding
+	 * instance {@code get}/{@code is} method is present. Static {@code get} and
+	 * {@code is} methods, on the other hand, are never considered read methods
+	 * for a property, aligning with standard JavaBeans introspection.
 	 * @param beanClass the target class to introspect
 	 * @return a collection of property descriptors
 	 * @throws IntrospectionException from introspecting the given bean class
@@ -68,11 +78,13 @@ abstract class PropertyDescriptorUtils {
 				setter = true;
 				nameIndex = 3;
 			}
-			else if (methodName.startsWith("get") && method.getParameterCount() == 0 && method.getReturnType() != void.class) {
+			else if (methodName.startsWith("get") && method.getParameterCount() == 0 &&
+					method.getReturnType() != void.class && !Modifier.isStatic(method.getModifiers())) {
 				setter = false;
 				nameIndex = 3;
 			}
-			else if (methodName.startsWith("is") && method.getParameterCount() == 0 && method.getReturnType() == boolean.class) {
+			else if (methodName.startsWith("is") && method.getParameterCount() == 0 &&
+					method.getReturnType() == boolean.class && !Modifier.isStatic(method.getModifiers())) {
 				setter = false;
 				nameIndex = 2;
 			}
@@ -88,25 +100,17 @@ abstract class PropertyDescriptorUtils {
 			BasicPropertyDescriptor pd = pdMap.get(propertyName);
 			if (pd != null) {
 				if (setter) {
-					Method writeMethod = pd.getWriteMethod();
-					if (writeMethod == null ||
-							writeMethod.getParameterTypes()[0].isAssignableFrom(method.getParameterTypes()[0])) {
-						pd.setWriteMethod(method);
-					}
-					else {
-						pd.addWriteMethod(method);
-					}
+					pd.addWriteMethod(method);
 				}
 				else {
 					Method readMethod = pd.getReadMethod();
-					if (readMethod == null ||
-							(readMethod.getReturnType() == method.getReturnType() && method.getName().startsWith("is"))) {
+					if (readMethod == null || readMethod.getReturnType().isAssignableFrom(method.getReturnType())) {
 						pd.setReadMethod(method);
 					}
 				}
 			}
 			else {
-				pd = new BasicPropertyDescriptor(propertyName, (!setter ? method : null), (setter ? method : null));
+				pd = new BasicPropertyDescriptor(propertyName, beanClass, (!setter ? method : null), (setter ? method : null));
 				pdMap.put(propertyName, pd);
 			}
 		}
@@ -141,8 +145,7 @@ abstract class PropertyDescriptorUtils {
 	/**
 	 * See {@link java.beans.PropertyDescriptor#findPropertyType}.
 	 */
-	@Nullable
-	public static Class<?> findPropertyType(@Nullable Method readMethod, @Nullable Method writeMethod)
+	public static @Nullable Class<?> findPropertyType(@Nullable Method readMethod, @Nullable Method writeMethod)
 			throws IntrospectionException {
 
 		Class<?> propertyType = null;
@@ -186,8 +189,7 @@ abstract class PropertyDescriptorUtils {
 	/**
 	 * See {@link java.beans.IndexedPropertyDescriptor#findIndexedPropertyType}.
 	 */
-	@Nullable
-	public static Class<?> findIndexedPropertyType(String name, @Nullable Class<?> propertyType,
+	public static @Nullable Class<?> findIndexedPropertyType(String name, @Nullable Class<?> propertyType,
 			@Nullable Method indexedReadMethod, @Nullable Method indexedWriteMethod) throws IntrospectionException {
 
 		Class<?> indexedPropertyType = null;
@@ -264,18 +266,19 @@ abstract class PropertyDescriptorUtils {
 	 */
 	private static class BasicPropertyDescriptor extends PropertyDescriptor {
 
-		@Nullable
-		private Method readMethod;
+		private final Class<?> beanClass;
 
-		@Nullable
-		private Method writeMethod;
+		private @Nullable Method readMethod;
 
-		private final List<Method> alternativeWriteMethods = new ArrayList<>();
+		private @Nullable Method writeMethod;
 
-		public BasicPropertyDescriptor(String propertyName, @Nullable Method readMethod, @Nullable Method writeMethod)
+		private final List<Method> candidateWriteMethods = new ArrayList<>();
+
+		public BasicPropertyDescriptor(String propertyName, Class<?> beanClass, @Nullable Method readMethod, @Nullable Method writeMethod)
 				throws IntrospectionException {
 
 			super(propertyName, readMethod, writeMethod);
+			this.beanClass = beanClass;
 		}
 
 		@Override
@@ -284,8 +287,7 @@ abstract class PropertyDescriptorUtils {
 		}
 
 		@Override
-		@Nullable
-		public Method getReadMethod() {
+		public @Nullable Method getReadMethod() {
 			return this.readMethod;
 		}
 
@@ -294,26 +296,47 @@ abstract class PropertyDescriptorUtils {
 			this.writeMethod = writeMethod;
 		}
 
-		public void addWriteMethod(Method writeMethod) {
+		void addWriteMethod(Method writeMethod) {
+			// Since setWriteMethod() is invoked from the PropertyDescriptor(String, Method, Method)
+			// constructor, this.writeMethod may be non-null.
 			if (this.writeMethod != null) {
-				this.alternativeWriteMethods.add(this.writeMethod);
+				this.candidateWriteMethods.add(this.writeMethod);
 				this.writeMethod = null;
 			}
-			this.alternativeWriteMethods.add(writeMethod);
+			this.candidateWriteMethods.add(writeMethod);
 		}
 
 		@Override
-		@Nullable
-		public Method getWriteMethod() {
-			if (this.writeMethod == null && !this.alternativeWriteMethods.isEmpty()) {
-				if (this.readMethod == null) {
-					return this.alternativeWriteMethods.get(0);
+		public @Nullable Method getWriteMethod() {
+			if (this.writeMethod == null && !this.candidateWriteMethods.isEmpty()) {
+				if (this.readMethod == null || this.candidateWriteMethods.size() == 1) {
+					this.writeMethod = this.candidateWriteMethods.get(0);
 				}
 				else {
-					for (Method method : this.alternativeWriteMethods) {
-						if (this.readMethod.getReturnType().isAssignableFrom(method.getParameterTypes()[0])) {
+					Class<?> resolvedReadType =
+							ResolvableType.forMethodReturnType(this.readMethod, this.beanClass).toClass();
+					for (Method method : this.candidateWriteMethods) {
+						// 1) Check for an exact match against the resolved types.
+						Class<?> resolvedWriteType =
+								ResolvableType.forMethodParameter(method, 0, this.beanClass).toClass();
+						if (resolvedReadType.equals(resolvedWriteType)) {
 							this.writeMethod = method;
 							break;
+						}
+
+						// 2) Check if the candidate write method's parameter type is compatible with
+						// the read method's return type.
+						Class<?> parameterType = method.getParameterTypes()[0];
+						if (this.readMethod.getReturnType().isAssignableFrom(parameterType)) {
+							// If we haven't yet found a compatible write method, or if the current
+							// candidate's parameter type is a subtype of the previous candidate's
+							// parameter type, track the current candidate as the write method.
+							if (this.writeMethod == null ||
+									this.writeMethod.getParameterTypes()[0].isAssignableFrom(parameterType)) {
+								this.writeMethod = method;
+								// We do not "break" here, since we need to compare the current candidate
+								// with all remaining candidates.
+							}
 						}
 					}
 				}
@@ -321,6 +344,5 @@ abstract class PropertyDescriptorUtils {
 			return this.writeMethod;
 		}
 	}
-
 
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2023 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import org.jspecify.annotations.Nullable;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Scheduler;
@@ -33,12 +34,13 @@ import reactor.core.scheduler.Schedulers;
 import org.springframework.core.ResolvableType;
 import org.springframework.core.codec.DecodingException;
 import org.springframework.core.io.buffer.DataBufferLimitException;
+import org.springframework.core.io.buffer.DataBufferUtils;
 import org.springframework.http.MediaType;
 import org.springframework.http.ReactiveHttpInputMessage;
 import org.springframework.http.codec.HttpMessageReader;
 import org.springframework.http.codec.LoggingCodecSupport;
-import org.springframework.lang.Nullable;
 import org.springframework.util.Assert;
+import org.springframework.util.unit.DataSize;
 
 /**
  * Default {@code HttpMessageReader} for parsing {@code "multipart/form-data"}
@@ -62,11 +64,11 @@ public class DefaultPartHttpMessageReader extends LoggingCodecSupport implements
 
 	private int maxHeadersSize = 10 * 1024;
 
-	private long maxDiskUsagePerPart = -1;
+	private long maxDiskUsagePerPart = DataSize.ofMegabytes(1).toBytes();
 
-	private int maxParts = -1;
+	private int maxParts = 50;
 
-	private Scheduler blockingOperationScheduler = Schedulers.boundedElastic();
+	private @Nullable Scheduler blockingOperationScheduler;
 
 	private FileStorage fileStorage = FileStorage.tempDirectory(this::getBlockingOperationScheduler);
 
@@ -75,7 +77,6 @@ public class DefaultPartHttpMessageReader extends LoggingCodecSupport implements
 
 	/**
 	 * Configure the maximum amount of memory that is allowed per headers section of each part.
-	 * When the limit
 	 * @param byteCount the maximum amount of memory for headers
 	 */
 	public void setMaxHeadersSize(int byteCount) {
@@ -93,8 +94,8 @@ public class DefaultPartHttpMessageReader extends LoggingCodecSupport implements
 	 * Configure the maximum amount of memory allowed per part.
 	 * When the limit is exceeded:
 	 * <ul>
-	 * <li>file parts are written to a temporary file.
-	 * <li>non-file parts are rejected with {@link DataBufferLimitException}.
+	 * <li>File parts are written to a temporary file.
+	 * <li>Non-file parts are rejected with {@link DataBufferLimitException}.
 	 * </ul>
 	 * <p>By default this is set to 256K.
 	 * @param maxInMemorySize the in-memory limit in bytes; if set to -1 the entire
@@ -105,9 +106,10 @@ public class DefaultPartHttpMessageReader extends LoggingCodecSupport implements
 	}
 
 	/**
-	 * Configure the maximum amount of disk space allowed for file parts.
-	 * <p>By default this is set to -1, meaning that there is no maximum.
-	 * <p>Note that this property is ignored when
+	 * Configure the maximum amount of disk space allowed for file parts
+	 * where -1 means no limit.
+	 * <p>By default, this is set to 1MB.
+	 * <p><strong>Note:</Strong> This property is ignored when
 	 * {@link #setMaxInMemorySize(int) maxInMemorySize} is set to -1.
 	 */
 	public void setMaxDiskUsagePerPart(long maxDiskUsagePerPart) {
@@ -115,8 +117,9 @@ public class DefaultPartHttpMessageReader extends LoggingCodecSupport implements
 	}
 
 	/**
-	 * Specify the maximum number of parts allowed in a given multipart request.
-	 * <p>By default this is set to -1, meaning that there is no maximum.
+	 * Specify the maximum number of parts allowed in a given multipart request
+	 * where -1 means no limit.
+	 * <p>By default, this is set to 50.
 	 */
 	public void setMaxParts(int maxParts) {
 		this.maxParts = maxParts;
@@ -152,12 +155,13 @@ public class DefaultPartHttpMessageReader extends LoggingCodecSupport implements
 	}
 
 	private Scheduler getBlockingOperationScheduler() {
-		return this.blockingOperationScheduler;
+		return (this.blockingOperationScheduler != null ?
+				this.blockingOperationScheduler : Schedulers.boundedElastic());
 	}
 
 	/**
 	 * Set the character set used to decode headers.
-	 * Defaults to UTF-8 as per RFC 7578.
+	 * <p>Defaults to UTF-8 as per RFC 7578.
 	 * @param headersCharset the charset to use for decoding headers
 	 * @since 5.3.6
 	 * @see <a href="https://tools.ietf.org/html/rfc7578#section-5.1">RFC-7578 Section 5.1</a>
@@ -200,13 +204,19 @@ public class DefaultPartHttpMessageReader extends LoggingCodecSupport implements
 					.windowUntil(MultipartParser.Token::isLast)
 					.concatMap(partsTokens -> {
 						if (tooManyParts(partCount)) {
-							return Mono.error(new DecodingException("Too many parts (" + partCount.get() + "/" +
-									this.maxParts + " allowed)"));
+							return partsTokens
+									.doOnNext(token -> {
+										if (token instanceof MultipartParser.BodyToken bodyToken) {
+											DataBufferUtils.release(bodyToken.buffer());
+										}
+									})
+									.then(Mono.error(new DecodingException("Too many parts (" + partCount.get() + "/" +
+											this.maxParts + " allowed)")));
 						}
 						else {
 							return PartGenerator.createPart(partsTokens,
 									this.maxInMemorySize, this.maxDiskUsagePerPart,
-									this.fileStorage.directory(), this.blockingOperationScheduler);
+									this.fileStorage.directory(), getBlockingOperationScheduler());
 						}
 					});
 		});
@@ -216,6 +226,5 @@ public class DefaultPartHttpMessageReader extends LoggingCodecSupport implements
 		int count = partCount.incrementAndGet();
 		return this.maxParts > 0 && count > this.maxParts;
 	}
-
 
 }

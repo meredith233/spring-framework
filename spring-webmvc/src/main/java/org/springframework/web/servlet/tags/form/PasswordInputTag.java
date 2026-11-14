@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2023 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,6 +21,10 @@ import jakarta.servlet.jsp.JspException;
 /**
  * The {@code <password>} tag renders an HTML 'input' tag with type 'password'
  * using the bound value.
+ *
+ * <p>Use this tag instead of the {@code <input>} tag ({@link InputTag}) with
+ * {@code type="password"} for password fields. By default, the bound value is
+ * not rendered.
  *
  * <h3>Attribute Summary</h3>
  * <table>

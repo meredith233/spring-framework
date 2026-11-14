@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -415,7 +415,7 @@ class UrlTagTests extends AbstractTagTests {
 	}
 
 	@Test  // SPR-11401
-	public void replaceUriTemplateParamsTemplateWithPathSegment() throws JspException {
+	void replaceUriTemplateParamsTemplateWithPathSegment() throws JspException {
 		List<Param> params = new ArrayList<>();
 		Set<String> usedParams = new HashSet<>();
 

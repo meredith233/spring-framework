@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2021 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,11 +18,11 @@ package org.springframework.core;
 
 import java.security.ProtectionDomain;
 
-import org.springframework.lang.Nullable;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Interface to be implemented by a reloading-aware ClassLoader
- * (e.g. a Groovy-based ClassLoader). Detected for example by
+ * (for example, a Groovy-based ClassLoader). Detected for example by
  * Spring's CGLIB proxy factory for making a caching decision.
  *
  * <p>If a ClassLoader does <i>not</i> implement this interface,
@@ -54,7 +54,7 @@ public interface SmartClassLoader {
 	 * In case of a reloadable or other selectively overriding ClassLoader which
 	 * commonly deals with unaffected classes from a base application class loader,
 	 * this should get implemented to return the original ClassLoader that the
-	 * present loader got derived from (e.g. through {@code return getParent();}).
+	 * present loader got derived from (for example, through {@code return getParent();}).
 	 * <p>This gets specifically used in Spring's AOP framework to determine the
 	 * class loader for a specific proxy in case the target class has not been
 	 * defined in the present class loader. In case of a reloadable class loader,

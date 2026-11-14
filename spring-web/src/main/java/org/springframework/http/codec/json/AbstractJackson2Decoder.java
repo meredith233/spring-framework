@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2023 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,6 +19,7 @@ package org.springframework.http.codec.json;
 import java.io.IOException;
 import java.lang.annotation.Annotation;
 import java.math.BigDecimal;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
@@ -30,6 +31,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.ObjectReader;
 import com.fasterxml.jackson.databind.exc.InvalidDefinitionException;
 import com.fasterxml.jackson.databind.util.TokenBuffer;
+import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Publisher;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
@@ -43,11 +45,12 @@ import org.springframework.core.codec.Hints;
 import org.springframework.core.io.buffer.DataBuffer;
 import org.springframework.core.io.buffer.DataBufferLimitException;
 import org.springframework.core.io.buffer.DataBufferUtils;
+import org.springframework.core.io.buffer.PooledDataBuffer;
 import org.springframework.core.log.LogFormatUtils;
+import org.springframework.http.codec.AbstractJacksonDecoder;
 import org.springframework.http.codec.HttpMessageDecoder;
 import org.springframework.http.server.reactive.ServerHttpRequest;
 import org.springframework.http.server.reactive.ServerHttpResponse;
-import org.springframework.lang.Nullable;
 import org.springframework.util.Assert;
 import org.springframework.util.MimeType;
 
@@ -59,7 +62,10 @@ import org.springframework.util.MimeType;
  * @author Arjen Poutsma
  * @since 5.0
  * @see <a href="https://github.com/FasterXML/jackson-core/issues/57" target="_blank">Add support for non-blocking ("async") JSON parsing</a>
+ * @deprecated since 7.0 in favor of {@link AbstractJacksonDecoder}
  */
+@Deprecated(since = "7.0", forRemoval = true)
+@SuppressWarnings("removal")
 public abstract class AbstractJackson2Decoder extends Jackson2CodecSupport implements HttpMessageDecoder<Object> {
 
 	private int maxInMemorySize = 256 * 1024;
@@ -95,6 +101,7 @@ public abstract class AbstractJackson2Decoder extends Jackson2CodecSupport imple
 	}
 
 
+	@SuppressWarnings("deprecation")  // as of Jackson 2.18: can(De)Serialize
 	@Override
 	public boolean canDecode(ResolvableType elementType, @Nullable MimeType mimeType) {
 		if (!supportsMimeType(mimeType)) {
@@ -135,9 +142,12 @@ public abstract class AbstractJackson2Decoder extends Jackson2CodecSupport imple
 			forceUseOfBigDecimal = true;
 		}
 
+		boolean tokenizeArrays = (!elementType.isArray() &&
+				!Collection.class.isAssignableFrom(elementType.resolve(Object.class)));
+
 		Flux<DataBuffer> processed = processInput(input, elementType, mimeType, hints);
 		Flux<TokenBuffer> tokens = Jackson2Tokenizer.tokenize(processed, mapper.getFactory(), mapper,
-				true, forceUseOfBigDecimal, getMaxInMemorySize());
+				tokenizeArrays, forceUseOfBigDecimal, getMaxInMemorySize());
 
 		return Flux.deferContextual(contextView -> {
 
@@ -157,7 +167,8 @@ public abstract class AbstractJackson2Decoder extends Jackson2CodecSupport imple
 				catch (IOException ex) {
 					sink.error(processException(ex));
 				}
-			});
+			})
+			.doOnDiscard(PooledDataBuffer.class, DataBufferUtils::release);
 		});
 	}
 
@@ -250,8 +261,7 @@ public abstract class AbstractJackson2Decoder extends Jackson2CodecSupport imple
 		return reader;
 	}
 
-	@Nullable
-	private Class<?> getContextClass(@Nullable ResolvableType elementType) {
+	private @Nullable Class<?> getContextClass(@Nullable ResolvableType elementType) {
 		MethodParameter param = (elementType != null ? getParameter(elementType) : null);
 		return (param != null ? param.getContainingClass() : null);
 	}
@@ -300,8 +310,7 @@ public abstract class AbstractJackson2Decoder extends Jackson2CodecSupport imple
 	// Jackson2CodecSupport
 
 	@Override
-	@Nullable
-	protected <A extends Annotation> A getAnnotation(MethodParameter parameter, Class<A> annotType) {
+	protected <A extends Annotation> @Nullable A getAnnotation(MethodParameter parameter, Class<A> annotType) {
 		return parameter.getParameterAnnotation(annotType);
 	}
 

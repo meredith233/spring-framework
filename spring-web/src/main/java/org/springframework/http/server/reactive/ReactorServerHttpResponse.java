@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -76,13 +76,6 @@ class ReactorServerHttpResponse extends AbstractServerHttpResponse implements Ze
 	}
 
 	@Override
-	@Deprecated
-	public Integer getRawStatusCode() {
-		Integer status = super.getRawStatusCode();
-		return (status != null ? status : this.response.status().code());
-	}
-
-	@Override
 	protected void applyStatusCode() {
 		HttpStatusCode status = super.getStatusCode();
 		if (status != null) {
@@ -120,6 +113,7 @@ class ReactorServerHttpResponse extends AbstractServerHttpResponse implements Ze
 				}
 				cookie.setSecure(httpCookie.isSecure());
 				cookie.setHttpOnly(httpCookie.isHttpOnly());
+				cookie.setPartitioned(httpCookie.isPartitioned());
 				if (httpCookie.getSameSite() != null) {
 					cookie.setSameSite(CookieHeaderNames.SameSite.valueOf(httpCookie.getSameSite()));
 				}

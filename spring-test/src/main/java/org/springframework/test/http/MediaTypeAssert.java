@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,10 +20,10 @@ import org.assertj.core.api.AbstractObjectAssert;
 import org.assertj.core.api.Assertions;
 import org.assertj.core.error.BasicErrorMessageFactory;
 import org.assertj.core.internal.Failures;
+import org.jspecify.annotations.Nullable;
 
 import org.springframework.http.InvalidMediaTypeException;
 import org.springframework.http.MediaType;
-import org.springframework.lang.Nullable;
 import org.springframework.util.StringUtils;
 
 /**
@@ -49,10 +49,21 @@ public class MediaTypeAssert extends AbstractObjectAssert<MediaTypeAssert, Media
 	/**
 	 * Verify that the actual media type is equal to the given string
 	 * representation.
-	 * @param expected the expected media type
+	 * @param mediaType the expected media type, as a String to be parsed
+	 * into a MediaType
 	 */
-	public MediaTypeAssert isEqualTo(String expected) {
-		return isEqualTo(parseMediaType(expected));
+	public MediaTypeAssert isEqualTo(String mediaType) {
+		return isEqualTo(parseMediaType(mediaType));
+	}
+
+	/**
+	 * Verify that the actual media type is not equal to the given string
+	 * representation.
+	 * @param mediaType the given media type, as a String to be parsed
+	 * into a MediaType
+	 */
+	public MediaTypeAssert isNotEqualTo(String mediaType) {
+		return isNotEqualTo(parseMediaType(mediaType));
 	}
 
 	/**
@@ -84,14 +95,14 @@ public class MediaTypeAssert extends AbstractObjectAssert<MediaTypeAssert, Media
 	 * // Check that actual is compatible with "text/plain"
 	 * assertThat(mediaType).isCompatibleWith("text/plain");
 	 * </code></pre>
-	 * @param mediaType the media type with which to compare
+	 * @param mediaType the media type with which to compare, as a String
+	 * to be parsed into a MediaType
 	 */
 	public MediaTypeAssert isCompatibleWith(String mediaType) {
 		return isCompatibleWith(parseMediaType(mediaType));
 	}
 
 
-	@SuppressWarnings("NullAway")
 	private MediaType parseMediaType(String value) {
 		try {
 			return MediaType.parseMediaType(value);

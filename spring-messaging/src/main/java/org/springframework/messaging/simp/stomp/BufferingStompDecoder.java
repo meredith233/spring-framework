@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,8 +21,10 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Queue;
 import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.atomic.AtomicInteger;
 
-import org.springframework.lang.Nullable;
+import org.jspecify.annotations.Nullable;
+
 import org.springframework.messaging.Message;
 import org.springframework.util.Assert;
 import org.springframework.util.LinkedMultiValueMap;
@@ -35,7 +37,7 @@ import org.springframework.util.MultiValueMap;
  * is not enough data still, continues to buffer.
  *
  * <p>A single instance of this decoder can be invoked repeatedly to read all
- * messages from a single stream (e.g. WebSocket session) as long as decoding
+ * messages from a single stream (for example, WebSocket session) as long as decoding
  * does not fail. If there is an exception, StompDecoder instance should not
  * be used any more as its internal state is not guaranteed to be consistent.
  * It is expected that the underlying session is closed at that point.
@@ -52,8 +54,9 @@ public class BufferingStompDecoder {
 
 	private final Queue<ByteBuffer> chunks = new LinkedBlockingQueue<>();
 
-	@Nullable
-	private volatile Integer expectedContentLength;
+	private final AtomicInteger bufferSize = new AtomicInteger();
+
+	private volatile @Nullable Integer expectedContentLength;
 
 
 	/**
@@ -94,12 +97,18 @@ public class BufferingStompDecoder {
 	 * is "content-length" header, every subsequent call to decode attempts to
 	 * parse again with all available data. Therefore the presence of a "content-length"
 	 * header helps to optimize the decoding of large messages.
+	 * <p>A buffer without any remaining content is ignored.
 	 * @param newBuffer a buffer containing new data to decode
 	 * @return decoded messages or an empty list
 	 * @throws StompConversionException raised in case of decoding issues
 	 */
 	public List<Message<byte[]>> decode(ByteBuffer newBuffer) {
+		if (!newBuffer.hasRemaining()) {
+			return Collections.emptyList();
+		}
+
 		this.chunks.add(newBuffer);
+		this.bufferSize.addAndGet(newBuffer.remaining());
 		checkBufferLimits();
 
 		Integer contentLength = this.expectedContentLength;
@@ -113,6 +122,7 @@ public class BufferingStompDecoder {
 
 		if (bufferToDecode.hasRemaining()) {
 			this.chunks.add(bufferToDecode);
+			this.bufferSize.addAndGet(bufferToDecode.remaining());
 			this.expectedContentLength = StompHeaderAccessor.getContentLength(headers);
 		}
 
@@ -132,6 +142,7 @@ public class BufferingStompDecoder {
 			result.flip();
 		}
 		this.chunks.clear();
+		this.bufferSize.set(0);
 		this.expectedContentLength = null;
 		return result;
 	}
@@ -141,7 +152,7 @@ public class BufferingStompDecoder {
 		if (contentLength != null && contentLength > this.bufferSizeLimit) {
 			throw new StompConversionException(
 					"STOMP 'content-length' header value " + this.expectedContentLength +
-					"  exceeds configured buffer size limit " + this.bufferSizeLimit);
+					" exceeds configured buffer size limit " + this.bufferSizeLimit);
 		}
 		if (getBufferSize() > this.bufferSizeLimit) {
 			throw new StompConversionException("The configured STOMP buffer size limit of " +
@@ -150,21 +161,16 @@ public class BufferingStompDecoder {
 	}
 
 	/**
-	 * Calculate the current buffer size.
+	 * Return the current buffer size.
 	 */
 	public int getBufferSize() {
-		int size = 0;
-		for (ByteBuffer buffer : this.chunks) {
-			size = size + buffer.remaining();
-		}
-		return size;
+		return this.bufferSize.get();
 	}
 
 	/**
 	 * Get the expected content length of the currently buffered, incomplete STOMP frame.
 	 */
-	@Nullable
-	public Integer getExpectedContentLength() {
+	public @Nullable Integer getExpectedContentLength() {
 		return this.expectedContentLength;
 	}
 

@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2023 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,6 +18,8 @@ package org.springframework.core
 
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
+import org.mockito.Mockito.mockStatic
+import org.mockito.stubbing.Answer
 import java.lang.reflect.Method
 import java.lang.reflect.TypeVariable
 import kotlin.coroutines.Continuation
@@ -110,8 +112,50 @@ class MethodParameterKotlinTests {
 		assertThat(returnGenericParameterType("suspendFun7")).isInstanceOf(TypeVariable::class.java)
 		assertThat(returnGenericParameterTypeBoundName("suspendFun7")).isEqualTo("org.springframework.core.Consumer<? super java.lang.Number>")
 
-		assertThat(returnParameterType("suspendFun8")).isEqualTo(Object::class.java)
-		assertThat(returnGenericParameterType("suspendFun8")).isEqualTo(Object::class.java)
+		assertThat(returnParameterType("suspendFun8")).isEqualTo(Any::class.java)
+		assertThat(returnGenericParameterType("suspendFun8")).isEqualTo(Any::class.java)
+	}
+
+	@Test
+	fun `Regular function return type`() {
+		assertThat(returnParameterType("regularFun")).isEqualTo(Producer::class.java)
+		assertThat(returnGenericParameterTypeName("regularFun")).isEqualTo("org.springframework.core.Producer<java.lang.Number>")
+	}
+
+	@Test
+	fun `Regular function return type does not use Kotlin reflection`() {
+		val methodParameter = returnMethodParameter("regularFun")
+		mockStatic(Class.forName("kotlin.reflect.jvm.ReflectJvmMapping"), Answer<Any> {
+			throw AssertionError("Kotlin reflection should not be used for regular functions")
+		}).use {
+			assertThat(methodParameter.parameterType).isEqualTo(Producer::class.java)
+			assertThat(methodParameter.genericParameterType.typeName)
+				.isEqualTo("org.springframework.core.Producer<java.lang.Number>")
+		}
+	}
+
+	@Test
+	fun `Regular function with Continuation parameter return type`() {
+		assertThat(returnParameterType("regularFunWithContinuation")).isEqualTo(Producer::class.java)
+		assertThat(returnGenericParameterTypeName("regularFunWithContinuation")).isEqualTo("org.springframework.core.Producer<java.lang.Number>")
+	}
+
+	@Test
+	fun `Parameter name for regular function`() {
+		val methodParameter = returnMethodParameter("nullable", 0)
+		assertThat(methodParameter.getParameterName()).isEqualTo("nullable")
+	}
+
+	@Test
+	fun `Parameter name for suspending function`() {
+		val methodParameter = returnMethodParameter("suspendFun", 0)
+		assertThat(methodParameter.getParameterName()).isEqualTo("p1")
+	}
+
+	@Test
+	fun `Continuation parameter name for suspending function`() {
+		val methodParameter = returnMethodParameter("suspendFun", 1)
+		assertThat(methodParameter.getParameterName()).isNull()
 	}
 
 	@Test
@@ -126,8 +170,8 @@ class MethodParameterKotlinTests {
 	private fun returnGenericParameterTypeName(funName: String) = returnGenericParameterType(funName).typeName
 	private fun returnGenericParameterTypeBoundName(funName: String) = (returnGenericParameterType(funName) as TypeVariable<*>).bounds[0].typeName
 
-	private fun returnMethodParameter(funName: String) =
-		MethodParameter(this::class.declaredFunctions.first { it.name == funName }.javaMethod!!, -1)
+	private fun returnMethodParameter(funName: String, parameterIndex: Int = -1) =
+		MethodParameter(this::class.declaredFunctions.first { it.name == funName }.javaMethod!!, parameterIndex)
 
 	@Suppress("unused_parameter")
 	fun nullable(nullable: String?): Int? = 42
@@ -168,6 +212,12 @@ class MethodParameterKotlinTests {
 
 	@Suppress("unused", "unused_parameter")
 	suspend fun suspendFun8(p1: String): Any? = TODO()
+
+	@Suppress("unused", "unused_parameter")
+	fun regularFun(p1: String): Producer<Number> = TODO()
+
+	@Suppress("unused", "unused_parameter")
+	fun regularFunWithContinuation(p1: String, continuation: Continuation<Number>): Producer<Number> = TODO()
 }
 
 interface Producer<out T>

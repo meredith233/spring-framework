@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -35,13 +35,13 @@ import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException
 class InputStreamEditorTests {
 
 	@Test
-	void testCtorWithNullResourceEditor() {
+	void ctorWithNullResourceEditor() {
 		assertThatIllegalArgumentException().isThrownBy(() ->
 				new InputStreamEditor(null));
 	}
 
 	@Test
-	void testSunnyDay() throws IOException {
+	void sunnyDay() throws IOException {
 		InputStream stream = null;
 		try {
 			String resource = "classpath:" + ClassUtils.classPackageAsResourcePath(getClass()) +
@@ -62,14 +62,14 @@ class InputStreamEditorTests {
 	}
 
 	@Test
-	void testWhenResourceDoesNotExist() {
+	void whenResourceDoesNotExist() {
 		InputStreamEditor editor = new InputStreamEditor();
 		assertThatIllegalArgumentException().isThrownBy(() ->
 				editor.setAsText("classpath:bingo!"));
 	}
 
 	@Test
-	void testGetAsTextReturnsNullByDefault() {
+	void getAsTextReturnsNullByDefault() {
 		assertThat(new InputStreamEditor().getAsText()).isNull();
 		String resource = "classpath:" + ClassUtils.classPackageAsResourcePath(getClass()) +
 				"/" + ClassUtils.getShortName(getClass()) + ".class";

@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,7 +18,7 @@ package org.springframework.util;
 
 import java.util.Properties;
 
-import org.springframework.lang.Nullable;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Utility class for working with Strings that have placeholder values in them.
@@ -55,24 +55,6 @@ public class PropertyPlaceholderHelper {
 	 * @param placeholderSuffix the suffix that denotes the end of a placeholder
 	 * @param valueSeparator the separating character between the placeholder variable
 	 * and the associated default value, if any
-	 * @param ignoreUnresolvablePlaceholders indicates whether unresolvable placeholders should
-	 * be ignored ({@code true}) or cause an exception ({@code false})
-	 * @deprecated as of 6.2, in favor of
-	 * {@link PropertyPlaceholderHelper#PropertyPlaceholderHelper(String, String, String, Character, boolean)}
-	 */
-	@Deprecated(since = "6.2", forRemoval = true)
-	public PropertyPlaceholderHelper(String placeholderPrefix, String placeholderSuffix,
-			@Nullable String valueSeparator, boolean ignoreUnresolvablePlaceholders) {
-
-		this(placeholderPrefix, placeholderSuffix, valueSeparator, null, ignoreUnresolvablePlaceholders);
-	}
-
-	/**
-	 * Create a new {@code PropertyPlaceholderHelper} that uses the supplied prefix and suffix.
-	 * @param placeholderPrefix the prefix that denotes the start of a placeholder
-	 * @param placeholderSuffix the suffix that denotes the end of a placeholder
-	 * @param valueSeparator the separating character between the placeholder variable
-	 * and the associated default value, if any
 	 * @param escapeCharacter the escape character to use to ignore placeholder prefix
 	 * or value separator, if any
 	 * @param ignoreUnresolvablePlaceholders indicates whether unresolvable placeholders should
@@ -97,7 +79,7 @@ public class PropertyPlaceholderHelper {
 	 * @param properties the {@code Properties} to use for replacement
 	 * @return the supplied value with placeholders replaced inline
 	 */
-	public String replacePlaceholders(String value, final Properties properties) {
+	public String replacePlaceholders(String value, Properties properties) {
 		Assert.notNull(properties, "'properties' must not be null");
 		return replacePlaceholders(value, properties::getProperty);
 	}
@@ -111,10 +93,6 @@ public class PropertyPlaceholderHelper {
 	 */
 	public String replacePlaceholders(String value, PlaceholderResolver placeholderResolver) {
 		Assert.notNull(value, "'value' must not be null");
-		return parseStringValue(value, placeholderResolver);
-	}
-
-	protected String parseStringValue(String value, PlaceholderResolver placeholderResolver) {
 		return this.parser.replacePlaceholders(value, placeholderResolver);
 	}
 
@@ -130,8 +108,7 @@ public class PropertyPlaceholderHelper {
 		 * @param placeholderName the name of the placeholder to resolve
 		 * @return the replacement value, or {@code null} if no replacement is to be made
 		 */
-		@Nullable
-		String resolvePlaceholder(String placeholderName);
+		@Nullable String resolvePlaceholder(String placeholderName);
 	}
 
 }

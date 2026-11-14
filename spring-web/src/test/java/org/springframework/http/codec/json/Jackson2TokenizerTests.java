@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -54,6 +54,7 @@ import static org.assertj.core.api.Assertions.fail;
  * @author Rossen Stoyanchev
  * @author Juergen Hoeller
  */
+@SuppressWarnings("removal")
 class Jackson2TokenizerTests extends AbstractLeakCheckingTests {
 
 	private JsonFactory jsonFactory;
@@ -251,7 +252,7 @@ class Jackson2TokenizerTests extends AbstractLeakCheckingTests {
 	}
 
 	@Test
-	void testLimit() {
+	void limit() {
 		List<String> source = asList(
 				"[",
 				"{", "\"id\":1,\"name\":\"Dan\"", "},",
@@ -272,7 +273,7 @@ class Jackson2TokenizerTests extends AbstractLeakCheckingTests {
 	}
 
 	@Test
-	void testLimitTokenized() {
+	void limitTokenized() {
 
 		List<String> source = asList(
 				"[",
@@ -310,7 +311,7 @@ class Jackson2TokenizerTests extends AbstractLeakCheckingTests {
 	}
 
 	@Test  // SPR-16521
-	public void jsonEOFExceptionIsWrappedAsDecodingError() {
+	void jsonEOFExceptionIsWrappedAsDecodingError() {
 		Flux<DataBuffer> source = Flux.just(stringBuffer("{\"status\": \"noClosingQuote}"));
 		Flux<TokenBuffer> tokens = Jackson2Tokenizer.tokenize(source, this.jsonFactory, this.objectMapper, false,
 				false, -1);

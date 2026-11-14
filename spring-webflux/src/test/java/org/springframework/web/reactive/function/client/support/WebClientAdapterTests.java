@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,26 +21,34 @@ import java.io.IOException;
 import java.net.URI;
 import java.time.Duration;
 import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.Map;
-import java.util.function.Consumer;
+import java.util.Set;
+import java.util.function.Function;
 
-import okhttp3.mockwebserver.MockResponse;
-import okhttp3.mockwebserver.MockWebServer;
-import okhttp3.mockwebserver.RecordedRequest;
+import jakarta.xml.bind.annotation.XmlRootElement;
+import mockwebserver3.MockResponse;
+import mockwebserver3.MockWebServer;
+import mockwebserver3.RecordedRequest;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import reactor.core.publisher.Mono;
 import reactor.test.StepVerifier;
 
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
-import org.springframework.lang.Nullable;
+import org.springframework.http.ResponseEntity;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestAttribute;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestPart;
+import org.springframework.web.client.ApiVersionInserter;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.service.annotation.GetExchange;
@@ -70,30 +78,31 @@ class WebClientAdapterTests {
 
 
 	@BeforeEach
-	void setUp() {
+	void setUp() throws IOException {
 		this.server = new MockWebServer();
+		this.server.start();
 		this.anotherServer = anotherServer();
+		this.anotherServer.start();
 	}
 
 	@SuppressWarnings("ConstantConditions")
 	@AfterEach
-	void shutdown() throws IOException {
+	void shutdown() {
 		if (this.server != null) {
-			this.server.shutdown();
+			this.server.close();
 		}
 
 		if (this.anotherServer != null) {
-			this.anotherServer.shutdown();
+			this.anotherServer.close();
 		}
 	}
 
 
 	@Test
 	void greeting() {
-		prepareResponse(response ->
-				response.setHeader("Content-Type", "text/plain").setBody("Hello Spring!"));
+		prepareResponse(builder -> builder.setHeader("Content-Type", "text/plain").body("Hello Spring!"));
 
-		StepVerifier.create(initService().getGreeting())
+		StepVerifier.create(initService(Service.class).getGreeting())
 				.expectNext("Hello Spring!")
 				.expectComplete()
 				.verify(Duration.ofSeconds(5));
@@ -111,10 +120,9 @@ class WebClientAdapterTests {
 				})
 				.build();
 
-		prepareResponse(response ->
-				response.setHeader("Content-Type", "text/plain").setBody("Hello Spring!"));
+		prepareResponse(response -> response.setHeader("Content-Type", "text/plain").body("Hello Spring!"));
 
-		StepVerifier.create(initService(webClient).getGreetingWithAttribute("myAttributeValue"))
+		StepVerifier.create(initService(webClient, Service.class).getGreetingWithAttribute("myAttributeValue"))
 				.expectNext("Hello Spring!")
 				.expectComplete()
 				.verify(Duration.ofSeconds(5));
@@ -122,115 +130,211 @@ class WebClientAdapterTests {
 		assertThat(attributes).containsEntry("myAttribute", "myAttributeValue");
 	}
 
+	@Test // gh-36514
+	void greetingWithDefaultApiVersion() throws InterruptedException {
+		prepareResponse(builder -> builder.setHeader("Content-Type", "text/plain").body("Hello Spring 2!"));
+
+		WebClient webClient = WebClient.builder()
+				.baseUrl(this.server.url("/").toString())
+				.defaultApiVersion("1.0")
+				.apiVersionInserter(ApiVersionInserter.useHeader("X-Version"))
+				.build();
+
+		StepVerifier.create(initService(webClient, Service.class).getGreeting())
+				.expectNext("Hello Spring 2!")
+				.expectComplete()
+				.verify(Duration.ofSeconds(5));
+
+		RecordedRequest request = this.server.takeRequest();
+		assertThat(request.getHeaders().get("X-Version")).isEqualTo("1.0");
+	}
+
+	@Test // see gh-36326
+	void getBodyWithGenericReturnType() {
+		prepareResponse(r -> r.setHeader("Content-Type", "application/json").body("{\"name\":\"Karl\"}"));
+		Person person = initService(PersonClient.class).getBody();
+
+		assertThat(person.getName()).isEqualTo("Karl");
+	}
+
+
+	@Test // see gh-36326
+	void getEntityWithGenericReturnType() {
+		prepareResponse(r -> r.setHeader("Content-Type", "application/json").body("{\"name\":\"Karl\"}"));
+		ResponseEntity<Person> entity = initService(PersonClient.class).getEntity();
+
+		assertThat(entity.getBody().getName()).isEqualTo("Karl");
+	}
+
 	@Test // gh-29624
 	void uri() throws Exception {
 		String expectedBody = "hello";
-		prepareResponse(response -> response.setResponseCode(200).setBody(expectedBody));
+		prepareResponse(response -> response.code(200).body(expectedBody));
 
 		URI dynamicUri = this.server.url("/greeting/123").uri();
-		String actualBody = initService().getGreetingById(dynamicUri, "456");
+		String actualBody = initService(Service.class).getGreetingById(dynamicUri, "456");
 
 		assertThat(actualBody).isEqualTo(expectedBody);
-		assertThat(this.server.takeRequest().getRequestUrl().uri()).isEqualTo(dynamicUri);
+		assertThat(this.server.takeRequest().getUrl().uri()).isEqualTo(dynamicUri);
 	}
 
 	@Test
 	void formData() throws Exception {
-		prepareResponse(response -> response.setResponseCode(201));
+		prepareResponse(response -> response.code(201));
 
 		MultiValueMap<String, String> map = new LinkedMultiValueMap<>();
 		map.add("param1", "value 1");
 		map.add("param2", "value 2");
 
-		initService().postForm(map);
+		initService(Service.class).postForm(map);
 
 		RecordedRequest request = this.server.takeRequest();
 		assertThat(request.getHeaders().get("Content-Type")).isEqualTo("application/x-www-form-urlencoded");
-		assertThat(request.getBody().readUtf8()).isEqualTo("param1=value+1&param2=value+2");
+		assertThat(request.getBody().utf8()).isEqualTo("param1=value+1&param2=value+2");
 	}
 
 	@Test // gh-30342
 	void multipart() throws InterruptedException {
-		prepareResponse(response -> response.setResponseCode(201));
+		prepareResponse(response -> response.code(201));
 		String fileName = "testFileName";
 		String originalFileName = "originalTestFileName";
-		MultipartFile file = new MockMultipartFile(fileName, originalFileName,
-				MediaType.APPLICATION_JSON_VALUE, "test".getBytes());
+		MultipartFile file = new MockMultipartFile(
+				fileName, originalFileName, MediaType.APPLICATION_JSON_VALUE, "test".getBytes());
 
-		initService().postMultipart(file, "test2");
+		initService(Service.class).postMultipart(file, "test2");
 
 		RecordedRequest request = this.server.takeRequest();
 		assertThat(request.getHeaders().get("Content-Type")).startsWith("multipart/form-data;boundary=");
-		assertThat(request.getBody().readUtf8())
+		assertThat(request.getBody().utf8())
 				.containsSubsequence("Content-Disposition: form-data; name=\"file\"; filename=\"originalTestFileName\"",
 						"Content-Type: application/json", "Content-Length: 4", "test",
 						"Content-Disposition: form-data; name=\"anotherPart\"",
 						"Content-Type: text/plain;charset=UTF-8", "Content-Length: 5", "test2");
 	}
 
+	@Test // gh-34793
+	void postSet() throws InterruptedException {
+		prepareResponse(response -> response.code(201));
+
+		Set<Person> persons = new LinkedHashSet<>();
+		persons.add(new Person("John"));
+		persons.add(new Person("Richard"));
+
+		initService(Service.class).postPersonSet(persons);
+
+		RecordedRequest request = server.takeRequest();
+		assertThat(request.getMethod()).isEqualTo("POST");
+		assertThat(request.getTarget()).isEqualTo("/persons");
+		assertThat(request.getBody().utf8()).isEqualTo("[{\"name\":\"John\"},{\"name\":\"Richard\"}]");
+	}
+
+	@Test // gh-36078
+	void postObject() throws InterruptedException {
+		prepareResponse(response -> response.code(201));
+
+		WebClient webClient = WebClient.builder()
+				.baseUrl(this.server.url("/").toString())
+				.defaultHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_XML_VALUE)
+				.build();
+
+		initService(webClient, Service.class).postObject(new Person("John"));
+
+		RecordedRequest request = server.takeRequest();
+		assertThat(request.getMethod()).isEqualTo("POST");
+		assertThat(request.getTarget()).isEqualTo("/object");
+		assertThat(request.getBody().utf8()).isEqualTo(
+				"<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?><person><name>John</name></person>");
+	}
+
 	@Test
 	void uriBuilderFactory() throws Exception {
 		String ignoredResponseBody = "hello";
-		prepareResponse(response -> response.setResponseCode(200).setBody(ignoredResponseBody));
+		prepareResponse(response -> response.code(200).body(ignoredResponseBody));
 		UriBuilderFactory factory = new DefaultUriBuilderFactory(this.anotherServer.url("/").toString());
 
-		String actualBody = initService().getWithUriBuilderFactory(factory);
+		String actualBody = initService(Service.class).getWithUriBuilderFactory(factory);
 
 		assertThat(actualBody).isEqualTo(ANOTHER_SERVER_RESPONSE_BODY);
-		assertThat(this.anotherServer.takeRequest().getPath()).isEqualTo("/greeting");
+		assertThat(this.anotherServer.takeRequest().getTarget()).isEqualTo("/greeting");
 		assertThat(this.server.getRequestCount()).isEqualTo(0);
 	}
 
 	@Test
 	void uriBuilderFactoryWithPathVariableAndRequestParam() throws Exception {
 		String ignoredResponseBody = "hello";
-		prepareResponse(response -> response.setResponseCode(200).setBody(ignoredResponseBody));
+		prepareResponse(response -> response.code(200).body(ignoredResponseBody));
 		UriBuilderFactory factory = new DefaultUriBuilderFactory(this.anotherServer.url("/").toString());
 
-		String actualBody = initService().getWithUriBuilderFactory(factory, "123", "test");
+		String actualBody = initService(Service.class).getWithUriBuilderFactory(factory, "123", "test");
 
 		assertThat(actualBody).isEqualTo(ANOTHER_SERVER_RESPONSE_BODY);
-		assertThat(this.anotherServer.takeRequest().getPath()).isEqualTo("/greeting/123?param=test");
+		assertThat(this.anotherServer.takeRequest().getTarget()).isEqualTo("/greeting/123?param=test");
 		assertThat(this.server.getRequestCount()).isEqualTo(0);
 	}
 
 	@Test
 	void ignoredUriBuilderFactory() throws Exception {
 		String expectedResponseBody = "hello";
-		prepareResponse(response -> response.setResponseCode(200).setBody(expectedResponseBody));
+		prepareResponse(response -> response.code(200).body(expectedResponseBody));
 		URI dynamicUri = this.server.url("/greeting/123").uri();
 		UriBuilderFactory factory = new DefaultUriBuilderFactory(this.anotherServer.url("/").toString());
 
-		String actualBody = initService().getWithIgnoredUriBuilderFactory(dynamicUri, factory);
+		String actualBody = initService(Service.class).getWithIgnoredUriBuilderFactory(dynamicUri, factory);
 
 		assertThat(actualBody).isEqualTo(expectedResponseBody);
-		assertThat(this.server.takeRequest().getRequestUrl().uri()).isEqualTo(dynamicUri);
+		assertThat(this.server.takeRequest().getUrl().uri()).isEqualTo(dynamicUri);
 		assertThat(this.anotherServer.getRequestCount()).isEqualTo(0);
+	}
+
+	@Test
+	void handleNotFoundException() {
+		MockResponse response = new MockResponse.Builder().code(404).build();
+		this.server.enqueue(response);
+		this.server.enqueue(response);
+
+		WebClientAdapter clientAdapter = WebClientAdapter.create(
+				WebClient.builder().baseUrl(this.server.url("/").toString()).build());
+
+		HttpServiceProxyFactory proxyFactory = HttpServiceProxyFactory.builderFor(clientAdapter)
+				.exchangeAdapterDecorator(NotFoundWebClientAdapterDecorator::new)
+				.build();
+
+		Service service = proxyFactory.createClient(Service.class);
+
+		StepVerifier.create(service.getGreeting()).verifyComplete();
+
+		StepVerifier.create(service.getGreetingEntity())
+				.consumeNextWith(entity -> {
+					assertThat(entity.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+					assertThat(entity.getBody()).isNull();
+				})
+				.verifyComplete();
 	}
 
 
 	private static MockWebServer anotherServer() {
 		MockWebServer anotherServer = new MockWebServer();
-		MockResponse response = new MockResponse();
-		response.setHeader("Content-Type", "text/plain").setBody(ANOTHER_SERVER_RESPONSE_BODY);
+		MockResponse response = new MockResponse.Builder()
+				.setHeader("Content-Type", "text/plain")
+				.body(ANOTHER_SERVER_RESPONSE_BODY)
+				.build();
 		anotherServer.enqueue(response);
 		return anotherServer;
 	}
 
-	private Service initService() {
+	private <S> S initService(Class<S> serviceType) {
 		WebClient webClient = WebClient.builder().baseUrl(this.server.url("/").toString()).build();
-		return initService(webClient);
+		return initService(webClient, serviceType);
 	}
 
-	private Service initService(WebClient webClient) {
+	private <S> S initService(WebClient webClient, Class<S> serviceType) {
 		WebClientAdapter adapter = WebClientAdapter.create(webClient);
-		return HttpServiceProxyFactory.builderFor(adapter).build().createClient(Service.class);
+		return HttpServiceProxyFactory.builderFor(adapter).build().createClient(serviceType);
 	}
 
-	private void prepareResponse(Consumer<MockResponse> consumer) {
-		MockResponse response = new MockResponse();
-		consumer.accept(response);
-		this.server.enqueue(response);
+	private void prepareResponse(Function<MockResponse.Builder, MockResponse.Builder> f) {
+		MockResponse.Builder builder = new MockResponse.Builder();
+		this.server.enqueue(f.apply(builder).build());
 	}
 
 
@@ -245,22 +349,66 @@ class WebClientAdapterTests {
 		@GetExchange("/greetings/{id}")
 		String getGreetingById(@Nullable URI uri, @PathVariable String id);
 
+		@GetExchange("/greeting")
+		Mono<ResponseEntity<String>> getGreetingEntity();
+
 		@PostExchange(contentType = "application/x-www-form-urlencoded")
 		void postForm(@RequestParam MultiValueMap<String, String> params);
 
 		@PostExchange
 		void postMultipart(MultipartFile file, @RequestPart String anotherPart);
 
+		@PostExchange("/persons")
+		void postPersonSet(@RequestBody Set<Person> set);
+
+		@PostExchange("/object")
+		void postObject(@RequestBody Object object);
+
 		@GetExchange("/greeting")
 		String getWithUriBuilderFactory(UriBuilderFactory uriBuilderFactory);
 
 		@GetExchange("/greeting/{id}")
-		String getWithUriBuilderFactory(UriBuilderFactory uriBuilderFactory,
-				@PathVariable String id, @RequestParam String param);
+		String getWithUriBuilderFactory(
+				UriBuilderFactory uriBuilderFactory, @PathVariable String id, @RequestParam String param);
 
 		@GetExchange("/greeting")
 		String getWithIgnoredUriBuilderFactory(URI uri, UriBuilderFactory uriBuilderFactory);
+	}
 
+
+	@XmlRootElement
+	static final class Person {
+
+		private String name;
+
+		public Person() {
+		}
+
+		Person(String name) {
+			this.name = name;
+		}
+
+		public String getName() {
+			return this.name;
+		}
+
+		public void setName(String name) {
+			this.name = name;
+		}
+	}
+
+
+	private interface BaseClient<T> {
+
+		@GetExchange
+		T getBody();
+
+		@GetExchange
+		ResponseEntity<T> getEntity();
+	}
+
+
+	private interface PersonClient extends BaseClient<Person> {
 	}
 
 }

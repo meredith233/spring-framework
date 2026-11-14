@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2022 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -28,8 +28,9 @@ import java.util.Set;
 import java.util.function.Function;
 import java.util.function.Predicate;
 
+import org.jspecify.annotations.Nullable;
+
 import org.springframework.core.annotation.MergedAnnotations.SearchStrategy;
-import org.springframework.lang.Nullable;
 
 /**
  * A single merged annotation returned from a {@link MergedAnnotations}
@@ -133,8 +134,7 @@ public interface MergedAnnotation<A extends Annotation> {
 	 * {@link #getRoot() root}.
 	 * @return the source, or {@code null}
 	 */
-	@Nullable
-	Object getSource();
+	@Nullable Object getSource();
 
 	/**
 	 * Get the source of the meta-annotation, or {@code null} if the
@@ -144,8 +144,7 @@ public interface MergedAnnotation<A extends Annotation> {
 	 * @return the meta-annotation source or {@code null}
 	 * @see #getRoot()
 	 */
-	@Nullable
-	MergedAnnotation<?> getMetaSource();
+	@Nullable MergedAnnotation<?> getMetaSource();
 
 	/**
 	 * Get the root annotation, i.e. the {@link #getDistance() distance} {@code 0}
@@ -443,37 +442,60 @@ public interface MergedAnnotation<A extends Annotation> {
 	/**
 	 * Create a new view of the annotation that exposes non-merged attribute values.
 	 * <p>Methods from this view will return attribute values with only alias mirroring
-	 * rules applied. Aliases to {@link #getMetaSource() meta-source} attributes will
+	 * rules applied. Aliases to {@linkplain #getMetaSource() meta-source} attributes will
 	 * not be applied.
 	 * @return a non-merged view of the annotation
 	 */
 	MergedAnnotation<A> withNonMergedAttributes();
 
 	/**
-	 * Create a new mutable {@link AnnotationAttributes} instance from this
-	 * merged annotation.
-	 * <p>The {@link Adapt adaptations} may be used to change the way that values
-	 * are added.
+	 * Create a mutable {@link AnnotationAttributes} map that contains all annotation
+	 * attributes from this merged annotation.
+	 * <p>The {@linkplain Adapt adaptations} may be used to change the way that
+	 * values are added.
+	 * <p>As of Spring Framework 7.0.7, annotation attributes of type {@code Class}
+	 * or {@code Class[]} in the returned {@code AnnotationAttributes} map may have
+	 * their values replaced by an {@linkplain Throwable exception} if an error
+	 * occurred while attempting to load the respective type via reflection.
+	 * Accessing such an attribute via {@link AnnotationAttributes#getClass(String)}
+	 * or {@link AnnotationAttributes#getClassArray(String)} will throw an
+	 * {@link IllegalArgumentException} which includes the original exception as
+	 * the cause.
 	 * @param adaptations the adaptations that should be applied to the annotation values
-	 * @return an immutable map containing the attributes and values
+	 * @return a mutable {@code AnnotationAttributes} map containing the attributes
+	 * and their values
 	 */
 	AnnotationAttributes asAnnotationAttributes(Adapt... adaptations);
 
 	/**
-	 * Get an immutable {@link Map} that contains all the annotation attributes.
-	 * <p>The {@link Adapt adaptations} may be used to change the way that values are added.
+	 * Create an immutable {@link Map} that contains all annotation attributes
+	 * from this merged annotation.
+	 * <p>The {@linkplain Adapt adaptations} may be used to change the way that
+	 * values are added.
+	 * <p>As of Spring Framework 7.0.7, annotation attributes of type {@code Class}
+	 * or {@code Class[]} in the returned map may have their values replaced by an
+	 * {@linkplain Throwable exception} if an error occurred while attempting to
+	 * load the respective type via reflection.
 	 * @param adaptations the adaptations that should be applied to the annotation values
-	 * @return an immutable map containing the attributes and values
+	 * @return an immutable map containing the attributes and their values
+	 * @see #asAnnotationAttributes(Adapt...)
 	 */
 	Map<String, Object> asMap(Adapt... adaptations);
 
 	/**
-	 * Create a new {@link Map} instance of the given type that contains all the annotation
-	 * attributes.
-	 * <p>The {@link Adapt adaptations} may be used to change the way that values are added.
+	 * Create a {@link Map} using the supplied factory and populate it with all
+	 * annotation attributes from this merged annotation.
+	 * <p>The {@linkplain Adapt adaptations} may be used to change the way that
+	 * values are added.
+	 * <p>As of Spring Framework 7.0.7, annotation attributes of type {@code Class}
+	 * or {@code Class[]} in the returned map may have their values replaced by an
+	 * {@linkplain Throwable exception} if an error occurred while attempting to
+	 * load the respective type via reflection.
 	 * @param factory a map factory
 	 * @param adaptations the adaptations that should be applied to the annotation values
-	 * @return a map containing the attributes and values
+	 * @return a map containing the attributes and their values
+	 * @see #asAnnotationAttributes(Adapt...)
+	 * @see #asMap(Adapt...)
 	 */
 	<T extends Map<String, Object>> T asMap(Function<MergedAnnotation<?>, T> factory, Adapt... adaptations);
 
@@ -491,8 +513,9 @@ public interface MergedAnnotation<A extends Annotation> {
 	 * it has not already been synthesized and one of the following is true.
 	 * <ul>
 	 * <li>The annotation declares attributes annotated with {@link AliasFor @AliasFor}.</li>
-	 * <li>The annotation is a composed annotation that relies on convention-based
-	 * annotation attribute overrides in meta-annotations.</li>
+	 * <li>The annotation is used as a meta-annotation, and one of its attributes
+	 * is overridden via an {@link AliasFor @AliasFor} declaration in a composed
+	 * annotation somewhere in the annotation hierarchy.</li>
 	 * <li>The annotation declares attributes that are annotations or arrays of
 	 * annotations that are themselves synthesizable.</li>
 	 * </ul>
@@ -603,7 +626,7 @@ public interface MergedAnnotation<A extends Annotation> {
 	 * @param annotationType the annotation type
 	 * @param attributes the annotation attributes or {@code null} if just default
 	 * values should be used
-	 * @return a {@link MergedAnnotation} instance for the annotation and attributes
+	 * @return a {@link MergedAnnotation} instance for the annotation type and attributes
 	 */
 	static <A extends Annotation> MergedAnnotation<A> of(
 			@Nullable ClassLoader classLoader, @Nullable Object source,

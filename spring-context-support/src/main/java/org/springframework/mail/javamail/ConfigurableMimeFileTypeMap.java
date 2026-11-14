@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2020 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,14 +19,15 @@ package org.springframework.mail.javamail;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.file.Path;
 
 import jakarta.activation.FileTypeMap;
 import jakarta.activation.MimetypesFileTypeMap;
+import org.jspecify.annotations.Nullable;
 
 import org.springframework.beans.factory.InitializingBean;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.core.io.Resource;
-import org.springframework.lang.Nullable;
 
 /**
  * Spring-configurable {@code FileTypeMap} implementation that will read
@@ -70,15 +71,13 @@ public class ConfigurableMimeFileTypeMap extends FileTypeMap implements Initiali
 	/**
 	 * Used to configure additional mappings.
 	 */
-	@Nullable
-	private String[] mappings;
+	private String @Nullable [] mappings;
 
 	/**
 	 * The delegate FileTypeMap, compiled from the mappings in the mapping file
 	 * and the entries in the {@code mappings} property.
 	 */
-	@Nullable
-	private FileTypeMap fileTypeMap;
+	private @Nullable FileTypeMap fileTypeMap;
 
 
 	/**
@@ -143,7 +142,7 @@ public class ConfigurableMimeFileTypeMap extends FileTypeMap implements Initiali
 	 * @see jakarta.activation.MimetypesFileTypeMap#MimetypesFileTypeMap(java.io.InputStream)
 	 * @see jakarta.activation.MimetypesFileTypeMap#addMimeTypes(String)
 	 */
-	protected FileTypeMap createFileTypeMap(@Nullable Resource mappingLocation, @Nullable String[] mappings) throws IOException {
+	protected FileTypeMap createFileTypeMap(@Nullable Resource mappingLocation, String @Nullable [] mappings) throws IOException {
 		MimetypesFileTypeMap fileTypeMap = null;
 		if (mappingLocation != null) {
 			try (InputStream is = mappingLocation.getInputStream()) {
@@ -178,6 +177,11 @@ public class ConfigurableMimeFileTypeMap extends FileTypeMap implements Initiali
 	@Override
 	public String getContentType(String fileName) {
 		return getFileTypeMap().getContentType(fileName);
+	}
+
+	// @Override - on Activation 2.2
+	public String getContentType(Path path) {
+		return getFileTypeMap().getContentType(path.getFileName().toString());
 	}
 
 }

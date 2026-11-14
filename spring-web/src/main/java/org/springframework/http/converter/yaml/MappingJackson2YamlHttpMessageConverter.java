@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -27,7 +27,7 @@ import org.springframework.util.Assert;
 /**
  * Implementation of {@link org.springframework.http.converter.HttpMessageConverter
  * HttpMessageConverter} that can read and write the <a href="https://yaml.io/">YAML</a>
- * data format using <a href="https://github.com/FasterXML/jackson-dataformats-text/tree/2.17/yaml">
+ * data format using <a href="https://github.com/FasterXML/jackson-dataformats-text/tree/2.18/yaml">
  * the dedicated Jackson 2.x extension</a>.
  *
  * <p>By default, this converter supports the {@link MediaType#APPLICATION_YAML_VALUE}
@@ -39,7 +39,10 @@ import org.springframework.util.Assert;
  *
  * @author Hyoungjune Kim
  * @since 6.2
+ * @deprecated since 7.0 in favor of {@link JacksonYamlHttpMessageConverter}
  */
+@Deprecated(since = "7.0", forRemoval = true)
+@SuppressWarnings("removal")
 public class MappingJackson2YamlHttpMessageConverter extends AbstractJackson2HttpMessageConverter {
 
 	/**

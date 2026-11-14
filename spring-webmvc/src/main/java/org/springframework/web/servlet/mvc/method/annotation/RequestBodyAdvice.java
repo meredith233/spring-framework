@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2021 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,11 +18,14 @@ package org.springframework.web.servlet.mvc.method.annotation;
 
 import java.io.IOException;
 import java.lang.reflect.Type;
+import java.util.Map;
+
+import org.jspecify.annotations.Nullable;
 
 import org.springframework.core.MethodParameter;
 import org.springframework.http.HttpInputMessage;
 import org.springframework.http.converter.HttpMessageConverter;
-import org.springframework.lang.Nullable;
+import org.springframework.http.converter.SmartHttpMessageConverter;
 
 /**
  * Allows customizing the request before its body is read and converted into an
@@ -35,6 +38,7 @@ import org.springframework.lang.Nullable;
  * {@code @ControllerAdvice} in which case they are auto-detected.
  *
  * @author Rossen Stoyanchev
+ * @author Sebastien Deleuze
  * @since 4.2
  */
 public interface RequestBodyAdvice {
@@ -43,7 +47,7 @@ public interface RequestBodyAdvice {
 	 * Invoked first to determine if this interceptor applies.
 	 * @param methodParameter the method parameter
 	 * @param targetType the target type, not necessarily the same as the method
-	 * parameter type, e.g. for {@code HttpEntity<String>}.
+	 * parameter type, for example, for {@code HttpEntity<String>}.
 	 * @param converterType the selected converter type
 	 * @return whether this interceptor should be invoked or not
 	 */
@@ -55,7 +59,7 @@ public interface RequestBodyAdvice {
 	 * @param inputMessage the request
 	 * @param parameter the target method parameter
 	 * @param targetType the target type, not necessarily the same as the method
-	 * parameter type, e.g. for {@code HttpEntity<String>}.
+	 * parameter type, for example, for {@code HttpEntity<String>}.
 	 * @param converterType the converter used to deserialize the body
 	 * @return the input request or a new instance (never {@code null})
 	 */
@@ -63,12 +67,26 @@ public interface RequestBodyAdvice {
 			Type targetType, Class<? extends HttpMessageConverter<?>> converterType) throws IOException;
 
 	/**
+	 * Invoked to determine read hints if the converter is a {@link SmartHttpMessageConverter}.
+	 * @param parameter the target method parameter
+	 * @param targetType the target type, not necessarily the same as the method
+	 * parameter type, for example, for {@code HttpEntity<String>}.
+	 * @param converterType the selected converter type
+	 * @return the hints determined otherwise {@code null}
+	 * @since 7.0
+	 */
+	default @Nullable Map<String, Object> determineReadHints(MethodParameter parameter,
+			Type targetType, Class<? extends SmartHttpMessageConverter<?>> converterType) {
+		return null;
+	}
+
+	/**
 	 * Invoked third (and last) after the request body is converted to an Object.
 	 * @param body set to the converter Object before the first advice is called
 	 * @param inputMessage the request
 	 * @param parameter the target method parameter
 	 * @param targetType the target type, not necessarily the same as the method
-	 * parameter type, e.g. for {@code HttpEntity<String>}.
+	 * parameter type, for example, for {@code HttpEntity<String>}.
 	 * @param converterType the converter used to deserialize the body
 	 * @return the same body or a new instance
 	 */
@@ -81,14 +99,12 @@ public interface RequestBodyAdvice {
 	 * @param inputMessage the request
 	 * @param parameter the method parameter
 	 * @param targetType the target type, not necessarily the same as the method
-	 * parameter type, e.g. for {@code HttpEntity<String>}.
+	 * parameter type, for example, for {@code HttpEntity<String>}.
 	 * @param converterType the selected converter type
 	 * @return the value to use, or {@code null} which may then raise an
 	 * {@code HttpMessageNotReadableException} if the argument is required
 	 */
-	@Nullable
-	Object handleEmptyBody(@Nullable Object body, HttpInputMessage inputMessage, MethodParameter parameter,
+	@Nullable Object handleEmptyBody(@Nullable Object body, HttpInputMessage inputMessage, MethodParameter parameter,
 			Type targetType, Class<? extends HttpMessageConverter<?>> converterType);
-
 
 }

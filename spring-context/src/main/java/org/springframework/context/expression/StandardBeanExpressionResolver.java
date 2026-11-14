@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,6 +19,8 @@ package org.springframework.context.expression;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
+import org.jspecify.annotations.Nullable;
+
 import org.springframework.beans.BeansException;
 import org.springframework.beans.factory.BeanExpressionException;
 import org.springframework.beans.factory.config.BeanExpressionContext;
@@ -36,7 +38,6 @@ import org.springframework.expression.spel.standard.SpelExpressionParser;
 import org.springframework.expression.spel.support.StandardEvaluationContext;
 import org.springframework.expression.spel.support.StandardTypeConverter;
 import org.springframework.expression.spel.support.StandardTypeLocator;
-import org.springframework.lang.Nullable;
 import org.springframework.util.Assert;
 import org.springframework.util.StringUtils;
 
@@ -117,8 +118,10 @@ public class StandardBeanExpressionResolver implements BeanExpressionResolver {
 	 * @param beanClassLoader the factory's bean class loader
 	 */
 	public StandardBeanExpressionResolver(@Nullable ClassLoader beanClassLoader) {
-		SpelParserConfiguration parserConfig = new SpelParserConfiguration(
-				null, beanClassLoader, false, false, Integer.MAX_VALUE, retrieveMaxExpressionLength());
+		SpelParserConfiguration parserConfig = SpelParserConfiguration.builder()
+				.compilerClassLoader(beanClassLoader)
+				.maximumExpressionLength(retrieveMaxExpressionLength())
+				.build();
 		this.expressionParser = new SpelExpressionParser(parserConfig);
 	}
 
@@ -155,8 +158,7 @@ public class StandardBeanExpressionResolver implements BeanExpressionResolver {
 
 
 	@Override
-	@Nullable
-	public Object evaluate(@Nullable String value, BeanExpressionContext beanExpressionContext) throws BeansException {
+	public @Nullable Object evaluate(@Nullable String value, BeanExpressionContext beanExpressionContext) throws BeansException {
 		if (!StringUtils.hasLength(value)) {
 			return value;
 		}
@@ -168,7 +170,7 @@ public class StandardBeanExpressionResolver implements BeanExpressionResolver {
 					StandardEvaluationContext sec = new StandardEvaluationContext(bec);
 					sec.addPropertyAccessor(new BeanExpressionContextAccessor());
 					sec.addPropertyAccessor(new BeanFactoryAccessor());
-					sec.addPropertyAccessor(new MapAccessor());
+					sec.addPropertyAccessor(new org.springframework.expression.spel.support.MapAccessor());
 					sec.addPropertyAccessor(new EnvironmentAccessor());
 					sec.setBeanResolver(new BeanFactoryResolver(beanFactory));
 					sec.setTypeLocator(new StandardTypeLocator(beanFactory.getBeanClassLoader()));
@@ -201,8 +203,8 @@ public class StandardBeanExpressionResolver implements BeanExpressionResolver {
 
 		try {
 			int maxLength = Integer.parseInt(value.trim());
-			Assert.isTrue(maxLength > 0, () -> "Value [" + maxLength + "] for system property ["
-					+ MAX_SPEL_EXPRESSION_LENGTH_PROPERTY_NAME + "] must be positive");
+			Assert.isTrue(maxLength > 0, () -> "Value [" + maxLength + "] for system property [" +
+					MAX_SPEL_EXPRESSION_LENGTH_PROPERTY_NAME + "] must be positive");
 			return maxLength;
 		}
 		catch (NumberFormatException ex) {

@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -44,12 +44,12 @@ class HttpMethodTests {
 	void values() {
 		HttpMethod[] values = HttpMethod.values();
 		assertThat(values).containsExactly(HttpMethod.GET, HttpMethod.HEAD, HttpMethod.POST, HttpMethod.PUT,
-				HttpMethod.PATCH, HttpMethod.DELETE, HttpMethod.OPTIONS, HttpMethod.TRACE);
+				HttpMethod.PATCH, HttpMethod.DELETE, HttpMethod.OPTIONS, HttpMethod.TRACE, HttpMethod.QUERY);
 
 		// check defensive copy
 		values[0] = HttpMethod.POST;
 		assertThat(HttpMethod.values()).containsExactly(HttpMethod.GET, HttpMethod.HEAD, HttpMethod.POST, HttpMethod.PUT,
-				HttpMethod.PATCH, HttpMethod.DELETE, HttpMethod.OPTIONS, HttpMethod.TRACE);
+				HttpMethod.PATCH, HttpMethod.DELETE, HttpMethod.OPTIONS, HttpMethod.TRACE, HttpMethod.QUERY);
 	}
 
 	@Test
@@ -57,8 +57,15 @@ class HttpMethodTests {
 		HttpMethod get = HttpMethod.valueOf("GET");
 		assertThat(get).isSameAs(HttpMethod.GET);
 
-		HttpMethod foo = HttpMethod.valueOf("FOO");
-		HttpMethod other = HttpMethod.valueOf("FOO");
+		get = HttpMethod.valueOf("Get");
+		assertThat(get).isSameAs(HttpMethod.GET);
+
+		get = HttpMethod.valueOf("get");
+		assertThat(get).isSameAs(HttpMethod.GET);
+
+		HttpMethod foo = HttpMethod.valueOf("foo");
+		HttpMethod other = HttpMethod.valueOf("foo");
+		assertThat(foo).isNotSameAs(other);
 		assertThat(foo).isEqualTo(other);
 	}
 
@@ -73,4 +80,5 @@ class HttpMethodTests {
 		assertThat(HttpMethod.GET.matches("GET")).isTrue();
 		assertThat(HttpMethod.GET.matches("FOO")).isFalse();
 	}
+
 }

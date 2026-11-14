@@ -16,7 +16,8 @@ advantages:
   during development, without negating the option of switching to explicit wiring when
   the code base becomes more stable.
 
-When using XML-based configuration metadata (see xref:core/beans/dependencies/factory-collaborators.adoc[Dependency Injection]), you
+When using XML-based configuration metadata (see
+xref:core/beans/dependencies/factory-collaborators.adoc[Dependency Injection]), you
 can specify the autowire mode for a bean definition with the `autowire` attribute of the
 `<bean/>` element. The autowiring functionality has four modes. You specify autowiring
 per bean and can thus choose which ones to autowire. The following table describes the
@@ -89,22 +90,22 @@ In the latter scenario, you have several options:
 
 * Abandon autowiring in favor of explicit wiring.
 * Avoid autowiring for a bean definition by setting its `autowire-candidate` attributes
-  to `false`, as described in the xref:core/beans/dependencies/factory-autowire.adoc#beans-factory-autowire-candidate[next section].
+  to `false`, as described in the
+  <<beans-factory-autowire-candidate,next section>>.
 * Designate a single bean definition as the primary candidate by setting the
   `primary` attribute of its `<bean/>` element to `true`.
 * Implement the more fine-grained control available with annotation-based configuration,
   as described in xref:core/beans/annotation-config.adoc[Annotation-based Container Configuration].
 
 
-
 [[beans-factory-autowire-candidate]]
 == Excluding a Bean from Autowiring
 
 On a per-bean basis, you can exclude a bean from autowiring. In Spring's XML format, set
-the `autowire-candidate` attribute of the `<bean/>` element to `false`. The container
-makes that specific bean definition unavailable to the autowiring infrastructure
-(including annotation style configurations such as xref:core/beans/annotation-config/autowired.adoc[`@Autowired`]
-).
+the `autowire-candidate` attribute of the `<bean/>` element to `false`; with the `@Bean`
+annotation, the attribute is named `autowireCandidate`. The container makes that specific
+bean definition unavailable to the autowiring infrastructure, including annotation-based
+injection points such as xref:core/beans/annotation-config/autowired.adoc[`@Autowired`].
 
 NOTE: The `autowire-candidate` attribute is designed to only affect type-based autowiring.
 It does not affect explicit references by name, which get resolved even if the
@@ -119,9 +120,22 @@ provide multiple patterns, define them in a comma-separated list. An explicit va
 `true` or `false` for a bean definition's `autowire-candidate` attribute always takes
 precedence. For such beans, the pattern matching rules do not apply.
 
-These techniques are useful for beans that you never want to be injected into other
-beans by autowiring. It does not mean that an excluded bean cannot itself be configured by
+These techniques are useful for beans that you never want to be injected into other beans
+by autowiring. It does not mean that an excluded bean cannot itself be configured by
 using autowiring. Rather, the bean itself is not a candidate for autowiring other beans.
 
+[NOTE]
+====
+As of 6.2, `@Bean` methods support two variants of the autowire candidate flag:
+`autowireCandidate` and `defaultCandidate`.
 
+When using xref:core/beans/annotation-config/autowired-qualifiers.adoc[qualifiers],
+a bean marked with `defaultCandidate=false` is only available for injection points
+where an additional qualifier indication is present. This is useful for restricted
+delegates that are supposed to be injectable in certain areas but are not meant to
+get in the way of beans of the same type in other places. Such a bean will never
+get injected by plain declared type only, rather by type plus specific qualifier.
 
+In contrast, `autowireCandidate=false` behaves exactly like the `autowire-candidate`
+attribute as explained above: Such a bean will never get injected by type at all.
+====

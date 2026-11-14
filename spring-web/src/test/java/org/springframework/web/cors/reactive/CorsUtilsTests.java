@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -67,7 +67,7 @@ class CorsUtilsTests {
 	}
 
 	@Test  // SPR-16262
-	public void isSameOriginWithXForwardedHeaders() {
+	void isSameOriginWithXForwardedHeaders() {
 		String server = "mydomain1.example";
 		testWithXForwardedHeaders(server, -1, "https", null, -1, "https://mydomain1.example");
 		testWithXForwardedHeaders(server, 123, "https", null, -1, "https://mydomain1.example");
@@ -78,7 +78,7 @@ class CorsUtilsTests {
 	}
 
 	@Test  // SPR-16262
-	public void isSameOriginWithForwardedHeader() {
+	void isSameOriginWithForwardedHeader() {
 		String server = "mydomain1.example";
 		testWithForwardedHeader(server, -1, "proto=https", "https://mydomain1.example");
 		testWithForwardedHeader(server, 123, "proto=https", "https://mydomain1.example");
@@ -89,16 +89,14 @@ class CorsUtilsTests {
 	}
 
 	@Test  // SPR-16362
-	@SuppressWarnings("deprecation")
-	public void isSameOriginWithDifferentSchemes() {
+	void isSameOriginWithDifferentSchemes() {
 		MockServerHttpRequest request = MockServerHttpRequest
 				.get("http://mydomain1.example")
 				.header(HttpHeaders.ORIGIN, "https://mydomain1.example")
 				.build();
-		assertThat(CorsUtils.isSameOrigin(request)).isFalse();
+		assertThat(CorsUtils.isCorsRequest(request)).isTrue();
 	}
 
-	@SuppressWarnings("deprecation")
 	private void testWithXForwardedHeaders(String serverName, int port,
 			String forwardedProto, String forwardedHost, int forwardedPort, String originHeader) {
 
@@ -118,11 +116,10 @@ class CorsUtilsTests {
 			builder.header("X-Forwarded-Port", String.valueOf(forwardedPort));
 		}
 
-		ServerHttpRequest request = adaptFromForwardedHeaders(builder);
-		assertThat(CorsUtils.isSameOrigin(request)).isTrue();
+		ServerHttpRequest request = adaptFromForwardedHeaders(builder, false);
+		assertThat(CorsUtils.isCorsRequest(request)).isFalse();
 	}
 
-	@SuppressWarnings("deprecation")
 	private void testWithForwardedHeader(String serverName, int port,
 			String forwardedHeader, String originHeader) {
 
@@ -135,14 +132,16 @@ class CorsUtilsTests {
 				.header("Forwarded", forwardedHeader)
 				.header(HttpHeaders.ORIGIN, originHeader);
 
-		ServerHttpRequest request = adaptFromForwardedHeaders(builder);
-		assertThat(CorsUtils.isSameOrigin(request)).isTrue();
+		ServerHttpRequest request = adaptFromForwardedHeaders(builder, true);
+		assertThat(CorsUtils.isCorsRequest(request)).isFalse();
 	}
 
 	// SPR-16668
-	private ServerHttpRequest adaptFromForwardedHeaders(MockServerHttpRequest.BaseBuilder<?> builder) {
+	private ServerHttpRequest adaptFromForwardedHeaders(
+			MockServerHttpRequest.BaseBuilder<?> builder, boolean useStandardForwardedHeader) {
+
 		MockServerWebExchange exchange = MockServerWebExchange.from(builder);
-		return new ForwardedHeaderTransformer().apply(exchange.getRequest());
+		return new ForwardedHeaderTransformer(useStandardForwardedHeader).apply(exchange.getRequest());
 	}
 
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -37,6 +37,7 @@ import org.springframework.validation.Validator;
 import org.springframework.validation.beanvalidation.LocalValidatorFactoryBean;
 import org.springframework.web.ErrorResponse;
 import org.springframework.web.bind.support.ConfigurableWebBindingInitializer;
+import org.springframework.web.reactive.accept.RequestedContentTypeResolver;
 import org.springframework.web.reactive.accept.RequestedContentTypeResolverBuilder;
 import org.springframework.web.reactive.result.method.annotation.ResponseBodyResultHandler;
 import org.springframework.web.reactive.socket.server.WebSocketService;
@@ -55,7 +56,7 @@ import static org.mockito.Mockito.verify;
  * @author Brian Clozel
  */
 @MockitoSettings(strictness = Strictness.LENIENT)
-public class DelegatingWebFluxConfigurationTests {
+class DelegatingWebFluxConfigurationTests {
 
 	@Mock
 	private WebFluxConfigurer webFluxConfigurer;
@@ -85,7 +86,8 @@ public class DelegatingWebFluxConfigurationTests {
 	@Test
 	void requestMappingHandlerMapping() {
 		delegatingConfig.setConfigurers(Collections.singletonList(webFluxConfigurer));
-		delegatingConfig.requestMappingHandlerMapping(delegatingConfig.webFluxContentTypeResolver());
+		delegatingConfig.requestMappingHandlerMapping(
+				delegatingConfig.webFluxContentTypeResolver(), delegatingConfig.webFluxApiVersionStrategy());
 
 		verify(webFluxConfigurer).configureContentTypeResolver(any(RequestedContentTypeResolverBuilder.class));
 		verify(webFluxConfigurer).addCorsMappings(any(CorsRegistry.class));
@@ -98,11 +100,12 @@ public class DelegatingWebFluxConfigurationTests {
 		ReactiveAdapterRegistry reactiveAdapterRegistry = delegatingConfig.webFluxAdapterRegistry();
 		ServerCodecConfigurer serverCodecConfigurer = delegatingConfig.serverCodecConfigurer();
 		FormattingConversionService formattingConversionService = delegatingConfig.webFluxConversionService();
+		RequestedContentTypeResolver requestedContentTypeResolver = delegatingConfig.webFluxContentTypeResolver();
 		Validator validator = delegatingConfig.webFluxValidator();
 
 		ConfigurableWebBindingInitializer initializer = (ConfigurableWebBindingInitializer)
 				this.delegatingConfig.requestMappingHandlerAdapter(reactiveAdapterRegistry, serverCodecConfigurer,
-						formattingConversionService, validator).getWebBindingInitializer();
+						formattingConversionService, requestedContentTypeResolver, validator).getWebBindingInitializer();
 
 		verify(webFluxConfigurer).configureHttpMessageCodecs(codecsConfigurer.capture());
 		verify(webFluxConfigurer).getValidator();
@@ -111,10 +114,9 @@ public class DelegatingWebFluxConfigurationTests {
 		verify(webFluxConfigurer).configureArgumentResolvers(any());
 
 		assertThat(initializer).isNotNull();
-		boolean condition = initializer.getValidator() instanceof LocalValidatorFactoryBean;
-		assertThat(condition).isTrue();
+		assertThat(initializer.getValidator()).isInstanceOf(LocalValidatorFactoryBean.class);
 		assertThat(initializer.getConversionService()).isSameAs(formatterRegistry.getValue());
-		assertThat(codecsConfigurer.getValue().getReaders()).hasSize(17);
+		assertThat(codecsConfigurer.getValue().getReaders()).hasSize(16);
 	}
 
 	@Test
@@ -122,7 +124,7 @@ public class DelegatingWebFluxConfigurationTests {
 		delegatingConfig.setConfigurers(Collections.singletonList(webFluxConfigurer));
 		willAnswer(invocation -> {
 			ResourceHandlerRegistry registry = invocation.getArgument(0);
-			registry.addResourceHandler("/static/**").addResourceLocations("classpath:/static");
+			registry.addResourceHandler("/static/**").addResourceLocations("classpath:/static/");
 			return null;
 		}).given(webFluxConfigurer).addResourceHandlers(any(ResourceHandlerRegistry.class));
 

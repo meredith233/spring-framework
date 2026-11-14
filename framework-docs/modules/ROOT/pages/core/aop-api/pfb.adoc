@@ -14,7 +14,6 @@ the pointcuts, any advice that applies, and their ordering. However, there are s
 options that are preferable if you do not need such control.
 
 
-
 [[aop-pfb-1]]
 == Basics
 
@@ -32,7 +31,6 @@ application objects (besides the target, which should be available in any AOP
 framework), benefiting from all the pluggability provided by Dependency Injection.
 
 
-
 [[aop-pfb-2]]
 == JavaBean Properties
 
@@ -40,7 +38,7 @@ In common with most `FactoryBean` implementations provided with Spring, the
 `ProxyFactoryBean` class is itself a JavaBean. Its properties are used to:
 
 * Specify the target you want to proxy.
-* Specify whether to use CGLIB (described later and see also xref:core/aop-api/pfb.adoc#aop-pfb-proxy-types[JDK- and CGLIB-based proxies]).
+* Specify whether to use CGLIB (described later and see also <<aop-pfb-proxy-types,JDK- and CGLIB-based proxies>>).
 
 Some key properties are inherited from `org.springframework.aop.framework.ProxyConfig`
 (the superclass for all AOP proxy factories in Spring). These key properties include
@@ -48,7 +46,7 @@ the following:
 
 * `proxyTargetClass`: `true` if the target class is to be proxied, rather than the
   target class's interfaces. If this property value is set to `true`, then CGLIB proxies
-  are created (but see also xref:core/aop-api/pfb.adoc#aop-pfb-proxy-types[JDK- and CGLIB-based proxies]).
+  are created (but see also <<aop-pfb-proxy-types,JDK- and CGLIB-based proxies>>).
 * `optimize`: Controls whether or not aggressive optimizations are applied to proxies
   created through CGLIB. You should not blithely use this setting unless you fully
   understand how the relevant AOP proxy handles optimization. This is currently used
@@ -66,7 +64,7 @@ the following:
 Other properties specific to `ProxyFactoryBean` include the following:
 
 * `proxyInterfaces`: An array of `String` interface names. If this is not supplied, a CGLIB
-  proxy for the target class is used (but see also xref:core/aop-api/pfb.adoc#aop-pfb-proxy-types[JDK- and CGLIB-based proxies]).
+  proxy for the target class is used (but see also <<aop-pfb-proxy-types,JDK- and CGLIB-based proxies>>).
 * `interceptorNames`: A `String` array of `Advisor`, interceptor, or other advice names to
   apply. Ordering is significant, on a first come-first served basis. That is to say
   that the first interceptor in the list is the first to be able to intercept the
@@ -78,14 +76,13 @@ factories. You cannot mention bean references here, since doing so results in th
 +
 You can append an interceptor name with an asterisk (`*`). Doing so results in the
 application of all advisor beans with names that start with the part before the asterisk
-to be applied. You can find an example of using this feature in xref:core/aop-api/pfb.adoc#aop-global-advisors[Using "`Global`" Advisors].
+to be applied. You can find an example of using this feature in <<aop-global-advisors,Using "`Global`" Advisors>>.
 
 * singleton: Whether or not the factory should return a single object, no matter how
   often the `getObject()` method is called. Several `FactoryBean` implementations offer
   such a method. The default value is `true`. If you want to use stateful advice - for
   example, for stateful mixins - use prototype advice along with a singleton value of
   `false`.
-
 
 
 [[aop-pfb-proxy-types]]
@@ -135,7 +132,6 @@ that are actually proxied are all of the interfaces that the target class
 implements. In effect, this is the same as supplying a list of each and every
 interface that the target class implements to the `proxyInterfaces` property. However,
 it is significantly less work and less prone to typographical errors.
-
 
 
 [[aop-api-proxying-intf]]
@@ -196,14 +192,14 @@ follows:
 ======
 Java::
 +
-[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+[source,java,indent=0,subs="verbatim,quotes"]
 ----
 	Person person = (Person) factory.getBean("person");
 ----
 
 Kotlin::
 +
-[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+[source,kotlin,indent=0,subs="verbatim,quotes"]
 ----
 	val person = factory.getBean("person") as Person
 ----
@@ -263,7 +259,6 @@ However, there are times when being able to obtain the un-advised target from th
 factory might actually be an advantage (for example, in certain test scenarios).
 
 
-
 [[aop-api-proxying-class]]
 == Proxying Classes
 
@@ -302,7 +297,6 @@ There is little performance difference between CGLIB proxies and dynamic proxies
 Performance should not be a decisive consideration in this case.
 
 
-
 [[aop-global-advisors]]
 == Using "`Global`" Advisors
 
@@ -325,7 +319,3 @@ two global advisors:
 	<bean id="global_debug" class="org.springframework.aop.interceptor.DebugInterceptor"/>
 	<bean id="global_performance" class="org.springframework.aop.interceptor.PerformanceMonitorInterceptor"/>
 ----
-
-
-
-

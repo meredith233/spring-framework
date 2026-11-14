@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2023 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -24,7 +24,8 @@ import java.util.Collection;
 import java.util.function.Predicate;
 import java.util.stream.Stream;
 
-import org.springframework.lang.Nullable;
+import org.jspecify.annotations.Nullable;
+
 import org.springframework.util.Assert;
 
 /**
@@ -35,10 +36,9 @@ import org.springframework.util.Assert;
  * "merged" from different source values, typically:
  *
  * <ul>
- * <li>Explicit and Implicit {@link AliasFor @AliasFor} declarations on one or
+ * <li>Explicit and implicit {@link AliasFor @AliasFor} declarations on one or
  * more attributes within the annotation</li>
- * <li>Explicit {@link AliasFor @AliasFor} declarations for a meta-annotation</li>
- * <li>Convention based attribute aliases for a meta-annotation</li>
+ * <li>Explicit {@code @AliasFor} declarations for a meta-annotation</li>
  * <li>From a meta-annotation declaration</li>
  * </ul>
  *
@@ -133,6 +133,14 @@ import org.springframework.util.Assert;
  * please use standard Java reflection or Spring's {@link AnnotationUtils}
  * for simple annotation retrieval purposes.
  *
+ * <p><strong>WARNING</strong>: If an annotation cannot be loaded because one of
+ * its attributes references a {@link Class} or {@link Enum}
+ * {@linkplain TypeNotPresentException that is not present in the classpath}, that
+ * annotation will not be accessible via the {@code MergedAnnotations} API.
+ * To assist with diagnosing such scenarios, you can set the log level for
+ * {@code "org.springframework.core.annotation.MergedAnnotation"} to {@code DEBUG},
+ * {@code INFO}, or {@code WARN}.
+
  * @author Phillip Webb
  * @author Sam Brannen
  * @since 5.2
@@ -140,6 +148,9 @@ import org.springframework.util.Assert;
  * @see MergedAnnotationCollectors
  * @see MergedAnnotationPredicates
  * @see MergedAnnotationSelectors
+ * @see AliasFor
+ * @see AnnotationUtils
+ * @see AnnotatedElementUtils
  */
 public interface MergedAnnotations extends Iterable<MergedAnnotation<Annotation>> {
 
@@ -299,8 +310,8 @@ public interface MergedAnnotations extends Iterable<MergedAnnotation<Annotation>
 	 * {@link #from(AnnotatedElement, SearchStrategy)} with an appropriate
 	 * {@link SearchStrategy}.
 	 * @param element the source element
-	 * @return a {@code MergedAnnotations} instance containing the element's
-	 * annotations
+	 * @return a {@code MergedAnnotations} instance containing the merged
+	 * annotations for the supplied element
 	 * @see #search(SearchStrategy)
 	 */
 	static MergedAnnotations from(AnnotatedElement element) {
@@ -314,7 +325,7 @@ public interface MergedAnnotations extends Iterable<MergedAnnotation<Annotation>
 	 * @param element the source element
 	 * @param searchStrategy the search strategy to use
 	 * @return a {@code MergedAnnotations} instance containing the merged
-	 * element annotations
+	 * annotations for the supplied element
 	 * @see #search(SearchStrategy)
 	 */
 	static MergedAnnotations from(AnnotatedElement element, SearchStrategy searchStrategy) {
@@ -327,10 +338,10 @@ public interface MergedAnnotations extends Iterable<MergedAnnotation<Annotation>
 	 * depending on the {@link SearchStrategy}, related inherited elements.
 	 * @param element the source element
 	 * @param searchStrategy the search strategy to use
-	 * @param repeatableContainers the repeatable containers that may be used by
-	 * the element annotations or the meta-annotations
+	 * @param repeatableContainers the strategy to use for finding repeatable
+	 * annotations and their container annotations
 	 * @return a {@code MergedAnnotations} instance containing the merged
-	 * element annotations
+	 * annotations for the supplied element
 	 * @see #search(SearchStrategy)
 	 */
 	static MergedAnnotations from(AnnotatedElement element, SearchStrategy searchStrategy,
@@ -345,8 +356,8 @@ public interface MergedAnnotations extends Iterable<MergedAnnotation<Annotation>
 	 * depending on the {@link SearchStrategy}, related inherited elements.
 	 * @param element the source element
 	 * @param searchStrategy the search strategy to use
-	 * @param repeatableContainers the repeatable containers that may be used by
-	 * the element annotations or the meta-annotations
+	 * @param repeatableContainers the strategy to use for finding repeatable
+	 * annotations and their container annotations
 	 * @param annotationFilter an annotation filter used to restrict the
 	 * annotations considered
 	 * @return a {@code MergedAnnotations} instance containing the merged
@@ -405,8 +416,8 @@ public interface MergedAnnotations extends Iterable<MergedAnnotation<Annotation>
 	 * for information and logging. It does not need to <em>actually</em>
 	 * contain the specified annotations, and it will not be searched.
 	 * @param annotations the annotations to include
-	 * @param repeatableContainers the repeatable containers that may be used by
-	 * meta-annotations
+	 * @param repeatableContainers the strategy to use for finding repeatable
+	 * annotations and their container annotations
 	 * @return a {@code MergedAnnotations} instance containing the annotations
 	 */
 	static MergedAnnotations from(Object source, Annotation[] annotations, RepeatableContainers repeatableContainers) {
@@ -420,8 +431,8 @@ public interface MergedAnnotations extends Iterable<MergedAnnotation<Annotation>
 	 * for information and logging. It does not need to <em>actually</em>
 	 * contain the specified annotations, and it will not be searched.
 	 * @param annotations the annotations to include
-	 * @param repeatableContainers the repeatable containers that may be used by
-	 * meta-annotations
+	 * @param repeatableContainers the strategy to use for finding repeatable
+	 * annotations and their container annotations
 	 * @param annotationFilter an annotation filter used to restrict the
 	 * annotations considered
 	 * @return a {@code MergedAnnotations} instance containing the annotations
@@ -435,15 +446,17 @@ public interface MergedAnnotations extends Iterable<MergedAnnotation<Annotation>
 	}
 
 	/**
-	 * Create a new {@link MergedAnnotations} instance from the specified
-	 * collection of directly present annotations. This method allows a
-	 * {@code MergedAnnotations} instance to be created from annotations that
-	 * are not necessarily loaded using reflection. The provided annotations
-	 * must all be {@link MergedAnnotation#isDirectlyPresent() directly present}
-	 * and must have an {@link MergedAnnotation#getAggregateIndex() aggregate
-	 * index} of {@code 0}.
+	 * Create a new {@link MergedAnnotations} instance from the provided
+	 * collection of annotations.
+	 * <p>This method allows a {@code MergedAnnotations} instance to be created
+	 * from annotations that are not necessarily loaded using reflection.
+	 * <p>The provided annotations must all be
+	 * {@link MergedAnnotation#isDirectlyPresent() directly present} and must have
+	 * an {@link MergedAnnotation#getAggregateIndex() aggregate index} of {@code 0}.
+	 * In addition, the provided collection must retain the source declaration order
+	 * of the annotations &mdash; for example, a {@link java.util.List}.
 	 * <p>The resulting {@code MergedAnnotations} instance will contain both the
-	 * specified annotations and any meta-annotations that can be read using
+	 * provided annotations and any meta-annotations that can be read using
 	 * reflection.
 	 * @param annotations the annotations to include
 	 * @return a {@code MergedAnnotations} instance containing the annotations
@@ -560,6 +573,7 @@ public interface MergedAnnotations extends Iterable<MergedAnnotation<Annotation>
 		 * @see #withRepeatableContainers(RepeatableContainers)
 		 * @see #withAnnotationFilter(AnnotationFilter)
 		 * @see #from(AnnotatedElement)
+		 * @see org.springframework.test.context.TestContextAnnotationUtils#searchEnclosingClass(Class)
 		 */
 		public Search withEnclosingClasses(Predicate<Class<?>> searchEnclosingClass) {
 			Assert.notNull(searchEnclosingClass, "Predicate must not be null");
@@ -572,8 +586,8 @@ public interface MergedAnnotations extends Iterable<MergedAnnotation<Annotation>
 		/**
 		 * Configure the {@link RepeatableContainers} to use.
 		 * <p>Defaults to {@link RepeatableContainers#standardRepeatables()}.
-		 * @param repeatableContainers the repeatable containers that may be used
-		 * by annotations or meta-annotations
+		 * @param repeatableContainers the strategy to use for finding repeatable
+		 * annotations and their container annotations
 		 * @return this {@code Search} instance for chained method invocations
 		 * @see #withAnnotationFilter(AnnotationFilter)
 		 * @see #from(AnnotatedElement)

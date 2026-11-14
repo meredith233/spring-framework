@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,7 +22,6 @@ import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.net.InetAddress;
 import java.net.URI;
-import java.net.URL;
 import java.net.UnknownHostException;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
@@ -62,6 +61,7 @@ import static org.springframework.util.ObjectUtils.isEmpty;
  * @author Rick Evans
  * @author Sam Brannen
  * @author Hyunjin Choi
+ * @author Ngoc Nhan
  */
 class ObjectUtilsTests {
 
@@ -188,19 +188,20 @@ class ObjectUtilsTests {
 
 	@Test
 	void toObjectArrayWithNonArrayType() {
-		assertThatIllegalArgumentException().isThrownBy(() ->
-				ObjectUtils.toObjectArray("Not an []"));
+		assertThatIllegalArgumentException()
+				.isThrownBy(() -> ObjectUtils.toObjectArray("Not an []"))
+				.withMessageStartingWith("Source is not an array");
 	}
 
 	@Test
 	void toObjectArrayWithNonPrimitiveArray() {
-		String[] source = new String[] {"Bingo"};
-		assertThat(ObjectUtils.toObjectArray(source)).isEqualTo(source);
+		String[] source = {"Bingo"};
+		assertThat(ObjectUtils.toObjectArray(source)).isSameAs(source);
 	}
 
 	@Test
 	void addObjectToArraySunnyDay() {
-		String[] array = new String[] {"foo", "bar"};
+		String[] array = {"foo", "bar"};
 		String newElement = "baz";
 		Object[] newArray = ObjectUtils.addObjectToArray(array, newElement);
 		assertThat(newArray).hasSize(3);
@@ -209,7 +210,7 @@ class ObjectUtilsTests {
 
 	@Test
 	void addObjectToArraysAtPosition() {
-		String[] array = new String[] {"foo", "bar", "baz"};
+		String[] array = {"foo", "bar", "baz"};
 		assertThat(ObjectUtils.addObjectToArray(array, "bat", 3)).containsExactly("foo", "bar", "baz", "bat");
 		assertThat(ObjectUtils.addObjectToArray(array, "bat", 2)).containsExactly("foo", "bar", "bat", "baz");
 		assertThat(ObjectUtils.addObjectToArray(array, "bat", 1)).containsExactly("foo", "bat", "bar", "baz");
@@ -228,7 +229,7 @@ class ObjectUtilsTests {
 	@Test
 	void addObjectToSingleNonNullElementArray() {
 		String existingElement = "foo";
-		String[] array = new String[] {existingElement};
+		String[] array = {existingElement};
 		String newElement = "bar";
 		String[] newArray = ObjectUtils.addObjectToArray(array, newElement);
 		assertThat(newArray).hasSize(2);
@@ -238,7 +239,7 @@ class ObjectUtilsTests {
 
 	@Test
 	void addObjectToSingleNullElementArray() {
-		String[] array = new String[] {null};
+		String[] array = {null};
 		String newElement = "bar";
 		String[] newArray = ObjectUtils.addObjectToArray(array, newElement);
 		assertThat(newArray).hasSize(2);
@@ -265,6 +266,13 @@ class ObjectUtilsTests {
 	void nullSafeEqualsWithArrays() {
 		assertThat(ObjectUtils.nullSafeEquals(new String[] {"a", "b", "c"}, new String[] {"a", "b", "c"})).isTrue();
 		assertThat(ObjectUtils.nullSafeEquals(new int[] {1, 2, 3}, new int[] {1, 2, 3})).isTrue();
+		assertThat(ObjectUtils.nullSafeEquals(new long[] {1, 2, 3}, new long[] {1, 2, 3})).isTrue();
+		assertThat(ObjectUtils.nullSafeEquals(new short[] {1, 2, 3}, new short[] {1, 2, 3})).isTrue();
+		assertThat(ObjectUtils.nullSafeEquals(new byte[] {1, 2, 3}, new byte[] {1, 2, 3})).isTrue();
+		assertThat(ObjectUtils.nullSafeEquals(new float[] {1, 2, 3}, new float[] {1, 2, 3})).isTrue();
+		assertThat(ObjectUtils.nullSafeEquals(new double[] {1, 2, 3}, new double[] {1, 2, 3})).isTrue();
+		assertThat(ObjectUtils.nullSafeEquals(new char[] {1, 2, 3}, new char[] {1, 2, 3})).isTrue();
+		assertThat(ObjectUtils.nullSafeEquals(new boolean[] {true, false, true}, new boolean[] {true, false, true})).isTrue();
 	}
 
 	@Test
@@ -628,8 +636,8 @@ class ObjectUtilsTests {
 
 	@Test
 	void nullSafeToStringWithByteArray() {
-		byte[] array = {5, 8};
-		assertThat(ObjectUtils.nullSafeToString(array)).isEqualTo("{5, 8}");
+		byte[] array = {5, 38};
+		assertThat(ObjectUtils.nullSafeToString(array)).isEqualTo("{0526}");
 	}
 
 	@Test
@@ -982,10 +990,10 @@ class ObjectUtilsTests {
 		@Test
 		void nullSafeConciseToStringForURL() throws Exception {
 			String url = "https://www.example.com/?foo=1&bar=2&baz=3";
-			assertThat(ObjectUtils.nullSafeConciseToString(new URL(url))).isEqualTo(url);
+			assertThat(ObjectUtils.nullSafeConciseToString(URI.create(url).toURL())).isEqualTo(url);
 
 			url += "&qux=" + "4".repeat(60);
-			assertThat(ObjectUtils.nullSafeConciseToString(new URL(url)))
+			assertThat(ObjectUtils.nullSafeConciseToString(URI.create(url).toURL()))
 					.hasSize(truncatedLength)
 					.startsWith(url.subSequence(0, 100))
 					.endsWith(truncated);
@@ -1111,6 +1119,25 @@ class ObjectUtilsTests {
 		private static String prefix(Class<?> clazz) {
 			return clazz.getTypeName() + "@";
 		}
+	}
+
+	@Test
+	void unwrapOptional() {
+
+		assertThat(ObjectUtils.unwrapOptional(null)).isNull();
+		assertThat(ObjectUtils.unwrapOptional("some value")).isEqualTo("some value");
+		assertThat(ObjectUtils.unwrapOptional(Optional.empty())).isNull();
+		assertThat(ObjectUtils.unwrapOptional(Optional.of("some value"))).isEqualTo("some value");
+
+		Optional<Optional<Object>> nestedEmptyOptional = Optional.of(Optional.empty());
+		assertThatIllegalArgumentException()
+			.isThrownBy(() -> ObjectUtils.unwrapOptional(nestedEmptyOptional))
+			.withMessage("Multi-level Optional usage not supported");
+
+		Optional<Optional<String>> nestedStringOptional = Optional.of(Optional.of("some value"));
+		assertThatIllegalArgumentException()
+			.isThrownBy(() -> ObjectUtils.unwrapOptional(nestedStringOptional))
+			.withMessage("Multi-level Optional usage not supported");
 	}
 
 }

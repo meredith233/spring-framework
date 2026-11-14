@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,7 +17,6 @@
 package org.springframework.web.servlet.mvc.condition;
 
 import jakarta.servlet.http.HttpServletRequest;
-import org.assertj.core.api.StringAssert;
 import org.junit.jupiter.api.Test;
 
 import org.springframework.web.testfixture.servlet.MockHttpServletRequest;
@@ -25,6 +24,7 @@ import org.springframework.web.util.ServletRequestPathUtils;
 import org.springframework.web.util.pattern.PathPatternParser;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.InstanceOfAssertFactories.STRING;
 
 /**
  * Tests for {@link PathPatternsRequestCondition}.
@@ -43,7 +43,7 @@ class PathPatternsRequestConditionTests {
 
 	@Test
 	void prependNonEmptyPatternsOnly() {
-		assertThat(createCondition("").getPatternValues(), StringAssert.class).element(0)
+		assertThat(createCondition("").getPatternValues()).first(STRING)
 				.as("Do not prepend empty patterns (SPR-8255)").isEmpty();
 	}
 
@@ -124,29 +124,6 @@ class PathPatternsRequestConditionTests {
 		PathPatternsRequestCondition expected = createCondition("/foo/bar", "/foo/*", "/**");
 
 		assertThat(match).isEqualTo(expected);
-	}
-
-	@Test
-	@SuppressWarnings("deprecation")
-	void matchTrailingSlash() {
-		MockHttpServletRequest request = createRequest("/foo/");
-
-		PathPatternParser patternParser = new PathPatternParser();
-		patternParser.setMatchOptionalTrailingSeparator(true);
-
-		PathPatternsRequestCondition condition = new PathPatternsRequestCondition(patternParser, "/foo");
-		PathPatternsRequestCondition match = condition.getMatchingCondition(request);
-
-		assertThat(match).isNotNull();
-		assertThat(match.getPatternValues()).containsExactly("/foo");
-
-		PathPatternParser strictParser = new PathPatternParser();
-		strictParser.setMatchOptionalTrailingSeparator(false);
-
-		condition = new PathPatternsRequestCondition(strictParser, "/foo");
-		match = condition.getMatchingCondition(request);
-
-		assertThat(match).isNull();
 	}
 
 	@Test

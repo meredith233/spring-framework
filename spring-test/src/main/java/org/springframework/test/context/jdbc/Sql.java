@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -111,10 +111,14 @@ public @interface Sql {
 	 * test class is defined. A path starting with a slash will be treated as an
 	 * <em>absolute</em> classpath resource, for example:
 	 * {@code "/org/example/schema.sql"}. A path which references a
-	 * URL (e.g., a path prefixed with
+	 * URL (for example, a path prefixed with
 	 * {@link org.springframework.util.ResourceUtils#CLASSPATH_URL_PREFIX classpath:},
 	 * {@link org.springframework.util.ResourceUtils#FILE_URL_PREFIX file:},
 	 * {@code http:}, etc.) will be loaded using the specified resource protocol.
+	 * <p>As of Spring Framework 6.2, paths may contain property placeholders
+	 * (<code>${...}</code>) that will be replaced by properties stored in the
+	 * {@link org.springframework.core.env.Environment Environment} of the test's
+	 * {@code ApplicationContext}.
 	 * <h4>Default Script Detection</h4>
 	 * <p>If no SQL scripts or {@link #statements} are specified, an attempt will
 	 * be made to detect a <em>default</em> script depending on where this
@@ -131,6 +135,7 @@ public @interface Sql {
 	 * </ul>
 	 * @see #value
 	 * @see #statements
+	 * @see org.springframework.core.env.Environment#resolveRequiredPlaceholders(String)
 	 */
 	@AliasFor("value")
 	String[] scripts() default {};

@@ -6,7 +6,7 @@
 The next table describes the supported controller method arguments. Reactive types are not supported
 for any arguments.
 
-JDK 8's `java.util.Optional` is supported as a method argument in combination with
+`java.util.Optional` is supported as a method argument in combination with
 annotations that have a `required` attribute (for example, `@RequestParam`, `@RequestHeader`,
 and others) and is equivalent to `required=false`.
 
@@ -30,8 +30,7 @@ and others) and is equivalent to `required=false`.
 
 | `jakarta.servlet.http.PushBuilder`
 | Servlet 4.0 push builder API for programmatic HTTP/2 resource pushes.
-  Note that, per the Servlet specification, the injected `PushBuilder` instance can be null if the client
-  does not support that HTTP/2 feature.
+  Note that this API has been deprecated as of Servlet 6.1.
 
 | `java.security.Principal`
 | Currently authenticated user -- possibly a specific `Principal` implementation class if known.
@@ -135,8 +134,6 @@ and others) and is equivalent to `required=false`.
 | Any other argument
 | If a method argument is not matched to any of the earlier values in this table and it is
   a simple type (as determined by
-	{spring-framework-api}/beans/BeanUtils.html#isSimpleProperty-java.lang.Class-[BeanUtils#isSimpleProperty]),
+	{spring-framework-api}/beans/BeanUtils.html#isSimpleProperty(java.lang.Class)[BeanUtils#isSimpleProperty]),
   it is resolved as a `@RequestParam`. Otherwise, it is resolved as a `@ModelAttribute`.
 |===
-
-

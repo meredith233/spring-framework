@@ -1,0 +1,520 @@
+[[resilience]]
+= Resilience Features
+
+As of 7.0, the core Spring Framework includes common resilience features, in particular
+<<resilience-annotations-retryable>> and <<resilience-annotations-concurrencylimit>>
+annotations for method invocations as well as <<resilience-programmatic-retry,
+programmatic retry support>>.
+
+
+[[resilience-annotations-retryable]]
+== `@Retryable`
+
+{spring-framework-api}/resilience/annotation/Retryable.html[`@Retryable`] is an annotation
+that specifies retry characteristics for an individual method (with the annotation
+declared at the method level), or for all proxy-invoked methods in a given class hierarchy
+(with the annotation declared at the type level).
+
+[source,java,indent=0,subs="verbatim,quotes"]
+----
+@Retryable
+public void sendNotification() {
+    this.jmsClient.destination("notifications").send(...);
+}
+----
+
+By default, the method invocation will be retried for any exception thrown: with at most
+3 retry attempts (`maxRetries = 3`) after an initial failure, and a delay of 1 second
+between attempts. If all attempts have failed and the retry policy has been exhausted,
+the last original exception from the target method will be propagated to the caller.
+
+[NOTE]
+====
+A `@Retryable` method will be invoked at least once and retried at most `maxRetries`
+times, where `maxRetries` is the maximum number of retry attempts. Specifically,
+`total attempts = 1 initial attempt + maxRetries attempts`.
+
+For example, if `maxRetries` is set to `4`, the `@Retryable` method will be invoked at
+least once and at most 5 times.
+====
+
+This can be specifically adapted for every method if necessary — for example, by narrowing
+the exceptions to retry via the `includes` and `excludes` attributes. The supplied
+exception types will be matched against an exception thrown by a failed invocation as well
+as nested causes.
+
+[source,java,indent=0,subs="verbatim,quotes"]
+----
+@Retryable(MessageDeliveryException.class)
+public void sendNotification() {
+    this.jmsClient.destination("notifications").send(...);
+}
+----
+
+NOTE: `@Retryable(MessageDeliveryException.class)` is a shortcut for
+`@Retryable(includes{nbsp}={nbsp}MessageDeliveryException.class)`.
+
+[TIP]
+====
+For advanced use cases, you can specify a custom `MethodRetryPredicate` via the
+`predicate` attribute in `@Retryable`, and the predicate will be used to determine whether
+to retry a failed method invocation based on a `Method` and a given `Throwable` – for
+example, by checking the message of the `Throwable`.
+
+Custom predicates can be combined with `includes` and `excludes`; however, custom
+predicates will always be applied after `includes` and `excludes` have been applied.
+====
+
+Or for 4 retry attempts and an exponential back-off strategy with a bit of jitter:
+
+[source,java,indent=0,subs="verbatim,quotes"]
+----
+@Retryable(
+        includes = MessageDeliveryException.class,
+        maxRetries = 4,
+        delay = 100,
+        jitter = 10,
+        multiplier = 2,
+        maxDelay = 1000)
+public void sendNotification() {
+    this.jmsClient.destination("notifications").send(...);
+}
+----
+
+[NOTE]
+====
+When `delay` is `0` combined with a positive `jitter`, the delay never grows
+regardless of any configured `multiplier`, so the full configured `jitter` is
+applied directly as a random delay in the range from `0` to `min(jitter, maxDelay)`.
+====
+
+Last but not least, `@Retryable` also works for reactive methods with a reactive return
+type, decorating the pipeline with Reactor's retry capabilities:
+
+[source,java,indent=0,subs="verbatim,quotes"]
+----
+@Retryable(maxRetries = 4, delay = 100)
+public Mono<Void> sendNotification() {
+    return Mono.from(...); // <1>
+}
+----
+<1> This raw `Mono` will get decorated with a retry spec.
+	
+For details on the various characteristics, see the available annotation attributes in
+{spring-framework-api}/resilience/annotation/Retryable.html[`@Retryable`].
+
+TIP: Several attributes in `@Retryable` have `String` variants that provide property
+placeholder and SpEL support, as an alternative to the specifically typed annotation
+attributes used in the above examples.
+
+[TIP]
+====
+During `@Retryable` processing, Spring publishes a `MethodRetryEvent` for every exception
+coming out of the target method. This can be used to track/log all original exceptions
+whereas the caller of the `@Retryable` method will only ever see the last exception.
+====
+
+
+[[resilience-annotations-retryable-combining]]
+=== Combining `@Retryable` with Other Proxy-Based Features
+
+Spring AOP applies interceptors in a specific order when multiple annotations such as
+`@Retryable`, `@Transactional`, `@Cacheable`, and `@Async` are present on the same method.
+The resulting advice chain determines how retries interact with each feature, and
+understanding that chain is important for using `@Retryable` correctly in combination with
+other annotations.
+
+[[resilience-annotations-retryable-combining-transactional]]
+==== With `@Transactional`
+
+When `@Transactional` and `@Retryable` are used together, the advice chain is:
+
+----
+Retry (OUTER) → Transaction (INNER) → target method
+----
+
+Each retry attempt starts a fresh transaction. If the target method throws, the transaction
+is rolled back and `@Retryable` decides whether to retry. On success, the transaction
+commits. This is usually the desired behavior for transient failures such as database
+deadlocks.
+
+[source,java,indent=0,subs="verbatim,quotes"]
+----
+@Transactional
+@Retryable(TransientDataAccessException.class)
+public void updateRecord() {
+    // Each retry runs in its own transaction
+}
+----
+
+[NOTE]
+====
+Because the retry interceptor is outside the transaction interceptor, the current
+transaction has already been rolled back by the time the retry interceptor receives the
+exception. The retry interceptor sees the same, unwrapped exception that the target
+method threw.
+====
+
+TIP: See xref:data-access/transaction/declarative/annotations.adoc[Using `@Transactional`]
+for general details on declarative transaction management.
+
+[[resilience-annotations-retryable-combining-cacheable]]
+==== With `@Cacheable`
+
+When `@Cacheable` and `@Retryable` are used together, the advice chain is:
+
+----
+Retry (OUTER) → Cache (INNER) → target method
+----
+
+The cache interceptor runs on every attempt. If the cache is populated between attempts
+(for example, by a concurrent request), subsequent retry attempts will return the cached
+value without invoking the target method. On success, the cache is populated as normal.
+
+The same fixed ordering applies to `@CacheEvict` and `@CachePut`, since they share the
+same underlying cache advisor.
+
+[source,java,indent=0,subs="verbatim,quotes"]
+----
+@Cacheable("items")
+@Retryable
+public Item loadItem(String id) {
+    // Retry wraps the cache lookup; each attempt checks the cache first
+}
+----
+
+TIP: See xref:integration/cache/annotations.adoc#cache-annotations-cacheable[The `@Cacheable` Annotation]
+for general details on declarative caching.
+
+[[resilience-annotations-retryable-combining-async]]
+==== With `@Async`
+
+When `@Async` and `@Retryable` are used together, the advice chain is:
+
+----
+Async (OUTER) → Retry (INNER) → target method
+----
+
+The method is submitted to the async executor once, and all retry attempts run on the
+same async thread. The caller receives a `CompletableFuture` or `Future` that completes
+when the last retry attempt finishes (either with a result or a final exception).
+
+[source,java,indent=0,subs="verbatim,quotes"]
+----
+@Async
+@Retryable
+public CompletableFuture<String> fetchData() {
+    // Retries happen on the async thread, not the calling thread
+}
+----
+
+[NOTE]
+====
+Because `@Async` is outermost, the calling thread is never blocked by retry delays.
+All retry attempts, including any configured delay between them, happen on the async
+executor thread.
+====
+
+TIP: See xref:integration/scheduling.adoc#scheduling-annotation-support-async[The `@Async` annotation]
+for general details on asynchronous method execution.
+
+[[resilience-annotations-retryable-combining-order]]
+==== Adjusting Advice Order
+
+The `@Async` ordering described above reflects the relative `order` of the
+`RetryAnnotationBeanPostProcessor` (registered by `@EnableResilientMethods`) and the
+`AsyncAnnotationBeanPostProcessor` (registered by `@EnableAsync`). Both are plain
+`Ordered` bean post-processors, so you can change their relative ordering by setting the
+`order` attribute on `@EnableResilientMethods` and/or `@EnableAsync`.
+
+[source,java,indent=0,subs="verbatim,quotes"]
+----
+@Configuration
+@EnableResilientMethods(order = Ordered.LOWEST_PRECEDENCE) // <1>
+@EnableAsync(order = Ordered.LOWEST_PRECEDENCE - 1) // <2>
+class AppConfig {
+}
+----
+<1> Raises the retry post-processor's order so that it runs after the async
+post-processor.
+<2> Lowers the async post-processor's order so that it runs before the retry
+post-processor. As a result, retry becomes the outermost advice and async the
+innermost, reversing the default order.
+
+[NOTE]
+====
+With the reversed order shown above, exceptions thrown during asynchronous execution are
+not retried: the retry interceptor only sees the `Future` handle, which is returned
+immediately, rather than the outcome of the asynchronous invocation. Such an arrangement
+only retries synchronous submission failures (for example, a rejected task submission)
+and is rarely desirable in practice.
+====
+
+[NOTE]
+====
+This technique does not apply to `@Transactional` or `@Cacheable`. Their advisors are
+registered through Spring's shared `InfrastructureAdvisorAutoProxyCreator`, whose own
+post-processor `order` is fixed at `Ordered.HIGHEST_PRECEDENCE` and is unaffected by the
+`order` attribute on `@EnableTransactionManagement` or `@EnableCaching` (that attribute
+only affects ordering relative to other advisors on the same proxy). As a result, retry
+advice is always applied outside `@Transactional` and `@Cacheable`, regardless of the
+`order` configured on `@EnableResilientMethods`.
+====
+
+
+[[resilience-annotations-concurrencylimit]]
+== `@ConcurrencyLimit`
+
+{spring-framework-api}/resilience/annotation/ConcurrencyLimit.html[`@ConcurrencyLimit`] is
+an annotation that specifies a concurrency limit for an individual method (with the
+annotation declared at the method level), or for all proxy-invoked methods in a given
+class hierarchy (with the annotation declared at the type level).
+
+[source,java,indent=0,subs="verbatim,quotes"]
+----
+@ConcurrencyLimit(10)
+public void sendNotification() {
+    this.jmsClient.destination("notifications").send(...);
+}
+----
+
+This is meant to protect the target resource from being accessed from too many threads at
+the same time, similar to the effect of a pool size limit for a thread pool or a
+connection pool that blocks access if its limit is reached.
+
+You may optionally set the limit to `1`, effectively locking access to the target bean
+instance:
+
+[source,java,indent=0,subs="verbatim,quotes"]
+----
+@ConcurrencyLimit(1)
+public void sendNotification() {
+    this.jmsClient.destination("notifications").send(...);
+}
+----
+	
+Such limiting is particularly useful with Virtual Threads where there is generally no
+thread pool limit in place. For asynchronous tasks, this can be constrained on
+{spring-framework-api}/core/task/SimpleAsyncTaskExecutor.html[`SimpleAsyncTaskExecutor`].
+For synchronous invocations, this annotation provides equivalent behavior through
+{spring-framework-api}/aop/interceptor/ConcurrencyThrottleInterceptor.html[`ConcurrencyThrottleInterceptor`]
+which has been available since Spring Framework 1.0 for programmatic use with the AOP
+framework.
+
+TIP: `@ConcurrencyLimit` also has a `limitString` attribute that provides property
+placeholder and SpEL support, as an alternative to the `int` based examples above.
+
+
+[[resilience-annotations-configuration]]
+== Enabling Resilient Methods
+
+Like many of Spring's core annotation-based features, `@Retryable` and `@ConcurrencyLimit`
+are designed as metadata that you can choose to honor or ignore. The most convenient way
+to enable processing of the resilience annotations is to declare
+{spring-framework-api}/resilience/annotation/EnableResilientMethods.html[`@EnableResilientMethods`]
+on a corresponding `@Configuration` class.
+
+Alternatively, these annotations can be individually enabled by defining a
+`RetryAnnotationBeanPostProcessor` or a `ConcurrencyLimitBeanPostProcessor` bean in the
+context.
+
+
+[[resilience-programmatic-retry]]
+== Programmatic Retry Support
+
+In contrast to <<resilience-annotations-retryable>> which provides a declarative approach
+for specifying retry semantics for methods within beans registered in the
+`ApplicationContext`,
+{spring-framework-api}/core/retry/RetryTemplate.html[`RetryTemplate`] provides a
+programmatic API for retrying arbitrary blocks of code.
+
+Specifically, a `RetryTemplate` executes and potentially retries a
+{spring-framework-api}/core/retry/Retryable.html[`Retryable`] operation based on a
+configured {spring-framework-api}/core/retry/RetryPolicy.html[`RetryPolicy`].
+
+[source,java,indent=0,subs="verbatim,quotes"]
+----
+    var retryTemplate = new RetryTemplate(); // <1>
+
+    retryTemplate.invoke(
+            () -> jmsClient.destination("notifications").send(...));
+----
+<1> Implicitly uses `RetryPolicy.withDefaults()`.
+
+By default, a retryable operation will be retried for any exception thrown: with at most
+3 retry attempts (`maxRetries = 3`) after an initial failure, and a delay of 1 second
+between attempts.
+
+[NOTE]
+====
+A retryable operation will be executed at least once and retried at most `maxRetries`
+times, where `maxRetries` is the maximum number of retry attempts. Specifically,
+`total attempts = 1 initial attempt + maxRetries attempts`.
+
+For example, if `maxRetries` is set to `4`, the retryable operation will be invoked at
+least once and at most 5 times.
+====
+
+If you only need to customize the number of retry attempts, you can use the
+`RetryPolicy.withMaxRetries()` factory method as demonstrated below.
+
+[source,java,indent=0,subs="verbatim,quotes"]
+----
+    var retryTemplate = new RetryTemplate(RetryPolicy.withMaxRetries(4)); // <1>
+
+    retryTemplate.invoke(
+            () -> jmsClient.destination("notifications").send(...));
+----
+<1> Explicitly uses `RetryPolicy.withMaxRetries(4)`.
+
+If you need to narrow the types of exceptions to retry, that can be achieved via the
+`includes()` and `excludes()` builder methods. The supplied exception types will be
+matched against an exception thrown by a failed operation as well as nested causes.
+
+[source,java,indent=0,subs="verbatim,quotes"]
+----
+    var retryPolicy = RetryPolicy.builder()
+            .includes(MessageDeliveryException.class) // <1>
+            .excludes(...) // <2>
+            .build();
+
+    var retryTemplate = new RetryTemplate(retryPolicy);
+
+    retryTemplate.invoke(
+            () -> jmsClient.destination("notifications").send(...));
+----
+<1> Specify one or more exception types to include.
+<2> Specify one or more exception types to exclude.
+
+[TIP]
+====
+For advanced use cases, you can specify a custom `Predicate<Throwable>` via the
+`predicate()` method in the `RetryPolicy.Builder`, and the predicate will be used to
+determine whether to retry a failed operation based on a given `Throwable` – for example,
+by checking the message of the `Throwable`.
+
+Custom predicates can be combined with `includes` and `excludes`; however, custom
+predicates will always be applied after `includes` and `excludes` have been applied.
+====
+
+The following example demonstrates how to configure a `RetryPolicy` with 4 retry attempts
+and an exponential back-off strategy with a bit of jitter.
+
+[source,java,indent=0,subs="verbatim,quotes"]
+----
+    var retryPolicy = RetryPolicy.builder()
+            .includes(MessageDeliveryException.class)
+            .maxRetries(4)
+            .delay(Duration.ofMillis(100))
+            .jitter(Duration.ofMillis(10))
+            .multiplier(2)
+            .maxDelay(Duration.ofSeconds(1))
+            .build();
+
+    var retryTemplate = new RetryTemplate(retryPolicy);
+
+    retryTemplate.invoke(
+            () -> jmsClient.destination("notifications").send(...));
+----
+
+[NOTE]
+====
+When `delay` is zero combined with a positive `jitter`, the delay never grows
+regardless of any configured `multiplier`, so the full configured `jitter` is
+applied directly as a random delay in the range from zero to `min(jitter, maxDelay)`.
+====
+
+[TIP]
+====
+Although the factory methods and builder API for `RetryPolicy` cover most common
+configuration scenarios, you can implement a custom `RetryPolicy` for complete control
+over the types of exceptions that should trigger a retry as well as the
+{spring-framework-api}/util/backoff/BackOff.html[`BackOff`] strategy to use. Note that
+you can also configure a customized `BackOff` strategy via the `backOff()` method in
+the `RetryPolicy.Builder`.
+====
+
+Note that the examples above apply a pattern similar to `@Retryable` method invocations
+where the last original exception will be propagated to the caller, using the `invoke`
+variants on `RetryTemplate` which are available with and without a return value.
+The callback may throw unchecked exceptions, the last one of which is exposed for
+direct handling on the caller side:
+
+[source,java,indent=0,subs="verbatim,quotes"]
+----
+    try {
+        retryTemplate.invoke(
+                () -> jmsClient.destination("notifications").send(...));
+    }
+    catch (MessageDeliveryException ex) {
+        // coming out of the original JmsClient send method
+    }
+----
+
+[source,java,indent=0,subs="verbatim,quotes"]
+----
+    try {
+        var result = retryTemplate.invoke(() -> {
+            jmsClient.destination("notifications").send(...);
+            return "result";
+        });
+    }
+    catch (MessageDeliveryException ex) {
+        // coming out of the original JmsClient send method
+    }
+----
+
+`RetryTemplate` instances are very light and can be created on the fly,
+potentially with a specific retry policy to use for a given invocation:
+
+[source,java,indent=0,subs="verbatim,quotes"]
+----
+    try {
+        new RetryTemplate(RetryPolicy.withMaxRetries(4)).invoke(
+                () -> jmsClient.destination("notifications").send(...));
+    }
+    catch (MessageDeliveryException ex) {
+        // coming out of the original JmsClient send method
+    }
+----
+
+For deeper interaction, you may use RetryTemplate's `execute` method. The caller will
+have to handle the checked `RetryException` thrown by `RetryTemplate`, exposing the
+outcome of all attempts:
+
+[source,java,indent=0,subs="verbatim,quotes"]
+----
+    try {
+        var result = retryTemplate.execute(() -> {
+            jmsClient.destination("notifications").send(...);
+            return "result";
+        });
+    }
+    catch (RetryException ex) {
+        // ex.getExceptions() / ex.getLastException() ...
+    }
+----
+
+A {spring-framework-api}/core/retry/RetryListener.html[`RetryListener`] can be registered
+with a `RetryTemplate` to react to key retry steps (before or after a retry attempt etc.)
+or simply to every invocation attempt, being able to track all exceptions coming out of
+the callback and all retry outcomes (exhaustion, interruption, timeout). This is
+particularly useful when using `invoke` where no retry state other than the last
+original exception is exposed otherwise:
+
+[source,java,indent=0,subs="verbatim,quotes"]
+----
+    var retryTemplate = new RetryTemplate();
+    retryTemplate.setRetryListener(new RetryListener() {
+        @Override
+        public void onRetryableExecution(RetryPolicy retryPolicy, Retryable<?> retryable, RetryState retryState) {
+            ...
+        }
+    });
+
+    retryTemplate.invoke(
+            () -> jmsClient.destination("notifications").send(...));
+----
+
+You can also compose multiple listeners via a
+{spring-framework-api}/core/retry/support/CompositeRetryListener.html[`CompositeRetryListener`].

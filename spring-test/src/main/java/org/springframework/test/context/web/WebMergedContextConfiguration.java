@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2023 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,12 +19,13 @@ package org.springframework.test.context.web;
 import java.util.List;
 import java.util.Set;
 
+import org.jspecify.annotations.Nullable;
+
 import org.springframework.context.ApplicationContextInitializer;
 import org.springframework.core.io.support.PropertySourceDescriptor;
 import org.springframework.core.style.DefaultToStringStyler;
 import org.springframework.core.style.SimpleValueStyler;
 import org.springframework.core.style.ToStringCreator;
-import org.springframework.lang.Nullable;
 import org.springframework.test.context.CacheAwareContextLoaderDelegate;
 import org.springframework.test.context.ContextCustomizer;
 import org.springframework.test.context.ContextLoader;
@@ -86,8 +87,8 @@ public class WebMergedContextConfiguration extends MergedContextConfiguration {
 	 * If a {@code null} value is supplied for the
 	 * {@code contextInitializerClasses} an empty set will be stored instead.
 	 * If an <em>empty</em> value is supplied for the {@code resourceBasePath}
-	 * an empty string will be used. Furthermore, active profiles will be sorted,
-	 * and duplicate profiles will be removed.
+	 * an empty string will be used. Furthermore, duplicate active profiles
+	 * will be removed while preserving registration order.
 	 * @param testClass the test class for which the configuration was merged
 	 * @param locations the merged resource locations
 	 * @param classes the merged annotated classes
@@ -105,9 +106,9 @@ public class WebMergedContextConfiguration extends MergedContextConfiguration {
 	 * {@link #WebMergedContextConfiguration(Class, String[], Class[], Set, String[], List, String[], Set, String, ContextLoader, CacheAwareContextLoaderDelegate, MergedContextConfiguration)}
 	 */
 	@Deprecated(since = "6.1")
-	public WebMergedContextConfiguration(Class<?> testClass, @Nullable String[] locations, @Nullable Class<?>[] classes,
+	public WebMergedContextConfiguration(Class<?> testClass, String @Nullable [] locations, Class<?> @Nullable [] classes,
 			@Nullable Set<Class<? extends ApplicationContextInitializer<?>>> contextInitializerClasses,
-			@Nullable String[] activeProfiles, @Nullable String[] propertySourceLocations, @Nullable String[] propertySourceProperties,
+			String @Nullable [] activeProfiles, String @Nullable [] propertySourceLocations, String @Nullable [] propertySourceProperties,
 			String resourceBasePath, ContextLoader contextLoader,
 			CacheAwareContextLoaderDelegate cacheAwareContextLoaderDelegate, @Nullable MergedContextConfiguration parent) {
 
@@ -124,8 +125,8 @@ public class WebMergedContextConfiguration extends MergedContextConfiguration {
 	 * If a {@code null} value is supplied for {@code contextInitializerClasses}
 	 * or {@code contextCustomizers}, an empty set will be stored instead.
 	 * If an <em>empty</em> value is supplied for the {@code resourceBasePath}
-	 * an empty string will be used. Furthermore, active profiles will be sorted,
-	 * and duplicate profiles will be removed.
+	 * an empty string will be used. Furthermore, duplicate active profiles
+	 * will be removed while preserving registration order.
 	 * @param testClass the test class for which the configuration was merged
 	 * @param locations the merged context resource locations
 	 * @param classes the merged annotated classes
@@ -144,9 +145,9 @@ public class WebMergedContextConfiguration extends MergedContextConfiguration {
 	 * {@link #WebMergedContextConfiguration(Class, String[], Class[], Set, String[], List, String[], Set, String, ContextLoader, CacheAwareContextLoaderDelegate, MergedContextConfiguration)}
 	 */
 	@Deprecated(since = "6.1")
-	public WebMergedContextConfiguration(Class<?> testClass, @Nullable String[] locations, @Nullable Class<?>[] classes,
+	public WebMergedContextConfiguration(Class<?> testClass, String @Nullable [] locations, Class<?> @Nullable [] classes,
 			@Nullable Set<Class<? extends ApplicationContextInitializer<?>>> contextInitializerClasses,
-			@Nullable String[] activeProfiles, @Nullable String[] propertySourceLocations, @Nullable String[] propertySourceProperties,
+			String @Nullable [] activeProfiles, String @Nullable [] propertySourceLocations, String @Nullable [] propertySourceProperties,
 			@Nullable Set<ContextCustomizer> contextCustomizers, String resourceBasePath, ContextLoader contextLoader,
 			CacheAwareContextLoaderDelegate cacheAwareContextLoaderDelegate, @Nullable MergedContextConfiguration parent) {
 
@@ -163,8 +164,8 @@ public class WebMergedContextConfiguration extends MergedContextConfiguration {
 	 * {@code activeProfiles}, or {@code propertySourceProperties} an empty array
 	 * will be stored instead. If a {@code null} value is supplied for
 	 * {@code contextInitializerClasses} or {@code contextCustomizers}, an empty
-	 * set will be stored instead. Furthermore, active profiles will be sorted,
-	 * and duplicate profiles will be removed.
+	 * set will be stored instead. Furthermore, duplicate active profiles
+	 * will be removed while preserving registration order.
 	 * @param testClass the test class for which the configuration was merged
 	 * @param locations the merged context resource locations
 	 * @param classes the merged annotated classes
@@ -180,10 +181,10 @@ public class WebMergedContextConfiguration extends MergedContextConfiguration {
 	 * @param parent the parent configuration or {@code null} if there is no parent
 	 * @since 6.1
 	 */
-	public WebMergedContextConfiguration(Class<?> testClass, @Nullable String[] locations, @Nullable Class<?>[] classes,
+	public WebMergedContextConfiguration(Class<?> testClass, String @Nullable [] locations, Class<?> @Nullable [] classes,
 			@Nullable Set<Class<? extends ApplicationContextInitializer<?>>> contextInitializerClasses,
-			@Nullable String[] activeProfiles,
-			List<PropertySourceDescriptor> propertySourceDescriptors, @Nullable String[] propertySourceProperties,
+			String @Nullable [] activeProfiles,
+			List<PropertySourceDescriptor> propertySourceDescriptors, String @Nullable [] propertySourceProperties,
 			@Nullable Set<ContextCustomizer> contextCustomizers, String resourceBasePath, ContextLoader contextLoader,
 			CacheAwareContextLoaderDelegate cacheAwareContextLoaderDelegate, @Nullable MergedContextConfiguration parent) {
 

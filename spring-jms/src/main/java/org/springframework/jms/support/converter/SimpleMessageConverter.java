@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2023 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -28,6 +28,7 @@ import jakarta.jms.Message;
 import jakarta.jms.ObjectMessage;
 import jakarta.jms.Session;
 import jakarta.jms.TextMessage;
+import org.jspecify.annotations.Nullable;
 
 import org.springframework.util.ObjectUtils;
 
@@ -40,6 +41,10 @@ import org.springframework.util.ObjectUtils;
  * <p>Converts a String to a {@link jakarta.jms.TextMessage}, a byte array to a
  * {@link jakarta.jms.BytesMessage}, a Map to a {@link jakarta.jms.MapMessage}, and
  * a Serializable object to a {@link jakarta.jms.ObjectMessage} (or vice versa).
+ *
+ * <p><b>Note that this converter must only be used against trusted broker setups,
+ * with trusted packages for {@code ObjectMessage} deserialization to be configured
+ * at the broker level (for example: in the ActiveMQ setup) if necessary.</b>
  *
  * @author Juergen Hoeller
  * @author Sam Brannen
@@ -87,13 +92,15 @@ public class SimpleMessageConverter implements MessageConverter {
 	 * ByteMessage back to a byte array, a MapMessage back to a Map,
 	 * and an ObjectMessage back to a Serializable object. Returns
 	 * the plain Message object in case of an unknown message type.
+	 * <p>Note that a {@code TextMessage} or {@code ObjectMessage} whose body was
+	 * never set is converted to {@code null}, per the JMS specification.
 	 * @see #extractStringFromMessage
 	 * @see #extractByteArrayFromMessage
 	 * @see #extractMapFromMessage
 	 * @see #extractSerializableFromMessage
 	 */
 	@Override
-	public Object fromMessage(Message message) throws JMSException, MessageConversionException {
+	public @Nullable Object fromMessage(Message message) throws JMSException, MessageConversionException {
 		if (message instanceof TextMessage textMessage) {
 			return extractStringFromMessage(textMessage);
 		}
@@ -175,10 +182,10 @@ public class SimpleMessageConverter implements MessageConverter {
 	/**
 	 * Extract a String from the given TextMessage.
 	 * @param message the message to convert
-	 * @return the resulting String
+	 * @return the resulting String, or {@code null} if the message body was never set
 	 * @throws JMSException if thrown by JMS methods
 	 */
-	protected String extractStringFromMessage(TextMessage message) throws JMSException {
+	protected @Nullable String extractStringFromMessage(TextMessage message) throws JMSException {
 		return message.getText();
 	}
 
@@ -214,10 +221,11 @@ public class SimpleMessageConverter implements MessageConverter {
 	/**
 	 * Extract a Serializable object from the given {@link ObjectMessage}.
 	 * @param message the message to convert
-	 * @return the resulting Serializable object
+	 * @return the resulting Serializable object, or {@code null} if the message body
+	 * was never set
 	 * @throws JMSException if thrown by JMS methods
 	 */
-	protected Serializable extractSerializableFromMessage(ObjectMessage message) throws JMSException {
+	protected @Nullable Serializable extractSerializableFromMessage(ObjectMessage message) throws JMSException {
 		return message.getObject();
 	}
 

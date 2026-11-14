@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -102,10 +102,19 @@ class WebSocketMessageBrokerConfigurationSupportTests {
 		webSocketHandler.afterConnectionEstablished(session);
 
 		webSocketHandler.handleMessage(session,
+				StompTextMessageBuilder.create(StompCommand.CONNECT).headers("destination:/foo").build());
+
+		webSocketHandler.handleMessage(session,
 				StompTextMessageBuilder.create(StompCommand.SEND).headers("destination:/foo").build());
 
 		Message<?> message = channel.messages.get(0);
 		StompHeaderAccessor accessor = StompHeaderAccessor.getAccessor(message, StompHeaderAccessor.class);
+		assertThat(accessor).isNotNull();
+		assertThat(accessor.isMutable()).isFalse();
+		assertThat(accessor.getMessageType()).isEqualTo(SimpMessageType.CONNECT);
+
+		message = channel.messages.get(1);
+		accessor = StompHeaderAccessor.getAccessor(message, StompHeaderAccessor.class);
 		assertThat(accessor).isNotNull();
 		assertThat(accessor.isMutable()).isFalse();
 		assertThat(accessor.getMessageType()).isEqualTo(SimpMessageType.MESSAGE);
@@ -212,10 +221,18 @@ class WebSocketMessageBrokerConfigurationSupportTests {
 	}
 
 	@Test
-	void lifecyclePhase() {
-		ApplicationContext context = createContext(LifecyclePhaseConfig.class);
+	void lifecyclePhaseDefault() {
+		ApplicationContext context = createContext(TestChannelConfig.class, TestConfigurer.class);
+		assertPhase(context, 0);
+	}
 
-		int phase = 99;
+	@Test
+	void lifecyclePhaseExplicitlySet() {
+		ApplicationContext context = createContext(LifecyclePhaseConfig.class);
+		assertPhase(context, 99);
+	}
+
+	private static void assertPhase(ApplicationContext context, int phase) {
 		Consumer<String> executorTester = beanName ->
 				assertThat(context.getBean(beanName, ThreadPoolTaskExecutor.class).getPhase()).isEqualTo(phase);
 

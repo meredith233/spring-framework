@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,13 +22,14 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.TimeZone;
 
+import org.jspecify.annotations.Nullable;
+
 import org.springframework.context.MessageSource;
 import org.springframework.context.MessageSourceResolvable;
 import org.springframework.context.NoSuchMessageException;
 import org.springframework.context.i18n.LocaleContext;
 import org.springframework.context.i18n.TimeZoneAwareLocaleContext;
 import org.springframework.http.server.reactive.ServerHttpRequest;
-import org.springframework.lang.Nullable;
 import org.springframework.util.Assert;
 import org.springframework.util.StringUtils;
 import org.springframework.validation.BindException;
@@ -65,14 +66,11 @@ public class RequestContext {
 
 	private TimeZone timeZone;
 
-	@Nullable
-	private Boolean defaultHtmlEscape;
+	private @Nullable Boolean defaultHtmlEscape;
 
-	@Nullable
-	private Map<String, Errors> errorsMap;
+	private @Nullable Map<String, Errors> errorsMap;
 
-	@Nullable
-	private final RequestDataValueProcessor dataValueProcessor;
+	private final @Nullable RequestDataValueProcessor dataValueProcessor;
 
 
 	public RequestContext(ServerWebExchange exchange, Map<String, Object> model, MessageSource messageSource) {
@@ -96,7 +94,7 @@ public class RequestContext {
 				tzaLocaleContext.getTimeZone() : null);
 		this.timeZone = (timeZone != null ? timeZone : TimeZone.getDefault());
 
-		this.defaultHtmlEscape = null;  // TODO
+		this.defaultHtmlEscape = exchange.getAttribute(ServerWebExchange.HTML_ESCAPE_ATTRIBUTE);
 		this.dataValueProcessor = dataValueProcessor;
 	}
 
@@ -114,9 +112,8 @@ public class RequestContext {
 
 	/**
 	 * Return the model Map that this RequestContext encapsulates, if any.
-	 * @return the populated model Map, or {@code null} if none available
+	 * @return the populated model Map
 	 */
-	@Nullable
 	public Map<String, Object> getModel() {
 		return this.model;
 	}
@@ -153,7 +150,6 @@ public class RequestContext {
 	/**
 	 * (De)activate default HTML escaping for messages and errors, for the scope
 	 * of this RequestContext.
-	 * <p>TODO: currently no application-wide setting ...
 	 */
 	public void setDefaultHtmlEscape(boolean defaultHtmlEscape) {
 		this.defaultHtmlEscape = defaultHtmlEscape;
@@ -168,12 +164,12 @@ public class RequestContext {
 	}
 
 	/**
-	 * Return the default HTML escape setting, differentiating between no default
-	 * specified and an explicit value.
-	 * @return whether default HTML escaping is enabled (null = no explicit default)
-	 */
-	@Nullable
-	public Boolean getDefaultHtmlEscape() {
+ 	* Return the default HTML escape setting, differentiating between no default
+ 	* specified and an explicit value.
+ 	* @return whether default HTML escaping is enabled (null = no explicit default
+ 	* specified at the handler level or the request context level)
+ 	*/
+	public @Nullable Boolean getDefaultHtmlEscape() {
 		return this.defaultHtmlEscape;
 	}
 
@@ -181,8 +177,7 @@ public class RequestContext {
 	 * Return the {@link RequestDataValueProcessor} instance to apply to in form
 	 * tag libraries and to redirect URLs.
 	 */
-	@Nullable
-	public RequestDataValueProcessor getRequestDataValueProcessor() {
+	public @Nullable RequestDataValueProcessor getRequestDataValueProcessor() {
 		return this.dataValueProcessor;
 	}
 
@@ -256,7 +251,7 @@ public class RequestContext {
 	 * @param defaultMessage the String to return if the lookup fails
 	 * @return the message
 	 */
-	public String getMessage(String code, @Nullable Object[] args, String defaultMessage) {
+	public String getMessage(String code, Object @Nullable [] args, String defaultMessage) {
 		return getMessage(code, args, defaultMessage, isDefaultHtmlEscape());
 	}
 
@@ -279,7 +274,7 @@ public class RequestContext {
 	 * @param htmlEscape if the message should be HTML-escaped
 	 * @return the message
 	 */
-	public String getMessage(String code, @Nullable Object[] args, String defaultMessage, boolean htmlEscape) {
+	public String getMessage(String code, Object @Nullable [] args, String defaultMessage, boolean htmlEscape) {
 		String msg = this.messageSource.getMessage(code, args, defaultMessage, this.locale);
 		if (msg == null) {
 			return "";
@@ -304,7 +299,7 @@ public class RequestContext {
 	 * @return the message
 	 * @throws org.springframework.context.NoSuchMessageException if not found
 	 */
-	public String getMessage(String code, @Nullable Object[] args) throws NoSuchMessageException {
+	public String getMessage(String code, Object @Nullable [] args) throws NoSuchMessageException {
 		return getMessage(code, args, isDefaultHtmlEscape());
 	}
 
@@ -327,13 +322,13 @@ public class RequestContext {
 	 * @return the message
 	 * @throws org.springframework.context.NoSuchMessageException if not found
 	 */
-	public String getMessage(String code, @Nullable Object[] args, boolean htmlEscape) throws NoSuchMessageException {
+	public String getMessage(String code, Object @Nullable [] args, boolean htmlEscape) throws NoSuchMessageException {
 		String msg = this.messageSource.getMessage(code, args, this.locale);
 		return (htmlEscape ? HtmlUtils.htmlEscape(msg) : msg);
 	}
 
 	/**
-	 * Retrieve the given MessageSourceResolvable (e.g. an ObjectError instance), using the "defaultHtmlEscape" setting.
+	 * Retrieve the given MessageSourceResolvable (for example, an ObjectError instance), using the "defaultHtmlEscape" setting.
 	 * @param resolvable the MessageSourceResolvable
 	 * @return the message
 	 * @throws org.springframework.context.NoSuchMessageException if not found
@@ -343,7 +338,7 @@ public class RequestContext {
 	}
 
 	/**
-	 * Retrieve the given MessageSourceResolvable (e.g. an ObjectError instance).
+	 * Retrieve the given MessageSourceResolvable (for example, an ObjectError instance).
 	 * @param resolvable the MessageSourceResolvable
 	 * @param htmlEscape if the message should be HTML-escaped
 	 * @return the message
@@ -360,8 +355,7 @@ public class RequestContext {
 	 * @param name the name of the bind object
 	 * @return the Errors instance, or {@code null} if not found
 	 */
-	@Nullable
-	public Errors getErrors(String name) {
+	public @Nullable Errors getErrors(String name) {
 		return getErrors(name, isDefaultHtmlEscape());
 	}
 
@@ -371,8 +365,7 @@ public class RequestContext {
 	 * @param htmlEscape create an Errors instance with automatic HTML escaping?
 	 * @return the Errors instance, or {@code null} if not found
 	 */
-	@Nullable
-	public Errors getErrors(String name, boolean htmlEscape) {
+	public @Nullable Errors getErrors(String name, boolean htmlEscape) {
 		if (this.errorsMap == null) {
 			this.errorsMap = new HashMap<>();
 		}
@@ -407,8 +400,7 @@ public class RequestContext {
 	 * @return the model object
 	 */
 	@SuppressWarnings("unchecked")
-	@Nullable
-	protected <T> T getModelObject(String modelName) {
+	protected <T> @Nullable T getModelObject(String modelName) {
 		T modelObject = (T) this.model.get(modelName);
 		if (modelObject == null) {
 			modelObject = this.exchange.getAttribute(modelName);
@@ -420,7 +412,7 @@ public class RequestContext {
 	 * Create a BindStatus for the given bind object using the
 	 * "defaultHtmlEscape" setting.
 	 * @param path the bean and property path for which values and errors will
-	 * be resolved (e.g. "person.age")
+	 * be resolved (for example, "person.age")
 	 * @return the new BindStatus instance
 	 * @throws IllegalStateException if no corresponding Errors object found
 	 */
@@ -432,7 +424,7 @@ public class RequestContext {
 	 * Create a BindStatus for the given bind object, using the
 	 * "defaultHtmlEscape" setting.
 	 * @param path the bean and property path for which values and errors will
-	 * be resolved (e.g. "person.age")
+	 * be resolved (for example, "person.age")
 	 * @param htmlEscape create a BindStatus with automatic HTML escaping?
 	 * @return the new BindStatus instance
 	 * @throws IllegalStateException if no corresponding Errors object found

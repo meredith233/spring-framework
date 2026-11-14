@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2017 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -24,7 +24,8 @@ import java.util.List;
 import java.util.Set;
 import java.util.StringJoiner;
 
-import org.springframework.lang.Nullable;
+import org.jspecify.annotations.Nullable;
+
 import org.springframework.util.StringUtils;
 
 /**
@@ -74,6 +75,8 @@ import org.springframework.util.StringUtils;
  * <li>6. try "typeMismatch.java.lang.String"
  * <li>7. try "typeMismatch"
  * </ul>
+ * <p>Codes for the whole collection are only generated for field names with
+ * at most 8 {@code [key]} segments.
  *
  * <p>By default the {@code errorCode}s will be placed at the beginning of constructed
  * message strings. The {@link #setMessageCodeFormatter(MessageCodeFormatter)
@@ -81,7 +84,7 @@ import org.springframework.util.StringUtils;
  * {@link MessageCodeFormatter format}.
  *
  * <p>In order to group all codes into a specific category within your resource bundles,
- * e.g. "validation.typeMismatch.name" instead of the default "typeMismatch.name",
+ * for example, "validation.typeMismatch.name" instead of the default "typeMismatch.name",
  * consider specifying a {@link #setPrefix prefix} to be applied.
  *
  * @author Juergen Hoeller
@@ -98,6 +101,12 @@ public class DefaultMessageCodesResolver implements MessageCodesResolver, Serial
 	public static final String CODE_SEPARATOR = ".";
 
 	private static final MessageCodeFormatter DEFAULT_FORMATTER = Format.PREFIX_ERROR_CODE;
+
+	/**
+	 * The maximum number of {@code [key]} segments in a field name for which
+	 * {@link #buildFieldList} adds stripped variants.
+	 */
+	private static final int MAX_STRIPPED_KEYS = 8;
 
 
 	private String prefix = "";
@@ -178,9 +187,14 @@ public class DefaultMessageCodesResolver implements MessageCodesResolver, Serial
 	/**
 	 * Add both keyed and non-keyed entries for the supplied {@code field}
 	 * to the supplied field list.
+	 * <p>For field names with more than 8 {@code [key]} segments, only the
+	 * supplied {@code field} itself is added, without any stripped variants.
 	 */
 	protected void buildFieldList(String field, List<String> fieldList) {
 		fieldList.add(field);
+		if (exceedsMaxStrippedKeys(field)) {
+			return;
+		}
 		String plainField = field;
 		int keyIndex = plainField.lastIndexOf('[');
 		while (keyIndex != -1) {
@@ -194,6 +208,24 @@ public class DefaultMessageCodesResolver implements MessageCodesResolver, Serial
 				keyIndex = -1;
 			}
 		}
+	}
+
+	/**
+	 * Determine whether the supplied {@code field} contains more than
+	 * {@link #MAX_STRIPPED_KEYS} opening key brackets.
+	 * <p>Each iteration in {@link #buildFieldList} removes exactly one opening
+	 * bracket, so this is an upper bound on the number of stripped variants.
+	 */
+	private static boolean exceedsMaxStrippedKeys(String field) {
+		int keyCount = 0;
+		int keyIndex = field.indexOf('[');
+		while (keyIndex != -1) {
+			if (++keyCount > MAX_STRIPPED_KEYS) {
+				return true;
+			}
+			keyIndex = field.indexOf('[', keyIndex + 1);
+		}
+		return false;
 	}
 
 	/**
@@ -216,7 +248,7 @@ public class DefaultMessageCodesResolver implements MessageCodesResolver, Serial
 	public enum Format implements MessageCodeFormatter {
 
 		/**
-		 * Prefix the error code at the beginning of the generated message code. e.g.:
+		 * Prefix the error code at the beginning of the generated message code. for example:
 		 * {@code errorCode + "." + object name + "." + field}
 		 */
 		PREFIX_ERROR_CODE {
@@ -227,7 +259,7 @@ public class DefaultMessageCodesResolver implements MessageCodesResolver, Serial
 		},
 
 		/**
-		 * Postfix the error code at the end of the generated message code. e.g.:
+		 * Postfix the error code at the end of the generated message code. for example:
 		 * {@code object name + "." + field + "." + errorCode}
 		 */
 		POSTFIX_ERROR_CODE {
@@ -242,7 +274,6 @@ public class DefaultMessageCodesResolver implements MessageCodesResolver, Serial
 		 * {@link DefaultMessageCodesResolver#CODE_SEPARATOR}, skipping zero-length or
 		 * null elements altogether.
 		 */
-		@SuppressWarnings("NullAway")
 		public static String toDelimitedString(@Nullable String... elements) {
 			StringJoiner rtn = new StringJoiner(CODE_SEPARATOR);
 			for (String element : elements) {

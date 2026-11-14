@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -37,7 +37,7 @@ class MapDataSourceLookupTests {
 
 	@Test
 	@SuppressWarnings({ "unchecked", "rawtypes" })
-	public void getDataSourcesReturnsUnmodifiableMap() {
+	void getDataSourcesReturnsUnmodifiableMap() {
 		MapDataSourceLookup lookup = new MapDataSourceLookup();
 		Map dataSources = lookup.getDataSources();
 
@@ -86,7 +86,7 @@ class MapDataSourceLookupTests {
 
 	@Test
 	@SuppressWarnings({ "unchecked", "rawtypes" })
-	public void getDataSourceWhereSuppliedMapHasNonDataSourceTypeUnderSpecifiedKey() {
+	void getDataSourceWhereSuppliedMapHasNonDataSourceTypeUnderSpecifiedKey() {
 		Map dataSources = new HashMap();
 		dataSources.put(DATA_SOURCE_NAME, new Object());
 		MapDataSourceLookup lookup = new MapDataSourceLookup(dataSources);

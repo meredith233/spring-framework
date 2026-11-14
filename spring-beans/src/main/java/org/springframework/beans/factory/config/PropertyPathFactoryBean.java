@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2023 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,6 +18,7 @@ package org.springframework.beans.factory.config;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.jspecify.annotations.Nullable;
 
 import org.springframework.beans.BeanWrapper;
 import org.springframework.beans.BeansException;
@@ -27,7 +28,6 @@ import org.springframework.beans.factory.BeanFactoryAware;
 import org.springframework.beans.factory.BeanFactoryUtils;
 import org.springframework.beans.factory.BeanNameAware;
 import org.springframework.beans.factory.FactoryBean;
-import org.springframework.lang.Nullable;
 import org.springframework.util.Assert;
 import org.springframework.util.StringUtils;
 
@@ -87,23 +87,17 @@ public class PropertyPathFactoryBean implements FactoryBean<Object>, BeanNameAwa
 
 	private static final Log logger = LogFactory.getLog(PropertyPathFactoryBean.class);
 
-	@Nullable
-	private BeanWrapper targetBeanWrapper;
+	private @Nullable BeanWrapper targetBeanWrapper;
 
-	@Nullable
-	private String targetBeanName;
+	private @Nullable String targetBeanName;
 
-	@Nullable
-	private String propertyPath;
+	private @Nullable String propertyPath;
 
-	@Nullable
-	private Class<?> resultType;
+	private @Nullable Class<?> resultType;
 
-	@Nullable
-	private String beanName;
+	private @Nullable String beanName;
 
-	@Nullable
-	private BeanFactory beanFactory;
+	private @Nullable BeanFactory beanFactory;
 
 
 	/**
@@ -121,7 +115,7 @@ public class PropertyPathFactoryBean implements FactoryBean<Object>, BeanNameAwa
 	 * Specify the name of a target bean to apply the property path to.
 	 * Alternatively, specify a target object directly.
 	 * @param targetBeanName the bean name to be looked up in the
-	 * containing bean factory (e.g. "testBean")
+	 * containing bean factory (for example, "testBean")
 	 * @see #setTargetObject
 	 */
 	public void setTargetBeanName(String targetBeanName) {
@@ -131,7 +125,7 @@ public class PropertyPathFactoryBean implements FactoryBean<Object>, BeanNameAwa
 	/**
 	 * Specify the property path to apply to the target.
 	 * @param propertyPath the property path, potentially nested
-	 * (e.g. "age" or "spouse.age")
+	 * (for example, "age" or "spouse.age")
 	 */
 	public void setPropertyPath(String propertyPath) {
 		this.propertyPath = StringUtils.trimAllWhitespace(propertyPath);
@@ -162,28 +156,29 @@ public class PropertyPathFactoryBean implements FactoryBean<Object>, BeanNameAwa
 
 
 	@Override
-	@SuppressWarnings("NullAway")
 	public void setBeanFactory(BeanFactory beanFactory) {
 		this.beanFactory = beanFactory;
+		String targetBeanName = this.targetBeanName;
 
-		if (this.targetBeanWrapper != null && this.targetBeanName != null) {
+		if (this.targetBeanWrapper != null && targetBeanName != null) {
 			throw new IllegalArgumentException("Specify either 'targetObject' or 'targetBeanName', not both");
 		}
 
-		if (this.targetBeanWrapper == null && this.targetBeanName == null) {
+		if (this.targetBeanWrapper == null && targetBeanName == null) {
 			if (this.propertyPath != null) {
 				throw new IllegalArgumentException(
 						"Specify 'targetObject' or 'targetBeanName' in combination with 'propertyPath'");
 			}
 
 			// No other properties specified: check bean name.
-			int dotIndex = (this.beanName != null ? this.beanName.indexOf('.') : -1);
-			if (dotIndex == -1) {
+			int dotIndex;
+			if (this.beanName == null || (dotIndex = this.beanName.indexOf('.')) <= 0) {
 				throw new IllegalArgumentException(
 						"Neither 'targetObject' nor 'targetBeanName' specified, and PropertyPathFactoryBean " +
 						"bean name '" + this.beanName + "' does not follow 'beanName.property' syntax");
 			}
-			this.targetBeanName = this.beanName.substring(0, dotIndex);
+			targetBeanName = this.beanName.substring(0, dotIndex);
+			this.targetBeanName = targetBeanName;
 			this.propertyPath = this.beanName.substring(dotIndex + 1);
 		}
 
@@ -192,9 +187,10 @@ public class PropertyPathFactoryBean implements FactoryBean<Object>, BeanNameAwa
 			throw new IllegalArgumentException("'propertyPath' is required");
 		}
 
-		if (this.targetBeanWrapper == null && this.beanFactory.isSingleton(this.targetBeanName)) {
+		if (this.targetBeanWrapper == null && StringUtils.hasLength(targetBeanName) &&
+				this.beanFactory.isSingleton(targetBeanName)) {
 			// Eagerly fetch singleton target bean, and determine result type.
-			Object bean = this.beanFactory.getBean(this.targetBeanName);
+			Object bean = this.beanFactory.getBean(targetBeanName);
 			this.targetBeanWrapper = PropertyAccessorFactory.forBeanPropertyAccess(bean);
 			this.resultType = this.targetBeanWrapper.getPropertyType(this.propertyPath);
 		}
@@ -202,8 +198,7 @@ public class PropertyPathFactoryBean implements FactoryBean<Object>, BeanNameAwa
 
 
 	@Override
-	@Nullable
-	public Object getObject() throws BeansException {
+	public @Nullable Object getObject() throws BeansException {
 		BeanWrapper target = this.targetBeanWrapper;
 		if (target != null) {
 			if (logger.isWarnEnabled() && this.targetBeanName != null &&
@@ -225,8 +220,7 @@ public class PropertyPathFactoryBean implements FactoryBean<Object>, BeanNameAwa
 	}
 
 	@Override
-	@Nullable
-	public Class<?> getObjectType() {
+	public @Nullable Class<?> getObjectType() {
 		return this.resultType;
 	}
 

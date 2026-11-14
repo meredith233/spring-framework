@@ -1,0 +1,194 @@
+/*
+ * Copyright 2002-present the original author or authors.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.springframework.aot.generate;
+
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Function;
+
+import org.jspecify.annotations.Nullable;
+
+import org.springframework.javapoet.ClassName;
+import org.springframework.util.Assert;
+import org.springframework.util.ClassUtils;
+import org.springframework.util.StringUtils;
+
+/**
+ * Generator for unique names based on a target {@link ClassName} and a
+ * feature name. Supports generating class names and resource paths.
+ *
+ * <p>This class is stateful, so the same instance should be used for all name
+ * generation.
+ *
+ * @author Phillip Webb
+ * @author Stephane Nicoll
+ * @since 7.1
+ */
+public final class NameGenerator {
+
+	private static final String CLASS_NAME_SEPARATOR = "__";
+
+	private static final String RESOURCE_NAME_SEPARATOR = "-";
+
+	private static final String AOT_FEATURE = "Aot";
+
+	private final ClassName defaultTarget;
+
+	private final String featureNamePrefix;
+
+	private final Map<String, AtomicInteger> sequenceGenerator;
+
+
+	/**
+	 * Create a new instance using the specified {@code defaultTarget} and no
+	 * feature name prefix.
+	 * @param defaultTarget the default target class to use
+	 */
+	public NameGenerator(ClassName defaultTarget) {
+		this(defaultTarget, "");
+	}
+
+	/**
+	 * Create a new instance using the specified {@code defaultTarget} and
+	 * feature name prefix.
+	 * @param defaultTarget the default target class to use
+	 * @param featureNamePrefix the prefix to use to qualify feature names
+	 */
+	public NameGenerator(ClassName defaultTarget, String featureNamePrefix) {
+		this(defaultTarget, featureNamePrefix, new ConcurrentHashMap<>());
+	}
+
+	private NameGenerator(ClassName defaultTarget, String featureNamePrefix,
+			Map<String, AtomicInteger> sequenceGenerator) {
+
+		Assert.notNull(defaultTarget, "'defaultTarget' must not be null");
+		this.defaultTarget = defaultTarget;
+		this.featureNamePrefix = (!StringUtils.hasText(featureNamePrefix) ? "" : featureNamePrefix);
+		this.sequenceGenerator = sequenceGenerator;
+	}
+
+
+	/**
+	 * Create a new {@link NameGenerator} instance for the specified feature name
+	 * prefix, keeping track of all the class names and resource names generated
+	 * by this instance.
+	 * @param featureNamePrefix the feature name prefix to use
+	 * @return a new instance for the specified feature name prefix
+	 */
+	NameGenerator withFeatureNamePrefix(String featureNamePrefix) {
+		return new NameGenerator(this.defaultTarget, featureNamePrefix,
+				this.sequenceGenerator);
+	}
+
+	String getFeatureNamePrefix() {
+		return this.featureNamePrefix;
+	}
+
+
+	/**
+	 * Generate a unique {@link ClassName} based on the specified
+	 * {@code featureName} and {@code target}. If the {@code target} is
+	 * {@code null}, the configured main target of this instance is used.
+	 * <p>The class name is a suffixed version of the target. For instance, a
+	 * {@code com.example.Demo} target with an {@code Initializer} feature name
+	 * leads to a {@code com.example.Demo__Initializer} generated class name.
+	 * The feature name is qualified by the configured feature name prefix,
+	 * if any.
+	 * <p>Generated class names are unique. If such a feature was already
+	 * requested for this target, a counter is used to ensure uniqueness.
+	 * @param featureName the name of the feature that the generated class
+	 * supports
+	 * @param target the class the newly generated class relates to, or
+	 * {@code null} to use the main target
+	 * @return a unique generated class name
+	 */
+	public ClassName generateClassName(String featureName, @Nullable ClassName target) {
+		return generateUniqueName(getRootClassName(featureName, target), uniqueName ->
+				ClassName.get(ClassUtils.getPackageName(uniqueName),
+						ClassUtils.getShortName(uniqueName)));
+	}
+
+	private String getRootClassName(String featureName, @Nullable ClassName target) {
+		Assert.hasLength(featureName, "'featureName' must not be empty");
+		featureName = clean(featureName);
+		ClassName targetToUse = (target != null ? target : this.defaultTarget);
+		String featureNameToUse = this.featureNamePrefix + featureName;
+		return toName(targetToUse).replace("$", "_") + CLASS_NAME_SEPARATOR + StringUtils.capitalize(featureNameToUse);
+	}
+
+	/**
+	 * Generate a unique resource path based on the specified {@code extension},
+	 * {@code featureName} and {@code target}. If the {@code target} is
+	 * {@code null}, the configured main target of this instance is used.
+	 * <p>The resource path is a suffixed version of the target. For instance, a
+	 * {@code com.example.Demo} target with a {@code metadata} feature name
+	 * and a {@code json} extension leads to a
+	 * {@code com/example/Demo-metadata.json} generated resource path.
+	 * The feature name is qualified by the configured feature name prefix,
+	 * if any.
+	 * <p>Generated resource paths are unique. If such a feature was already
+	 * requested for this target, a counter is used to ensure uniqueness.
+	 * @param extension the file extension
+	 * @param featureName the name of the feature that the generated path
+	 * supports
+	 * @param target the class the generated resource relates to, or
+	 * {@code null} to use the main target
+	 * @return a unique absolute path for the resource
+	 */
+	public String generateResourcePath(String extension, String featureName, @Nullable ClassName target) {
+		Assert.hasLength(extension, "'extension' must not be empty");
+		return generateUniqueName(getRootResourceName(featureName, target),
+				uniqueName -> uniqueName + "." + extension);
+	}
+
+	private String getRootResourceName(String featureName, @Nullable ClassName target) {
+		Assert.hasLength(featureName, "'featureName' must not be empty");
+		ClassName targetToUse = (target != null ? target : this.defaultTarget);
+		String featureNameToUse = this.featureNamePrefix +
+				(this.featureNamePrefix.isEmpty() ? "" : RESOURCE_NAME_SEPARATOR) + featureName;
+		return toName(targetToUse).replace("$", "_").replace(".", "/") + RESOURCE_NAME_SEPARATOR + featureNameToUse;
+	}
+
+	private String clean(String name) {
+		StringBuilder clean = new StringBuilder();
+		boolean lastNotLetter = true;
+		for (char ch : name.toCharArray()) {
+			if (!Character.isLetter(ch)) {
+				lastNotLetter = true;
+				continue;
+			}
+			clean.append(lastNotLetter ? Character.toUpperCase(ch) : ch);
+			lastNotLetter = false;
+		}
+		return (!clean.isEmpty()) ? clean.toString() : AOT_FEATURE;
+	}
+
+	private <T> T generateUniqueName(String name, Function<String, T> factory) {
+		int sequence = this.sequenceGenerator.computeIfAbsent(name, key ->
+				new AtomicInteger()).getAndIncrement();
+		if (sequence > 0) {
+			name = name + sequence;
+		}
+		return factory.apply(name);
+	}
+
+	private static String toName(ClassName className) {
+		return GeneratedTypeReference.of(className).getName();
+	}
+
+}

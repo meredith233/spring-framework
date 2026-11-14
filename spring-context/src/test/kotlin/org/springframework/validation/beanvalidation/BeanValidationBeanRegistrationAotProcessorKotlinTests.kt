@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2023 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -36,45 +36,45 @@ import org.springframework.validation.beanvalidation.BeanValidationBeanRegistrat
  */
 class BeanValidationBeanRegistrationAotProcessorKotlinTests {
 
-    private val processor = BeanValidationBeanRegistrationAotProcessor()
+	private val processor = BeanValidationBeanRegistrationAotProcessor()
 
-    private val generationContext: GenerationContext = TestGenerationContext()
+	private val generationContext: GenerationContext = TestGenerationContext()
 
-    @Test
-    fun shouldProcessMethodParameterLevelConstraint() {
-        process(MethodParameterLevelConstraint::class.java)
-        Assertions.assertThat(
-            RuntimeHintsPredicates.reflection().onType(ExistsValidator::class.java)
-                .withMemberCategory(MemberCategory.INVOKE_DECLARED_CONSTRUCTORS)
-        ).accepts(generationContext.runtimeHints)
-    }
+	@Test
+	fun shouldProcessMethodParameterLevelConstraint() {
+		process(MethodParameterLevelConstraint::class.java)
+		Assertions.assertThat(
+			RuntimeHintsPredicates.reflection().onType(ExistsValidator::class.java)
+				.withMemberCategory(MemberCategory.INVOKE_DECLARED_CONSTRUCTORS)
+		).accepts(generationContext.runtimeHints)
+	}
 
-    @Test
-    fun shouldSkipMethodParameterLevelConstraintWihExtension() {
-        process(MethodParameterLevelConstraintWithExtension::class.java)
-        Assertions.assertThat(generationContext.runtimeHints.reflection().typeHints()).isEmpty()
-    }
+	@Test
+	fun shouldSkipMethodParameterLevelConstraintWihExtension() {
+		process(MethodParameterLevelConstraintWithExtension::class.java)
+		Assertions.assertThat(generationContext.runtimeHints.reflection().typeHints()).isEmpty()
+	}
 
-    private fun process(beanClass: Class<*>) {
-        val contribution = createContribution(beanClass)
-        contribution?.applyTo(generationContext, Mockito.mock())
-    }
+	private fun process(beanClass: Class<*>) {
+		val contribution = createContribution(beanClass)
+		contribution?.applyTo(generationContext, Mockito.mock())
+	}
 
-    private fun createContribution(beanClass: Class<*>): BeanRegistrationAotContribution? {
-        val beanFactory = DefaultListableBeanFactory()
-        beanFactory.registerBeanDefinition(beanClass.name, RootBeanDefinition(beanClass))
-        return processor.processAheadOfTime(RegisteredBean.of(beanFactory, beanClass.name))
-    }
+	private fun createContribution(beanClass: Class<*>): BeanRegistrationAotContribution? {
+		val beanFactory = DefaultListableBeanFactory()
+		beanFactory.registerBeanDefinition(beanClass.name, RootBeanDefinition(beanClass))
+		return processor.processAheadOfTime(RegisteredBean.of(beanFactory, beanClass.name))
+	}
 
-    internal class MethodParameterLevelConstraintWithExtension {
+	internal class MethodParameterLevelConstraintWithExtension {
 
-        @Suppress("unused")
-        fun hello(name: @Exists String): String {
-            return name.toHello()
-        }
+		@Suppress("unused")
+		fun hello(name: @Exists String): String {
+			return name.toHello()
+		}
 
-        private fun String.toHello() =
-            "Hello $this"
-    }
+		private fun String.toHello() =
+			"Hello $this"
+	}
 
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2021 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,10 +23,13 @@ import java.sql.Statement;
 
 import javax.sql.DataSource;
 
+import org.jspecify.annotations.Nullable;
+
 import org.springframework.dao.DataAccessException;
 import org.springframework.dao.DataAccessResourceFailureException;
 import org.springframework.jdbc.datasource.DataSourceUtils;
 import org.springframework.jdbc.support.JdbcUtils;
+import org.springframework.util.Assert;
 
 /**
  * Abstract base class for {@link DataFieldMaxValueIncrementer} implementations
@@ -41,7 +44,7 @@ public abstract class AbstractIdentityColumnMaxValueIncrementer extends Abstract
 	private boolean deleteSpecificValues = false;
 
 	/** The current cache of values. */
-	private long[] valueCache;
+	private long @Nullable [] valueCache;
 
 	/** The next id to serve from the value cache. */
 	private int nextValueIndex = -1;
@@ -53,11 +56,9 @@ public abstract class AbstractIdentityColumnMaxValueIncrementer extends Abstract
 	 * @see #setIncrementerName
 	 * @see #setColumnName
 	 */
-	@SuppressWarnings("NullAway")
 	public AbstractIdentityColumnMaxValueIncrementer() {
 	}
 
-	@SuppressWarnings("NullAway")
 	public AbstractIdentityColumnMaxValueIncrementer(DataSource dataSource, String incrementerName, String columnName) {
 		super(dataSource, incrementerName, columnName);
 	}
@@ -90,13 +91,13 @@ public abstract class AbstractIdentityColumnMaxValueIncrementer extends Abstract
 			* are performed on the same connection (otherwise we can't be sure that @@identity
 			* returns the correct value)
 			*/
-			Connection con = DataSourceUtils.getConnection(getDataSource());
+			DataSource dataSource = obtainDataSource();
+			Connection con = DataSourceUtils.getConnection(dataSource);
 			Statement stmt = null;
 			try {
 				stmt = con.createStatement();
-				DataSourceUtils.applyTransactionTimeout(stmt, getDataSource());
-				this.valueCache = new long[getCacheSize()];
-				this.nextValueIndex = 0;
+				DataSourceUtils.applyTransactionTimeout(stmt, dataSource);
+				long[] newValues = new long[getCacheSize()];
 				for (int i = 0; i < getCacheSize(); i++) {
 					stmt.executeUpdate(getIncrementStatement());
 					ResultSet rs = stmt.executeQuery(getIdentityStatement());
@@ -104,22 +105,26 @@ public abstract class AbstractIdentityColumnMaxValueIncrementer extends Abstract
 						if (!rs.next()) {
 							throw new DataAccessResourceFailureException("Identity statement failed after inserting");
 						}
-						this.valueCache[i] = rs.getLong(1);
+						newValues[i] = rs.getLong(1);
 					}
 					finally {
 						JdbcUtils.closeResultSet(rs);
 					}
 				}
-				stmt.executeUpdate(getDeleteStatement(this.valueCache));
+				stmt.executeUpdate(getDeleteStatement(newValues));
+				// Only expose the new values once the entire range has been obtained
+				this.valueCache = newValues;
+				this.nextValueIndex = 0;
 			}
 			catch (SQLException ex) {
 				throw new DataAccessResourceFailureException("Could not increment identity", ex);
 			}
 			finally {
 				JdbcUtils.closeStatement(stmt);
-				DataSourceUtils.releaseConnection(con, getDataSource());
+				DataSourceUtils.releaseConnection(con, dataSource);
 			}
 		}
+		Assert.state(this.valueCache != null, "The cache of values can't be null");
 		return this.valueCache[this.nextValueIndex++];
 	}
 

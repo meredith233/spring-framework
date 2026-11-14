@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -39,7 +39,7 @@ class AspectJPointcutAdvisorTests {
 
 
 	@Test
-	void testSingleton() throws SecurityException, NoSuchMethodException {
+	void singleton() throws SecurityException, NoSuchMethodException {
 		AspectJExpressionPointcut ajexp = new AspectJExpressionPointcut();
 		ajexp.setExpression(CommonExpressions.MATCH_ALL_METHODS);
 
@@ -53,7 +53,7 @@ class AspectJPointcutAdvisorTests {
 	}
 
 	@Test
-	void testPerTarget() throws SecurityException, NoSuchMethodException {
+	void perTarget() throws SecurityException, NoSuchMethodException {
 		AspectJExpressionPointcut ajexp = new AspectJExpressionPointcut();
 		ajexp.setExpression(CommonExpressions.MATCH_ALL_METHODS);
 
@@ -63,8 +63,7 @@ class AspectJPointcutAdvisorTests {
 				1, "someBean");
 
 		assertThat(ajpa.getAspectMetadata().getPerClausePointcut()).isNotSameAs(Pointcut.TRUE);
-		boolean condition = ajpa.getAspectMetadata().getPerClausePointcut() instanceof AspectJExpressionPointcut;
-		assertThat(condition).isTrue();
+		assertThat(ajpa.getAspectMetadata().getPerClausePointcut()).isInstanceOf(AspectJExpressionPointcut.class);
 		assertThat(ajpa.isPerInstance()).isTrue();
 
 		assertThat(ajpa.getAspectMetadata().getPerClausePointcut().getClassFilter().matches(TestBean.class)).isTrue();
@@ -76,13 +75,13 @@ class AspectJPointcutAdvisorTests {
 	}
 
 	@Test
-	void testPerCflowTarget() {
+	void perCflowTarget() {
 		assertThatExceptionOfType(AopConfigException.class).isThrownBy(() ->
 				testIllegalInstantiationModel(AbstractAspectJAdvisorFactoryTests.PerCflowAspect.class));
 	}
 
 	@Test
-	void testPerCflowBelowTarget() {
+	void perCflowBelowTarget() {
 		assertThatExceptionOfType(AopConfigException.class).isThrownBy(() ->
 				testIllegalInstantiationModel(AbstractAspectJAdvisorFactoryTests.PerCflowBelowAspect.class));
 	}

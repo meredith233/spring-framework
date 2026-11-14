@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,7 +17,6 @@
 package org.springframework.beans.factory.xml;
 
 import java.lang.reflect.Proxy;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
@@ -28,6 +27,7 @@ import org.assertj.core.api.InstanceOfAssertFactories;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import org.springframework.beans.factory.config.DependencyDescriptor;
 import org.springframework.beans.factory.config.FieldRetrievingFactoryBean;
 import org.springframework.beans.factory.config.PropertiesFactoryBean;
 import org.springframework.beans.factory.parsing.ComponentDefinition;
@@ -46,7 +46,6 @@ import static org.assertj.core.api.Assertions.assertThat;
  * @author Juergen Hoeller
  * @author Mark Fisher
  */
-@SuppressWarnings("rawtypes")
 class UtilNamespaceHandlerTests {
 
 	private DefaultListableBeanFactory beanFactory;
@@ -55,7 +54,7 @@ class UtilNamespaceHandlerTests {
 
 
 	@BeforeEach
-	void setUp() {
+	void setup() {
 		this.beanFactory = new DefaultListableBeanFactory();
 		XmlBeanDefinitionReader reader = new XmlBeanDefinitionReader(this.beanFactory);
 		reader.setEventListener(this.listener);
@@ -64,19 +63,19 @@ class UtilNamespaceHandlerTests {
 
 
 	@Test
-	void testConstant() {
+	void constant() {
 		Integer min = (Integer) this.beanFactory.getBean("min");
 		assertThat(min).isEqualTo(Integer.MIN_VALUE);
 	}
 
 	@Test
-	void testConstantWithDefaultName() {
+	void constantWithDefaultName() {
 		Integer max = (Integer) this.beanFactory.getBean("java.lang.Integer.MAX_VALUE");
 		assertThat(max).isEqualTo(Integer.MAX_VALUE);
 	}
 
 	@Test
-	void testEvents() {
+	void events() {
 		ComponentDefinition propertiesComponent = this.listener.getComponentDefinition("myProperties");
 		assertThat(propertiesComponent).as("Event for 'myProperties' not sent").isNotNull();
 		AbstractBeanDefinition propertiesBean = (AbstractBeanDefinition) propertiesComponent.getBeanDefinitions()[0];
@@ -89,43 +88,43 @@ class UtilNamespaceHandlerTests {
 	}
 
 	@Test
-	void testNestedProperties() {
+	void nestedProperties() {
 		TestBean bean = (TestBean) this.beanFactory.getBean("testBean");
 		Properties props = bean.getSomeProperties();
 		assertThat(props).as("Incorrect property value").containsEntry("foo", "bar");
 	}
 
 	@Test
-	void testPropertyPath() {
+	void propertyPath() {
 		String name = (String) this.beanFactory.getBean("name");
 		assertThat(name).isEqualTo("Rob Harrop");
 	}
 
 	@Test
-	void testNestedPropertyPath() {
+	void nestedPropertyPath() {
 		TestBean bean = (TestBean) this.beanFactory.getBean("testBean");
 		assertThat(bean.getName()).isEqualTo("Rob Harrop");
 	}
 
 	@Test
-	void testSimpleMap() {
-		Map<?, ?> map = (Map) this.beanFactory.getBean("simpleMap");
+	void simpleMap() {
+		Map<?, ?> map = (Map<?, ?>) this.beanFactory.getBean("simpleMap");
 		assertThat(map.get("foo")).isEqualTo("bar");
-		Map<?, ?> map2 = (Map) this.beanFactory.getBean("simpleMap");
+		Map<?, ?> map2 = (Map<?, ?>) this.beanFactory.getBean("simpleMap");
 		assertThat(map).isSameAs(map2);
 	}
 
 	@Test
-	void testScopedMap() {
-		Map<?, ?> map = (Map) this.beanFactory.getBean("scopedMap");
+	void scopedMap() {
+		Map<?, ?> map = (Map<?, ?>) this.beanFactory.getBean("scopedMap");
 		assertThat(map.get("foo")).isEqualTo("bar");
-		Map<?, ?> map2 = (Map) this.beanFactory.getBean("scopedMap");
+		Map<?, ?> map2 = (Map<?, ?>) this.beanFactory.getBean("scopedMap");
 		assertThat(map2.get("foo")).isEqualTo("bar");
 		assertThat(map).isNotSameAs(map2);
 	}
 
 	@Test
-	void testSimpleList() {
+	void simpleList() {
 		assertThat(this.beanFactory.getBean("simpleList"))
 				.asInstanceOf(InstanceOfAssertFactories.LIST).element(0).isEqualTo("Rob Harrop");
 		assertThat(this.beanFactory.getBean("simpleList"))
@@ -133,7 +132,7 @@ class UtilNamespaceHandlerTests {
 	}
 
 	@Test
-	void testScopedList() {
+	void scopedList() {
 		assertThat(this.beanFactory.getBean("scopedList"))
 				.asInstanceOf(InstanceOfAssertFactories.LIST).element(0).isEqualTo("Rob Harrop");
 		assertThat(this.beanFactory.getBean("scopedList"))
@@ -143,7 +142,7 @@ class UtilNamespaceHandlerTests {
 	}
 
 	@Test
-	void testSimpleSet() {
+	void simpleSet() {
 		assertThat(this.beanFactory.getBean("simpleSet")).isInstanceOf(Set.class)
 				.asInstanceOf(InstanceOfAssertFactories.collection(String.class))
 				.containsOnly("Rob Harrop");
@@ -152,7 +151,7 @@ class UtilNamespaceHandlerTests {
 	}
 
 	@Test
-	void testScopedSet() {
+	void scopedSet() {
 		assertThat(this.beanFactory.getBean("scopedSet")).isInstanceOf(Set.class)
 				.asInstanceOf(InstanceOfAssertFactories.collection(String.class))
 				.containsOnly("Rob Harrop");
@@ -164,21 +163,27 @@ class UtilNamespaceHandlerTests {
 	}
 
 	@Test
-	void testMapWithRef() {
-		Map<?, ?> map = (Map) this.beanFactory.getBean("mapWithRef");
+	void mapWithRef() throws Exception {
+		Map<?, ?> map = (Map<?, ?>) this.beanFactory.getBean("mapWithRef");
 		assertThat(map).isInstanceOf(TreeMap.class);
 		assertThat(map.get("bean")).isEqualTo(this.beanFactory.getBean("testBean"));
+		assertThat(this.beanFactory.resolveDependency(
+				new DependencyDescriptor(getClass().getDeclaredField("mapWithRef"), true), null))
+				.isSameAs(map);
 	}
 
 	@Test
-	void testMapWithTypes() {
-		Map<?, ?> map = (Map) this.beanFactory.getBean("mapWithTypes");
+	void mapWithTypes() throws Exception {
+		Map<?, ?> map = (Map<?, ?>) this.beanFactory.getBean("mapWithTypes");
 		assertThat(map).isInstanceOf(LinkedCaseInsensitiveMap.class);
 		assertThat(map.get("bean")).isEqualTo(this.beanFactory.getBean("testBean"));
+		assertThat(this.beanFactory.resolveDependency(
+				new DependencyDescriptor(getClass().getDeclaredField("mapWithTypes"), true), null))
+				.isSameAs(map);
 	}
 
 	@Test
-	void testNestedCollections() {
+	void nestedCollections() {
 		TestBean bean = (TestBean) this.beanFactory.getBean("nestedCollectionsBean");
 
 		assertThat(bean.getSomeList()).singleElement().isEqualTo("foo");
@@ -199,7 +204,7 @@ class UtilNamespaceHandlerTests {
 	}
 
 	@Test
-	void testNestedShortcutCollections() {
+	void nestedShortcutCollections() {
 		TestBean bean = (TestBean) this.beanFactory.getBean("nestedShortcutCollections");
 
 		assertThat(bean.getStringArray()).containsExactly("fooStr");
@@ -207,7 +212,7 @@ class UtilNamespaceHandlerTests {
 		assertThat(bean.getSomeSet()).singleElement().isEqualTo("bar");
 
 		TestBean bean2 = (TestBean) this.beanFactory.getBean("nestedShortcutCollections");
-		assertThat(Arrays.equals(bean.getStringArray(), bean2.getStringArray())).isTrue();
+		assertThat(bean.getStringArray()).isEqualTo(bean2.getStringArray());
 		assertThat(bean.getStringArray()).isNotSameAs(bean2.getStringArray());
 		assertThat(bean2.getSomeList()).isEqualTo(bean.getSomeList());
 		assertThat(bean2.getSomeSet()).isEqualTo(bean.getSomeSet());
@@ -216,7 +221,7 @@ class UtilNamespaceHandlerTests {
 	}
 
 	@Test
-	void testNestedInCollections() {
+	void nestedInCollections() {
 		TestBean bean = (TestBean) this.beanFactory.getBean("nestedCustomTagBean");
 
 		assertThat(bean.getSomeList()).singleElement().isEqualTo(Integer.MIN_VALUE);
@@ -237,88 +242,88 @@ class UtilNamespaceHandlerTests {
 	}
 
 	@Test
-	void testCircularCollections() {
+	void circularCollections() {
 		TestBean bean = (TestBean) this.beanFactory.getBean("circularCollectionsBean");
 
-		assertThat(bean.getSomeList()).singleElement().isEqualTo(bean);
-		assertThat(bean.getSomeSet()).singleElement().isEqualTo(bean);
+		assertThat(bean.getSomeList()).singleElement().isSameAs(bean);
+		assertThat(bean.getSomeSet()).singleElement().isSameAs(bean);
 		assertThat(bean.getSomeMap()).hasSize(1).allSatisfy((key, value) -> {
 			assertThat(key).isEqualTo("foo");
-			assertThat(value).isEqualTo(bean);
+			assertThat(value).isSameAs(bean);
 		});
 	}
 
 	@Test
-	void testCircularCollectionBeansStartingWithList() {
+	void circularCollectionBeansStartingWithList() {
 		this.beanFactory.getBean("circularList");
 		TestBean bean = (TestBean) this.beanFactory.getBean("circularCollectionBeansBean");
 
 		List<?> list = bean.getSomeList();
 		assertThat(Proxy.isProxyClass(list.getClass())).isTrue();
-		assertThat(list).singleElement().isEqualTo(bean);
+		assertThat(list).singleElement().isSameAs(bean);
 
 		Set<?> set = bean.getSomeSet();
 		assertThat(Proxy.isProxyClass(set.getClass())).isFalse();
-		assertThat(set).singleElement().isEqualTo(bean);
+		assertThat(set).singleElement().isSameAs(bean);
 
 		Map<?, ?> map = bean.getSomeMap();
 		assertThat(Proxy.isProxyClass(map.getClass())).isFalse();
 		assertThat(map).hasSize(1).allSatisfy((key, value) -> {
 			assertThat(key).isEqualTo("foo");
-			assertThat(value).isEqualTo(bean);
+			assertThat(value).isSameAs(bean);
 		});
 	}
 
 	@Test
-	void testCircularCollectionBeansStartingWithSet() {
+	void circularCollectionBeansStartingWithSet() {
 		this.beanFactory.getBean("circularSet");
 		TestBean bean = (TestBean) this.beanFactory.getBean("circularCollectionBeansBean");
 
 		List<?> list = bean.getSomeList();
 		assertThat(Proxy.isProxyClass(list.getClass())).isFalse();
-		assertThat(list).singleElement().isEqualTo(bean);
+		assertThat(list).singleElement().isSameAs(bean);
 
 		Set<?> set = bean.getSomeSet();
 		assertThat(Proxy.isProxyClass(set.getClass())).isTrue();
-		assertThat(set).singleElement().isEqualTo(bean);
+		assertThat(set).singleElement().isSameAs(bean);
 
 		Map<?, ?> map = bean.getSomeMap();
 		assertThat(Proxy.isProxyClass(map.getClass())).isFalse();
 		assertThat(map).hasSize(1).allSatisfy((key, value) -> {
 			assertThat(key).isEqualTo("foo");
-			assertThat(value).isEqualTo(bean);
+			assertThat(value).isSameAs(bean);
 		});
 	}
 
 	@Test
-	void testCircularCollectionBeansStartingWithMap() {
+	void circularCollectionBeansStartingWithMap() {
 		this.beanFactory.getBean("circularMap");
 		TestBean bean = (TestBean) this.beanFactory.getBean("circularCollectionBeansBean");
 
 		List<?> list = bean.getSomeList();
 		assertThat(Proxy.isProxyClass(list.getClass())).isFalse();
-		assertThat(list).singleElement().isEqualTo(bean);
+		assertThat(list).singleElement().isSameAs(bean);
 
 		Set<?> set = bean.getSomeSet();
 		assertThat(Proxy.isProxyClass(set.getClass())).isFalse();
-		assertThat(set).singleElement().isEqualTo(bean);
+		assertThat(set).singleElement().isSameAs(bean);
 
 		Map<?, ?> map = bean.getSomeMap();
 		assertThat(Proxy.isProxyClass(map.getClass())).isTrue();
 		assertThat(map).hasSize(1).allSatisfy((key, value) -> {
 			assertThat(key).isEqualTo("foo");
-			assertThat(value).isEqualTo(bean);
+			assertThat(value).isSameAs(bean);
 		});
 	}
 
 	@Test
-	void testNestedInConstructor() {
+	void nestedInConstructor() {
 		TestBean bean = (TestBean) this.beanFactory.getBean("constructedTestBean");
 		assertThat(bean.getName()).isEqualTo("Rob Harrop");
 	}
 
 	@Test
-	void testLoadProperties() {
+	void loadProperties() {
 		Properties props = (Properties) this.beanFactory.getBean("myProperties");
 		assertThat(props).as("Incorrect property value").containsEntry("foo", "bar");
 		assertThat(props).as("Incorrect property value").doesNotContainKey("foo2");
@@ -327,7 +332,7 @@ class UtilNamespaceHandlerTests {
 	}
 
 	@Test
-	void testScopedProperties() {
+	void scopedProperties() {
 		Properties props = (Properties) this.beanFactory.getBean("myScopedProperties");
 		assertThat(props).as("Incorrect property value").containsEntry("foo", "bar");
 		assertThat(props).as("Incorrect property value").doesNotContainKey("foo2");
@@ -338,38 +343,43 @@ class UtilNamespaceHandlerTests {
 	}
 
 	@Test
-	void testLocalProperties() {
+	void localProperties() {
 		Properties props = (Properties) this.beanFactory.getBean("myLocalProperties");
 		assertThat(props).as("Incorrect property value").doesNotContainKey("foo");
 		assertThat(props).as("Incorrect property value").containsEntry("foo2", "bar2");
 	}
 
 	@Test
-	void testMergedProperties() {
+	void mergedProperties() {
 		Properties props = (Properties) this.beanFactory.getBean("myMergedProperties");
 		assertThat(props).as("Incorrect property value").containsEntry("foo", "bar");
 		assertThat(props).as("Incorrect property value").containsEntry("foo2", "bar2");
 	}
 
 	@Test
-	void testLocalOverrideDefault() {
+	void localOverrideDefault() {
 		Properties props = (Properties) this.beanFactory.getBean("defaultLocalOverrideProperties");
 		assertThat(props).as("Incorrect property value").containsEntry("foo", "bar");
 		assertThat(props).as("Incorrect property value").containsEntry("foo2", "local2");
 	}
 
 	@Test
-	void testLocalOverrideFalse() {
+	void localOverrideFalse() {
 		Properties props = (Properties) this.beanFactory.getBean("falseLocalOverrideProperties");
 		assertThat(props).as("Incorrect property value").containsEntry("foo", "bar");
 		assertThat(props).as("Incorrect property value").containsEntry("foo2", "local2");
 	}
 
 	@Test
-	void testLocalOverrideTrue() {
+	void localOverrideTrue() {
 		Properties props = (Properties) this.beanFactory.getBean("trueLocalOverrideProperties");
 		assertThat(props).as("Incorrect property value").containsEntry("foo", "local");
 		assertThat(props).as("Incorrect property value").containsEntry("foo2", "local2");
 	}
+
+
+	// For DependencyDescriptor resolution
+	Map<String, TestBean> mapWithRef;
+	Map<String, TestBean> mapWithTypes;
 
 }

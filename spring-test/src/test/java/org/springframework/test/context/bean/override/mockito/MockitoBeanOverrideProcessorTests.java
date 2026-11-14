@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,61 +18,361 @@ package org.springframework.test.context.bean.override.mockito;
 
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Field;
+import java.lang.reflect.Parameter;
+import java.util.List;
 
+import org.jspecify.annotations.Nullable;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
 import org.springframework.core.annotation.AnnotationUtils;
-import org.springframework.lang.Nullable;
-import org.springframework.test.context.bean.override.OverrideMetadata;
-import org.springframework.test.context.bean.override.example.ExampleService;
+import org.springframework.test.context.bean.override.BeanOverrideHandler;
+import org.springframework.util.ReflectionUtils;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatIllegalStateException;
 
-public class MockitoBeanOverrideProcessorTests {
+/**
+ * Tests for {@link MockitoBeanOverrideProcessor}.
+ *
+ * @author Simon Baslé
+ * @author Sam Brannen
+ * @since 6.2
+ */
+class MockitoBeanOverrideProcessorTests {
 
-	@Test
-	void mockAnnotationCreatesMockMetadata() throws NoSuchFieldException {
-		MockitoBeanOverrideProcessor processor = new MockitoBeanOverrideProcessor();
-		MockitoBean annotation = AnnotationUtils.synthesizeAnnotation(MockitoBean.class);
-		Class<?> clazz = MockitoConf.class;
-		Field field = clazz.getField("a");
+	private final MockitoBeanOverrideProcessor processor = new MockitoBeanOverrideProcessor();
 
-		OverrideMetadata object = processor.createMetadata(annotation, clazz, field);
 
-		assertThat(object).isExactlyInstanceOf(MockitoBeanMetadata.class);
+	@Nested
+	class CreateHandlerTests {
+
+		private final Field field = ReflectionUtils.findField(TestCase.class, "number");
+
+
+		@Test
+		void mockAnnotationCreatesMockitoBeanOverrideHandler() {
+			MockitoBean annotation = AnnotationUtils.synthesizeAnnotation(MockitoBean.class);
+			BeanOverrideHandler handler = processor.createHandler(annotation, TestCase.class, field);
+
+			assertThat(handler).isExactlyInstanceOf(MockitoBeanOverrideHandler.class);
+		}
+
+		@Test
+		void spyAnnotationCreatesMockitoSpyBeanOverrideHandler() {
+			MockitoSpyBean annotation = AnnotationUtils.synthesizeAnnotation(MockitoSpyBean.class);
+			BeanOverrideHandler handler = processor.createHandler(annotation, TestCase.class, field);
+
+			assertThat(handler).isExactlyInstanceOf(MockitoSpyBeanOverrideHandler.class);
+		}
+
+		@Test
+		void otherAnnotationThrows() {
+			Annotation annotation = field.getAnnotation(Nullable.class);
+
+			assertThatIllegalStateException()
+					.isThrownBy(() -> processor.createHandler(annotation, TestCase.class, field))
+					.withMessage("Invalid annotation passed to MockitoBeanOverrideProcessor: expected either " +
+							"@MockitoBean or @MockitoSpyBean on field %s.%s", field.getDeclaringClass().getName(),
+							field.getName());
+		}
+
+		@Test
+		void typesNotSupportedAtFieldLevel() {
+			Field field = ReflectionUtils.findField(TestCase.class, "typesNotSupported");
+			MockitoBean annotation = field.getAnnotation(MockitoBean.class);
+
+			assertThatIllegalStateException()
+					.isThrownBy(() -> processor.createHandler(annotation, TestCase.class, field))
+					.withMessage("The @MockitoBean 'types' attribute must be omitted when declared on a field");
+		}
+
+
+		static class TestCase {
+
+			@MockitoBean
+			@MockitoSpyBean
+			public @Nullable Integer number;
+
+			@MockitoBean(types = Integer.class)
+			String typesNotSupported;
+		}
+
+		@MockitoBean(name = "bogus", types = Integer.class)
+		static class NameNotSupportedTestCase {
+		}
 	}
 
-	@Test
-	void spyAnnotationCreatesSpyMetadata() throws NoSuchFieldException {
-		MockitoBeanOverrideProcessor processor = new MockitoBeanOverrideProcessor();
-		MockitoSpyBean annotation = AnnotationUtils.synthesizeAnnotation(MockitoSpyBean.class);
-		Class<?> clazz = MockitoConf.class;
-		Field field = clazz.getField("a");
+	@Nested  // gh-36096
+	class CreateHandlerForParameterTests {
 
-		OverrideMetadata object = processor.createMetadata(annotation, clazz, field);
+		private final Parameter parameter = TestCase.class.getDeclaredConstructors()[0].getParameters()[0];
 
-		assertThat(object).isExactlyInstanceOf(MockitoSpyBeanMetadata.class);
+
+		@Test
+		void mockAnnotationCreatesMockitoBeanOverrideHandler() {
+			MockitoBean annotation = AnnotationUtils.synthesizeAnnotation(MockitoBean.class);
+			BeanOverrideHandler handler = processor.createHandler(annotation, TestCase.class, parameter);
+
+			assertThat(handler).isExactlyInstanceOf(MockitoBeanOverrideHandler.class);
+		}
+
+		@Test
+		void spyAnnotationCreatesMockitoSpyBeanOverrideHandler() {
+			MockitoSpyBean annotation = AnnotationUtils.synthesizeAnnotation(MockitoSpyBean.class);
+			BeanOverrideHandler handler = processor.createHandler(annotation, TestCase.class, parameter);
+
+			assertThat(handler).isExactlyInstanceOf(MockitoSpyBeanOverrideHandler.class);
+		}
+
+		@Test
+		void otherAnnotationThrows() {
+			Annotation annotation = parameter.getAnnotation(Nullable.class);
+
+			assertThatIllegalStateException()
+					.isThrownBy(() -> processor.createHandler(annotation, TestCase.class, parameter))
+					.withMessage("Invalid annotation passed to MockitoBeanOverrideProcessor: expected either " +
+							"@MockitoBean or @MockitoSpyBean on parameter '%s' in constructor %s",
+							parameter.getName(), parameter.getDeclaringExecutable().getName());
+		}
+
+		@Test
+		void typesAttributeNotSupportedForMockitoBean() {
+			Parameter parameter = TypesNotSupportedForMockitoBeanTestCase.class
+					.getDeclaredConstructors()[0].getParameters()[0];
+			MockitoBean annotation = parameter.getAnnotation(MockitoBean.class);
+
+			assertThatIllegalStateException()
+					.isThrownBy(() -> processor.createHandler(annotation, TypesNotSupportedForMockitoBeanTestCase.class, parameter))
+					.withMessage("The @MockitoBean 'types' attribute must be omitted when declared on a parameter");
+		}
+
+		@Test
+		void typesAttributeNotSupportedForMockitoSpyBean() {
+			Parameter parameter = TypesNotSupportedForMockitoSpyBeanTestCase.class
+					.getDeclaredConstructors()[0].getParameters()[0];
+			MockitoSpyBean annotation = parameter.getAnnotation(MockitoSpyBean.class);
+
+			assertThatIllegalStateException()
+					.isThrownBy(() -> processor.createHandler(annotation, TypesNotSupportedForMockitoSpyBeanTestCase.class, parameter))
+					.withMessage("The @MockitoSpyBean 'types' attribute must be omitted when declared on a parameter");
+		}
+
+
+		static class TestCase {
+
+			TestCase(@MockitoBean @MockitoSpyBean @Nullable Integer number) {
+			}
+		}
+
+		static class TypesNotSupportedForMockitoBeanTestCase {
+
+			TypesNotSupportedForMockitoBeanTestCase(@MockitoBean(types = Integer.class) String param) {
+			}
+		}
+
+		static class TypesNotSupportedForMockitoSpyBeanTestCase {
+
+			TypesNotSupportedForMockitoSpyBeanTestCase(@MockitoSpyBean(types = Integer.class) String param) {
+			}
+		}
 	}
 
-	@Test
-	void otherAnnotationThrows() throws NoSuchFieldException {
-		MockitoBeanOverrideProcessor processor = new MockitoBeanOverrideProcessor();
-		Class<?> clazz = MockitoConf.class;
-		Field field = clazz.getField("a");
-		Annotation annotation = field.getAnnotation(Nullable.class);
+	@Nested
+	class CreateHandlersTests {
 
-		assertThatIllegalStateException().isThrownBy(() -> processor.createMetadata(annotation, clazz, field))
-				.withMessage("Invalid annotation passed to MockitoBeanOverrideProcessor: expected " +
-						"@MockitoBean/@MockitoSpyBean on field %s.%s", field.getDeclaringClass().getName(),
-						field.getName());
-	}
+		@Test
+		void otherAnnotationThrows() {
+			Annotation annotation = getClass().getAnnotation(Nested.class);
 
-	static class MockitoConf {
-		@Nullable
-		@MockitoBean
-		@MockitoSpyBean
-		public ExampleService a;
+			assertThatIllegalStateException()
+					.isThrownBy(() -> processor.createHandlers(annotation, getClass()))
+					.withMessage("Invalid annotation passed to MockitoBeanOverrideProcessor: expected either " +
+							"@MockitoBean or @MockitoSpyBean on test class %s", getClass().getName());
+		}
+
+		@Nested
+		class MockitoBeanTests {
+
+			@Test
+			void missingTypes() {
+				Class<?> testClass = MissingTypesTestCase.class;
+				MockitoBean annotation = testClass.getAnnotation(MockitoBean.class);
+
+				assertThatIllegalStateException()
+						.isThrownBy(() -> processor.createHandlers(annotation, testClass))
+						.withMessage("The @MockitoBean 'types' attribute must not be empty when declared on a class");
+			}
+
+			@Test
+			void nameNotSupportedWithMultipleTypes() {
+				Class<?> testClass = NameNotSupportedWithMultipleTypesTestCase.class;
+				MockitoBean annotation = testClass.getAnnotation(MockitoBean.class);
+
+				assertThatIllegalStateException()
+						.isThrownBy(() -> processor.createHandlers(annotation, testClass))
+						.withMessage("The @MockitoBean 'name' attribute cannot be used when mocking multiple types");
+			}
+
+			@Test
+			void singleMockByType() {
+				Class<?> testClass = SingleMockByTypeTestCase.class;
+				MockitoBean annotation = testClass.getAnnotation(MockitoBean.class);
+				List<BeanOverrideHandler> handlers = processor.createHandlers(annotation, testClass);
+
+				assertThat(handlers).singleElement().isInstanceOfSatisfying(MockitoBeanOverrideHandler.class, handler -> {
+					assertThat(handler.getField()).isNull();
+					assertThat(handler.getBeanName()).isNull();
+					assertThat(handler.getBeanType().resolve()).isEqualTo(Integer.class);
+				});
+			}
+
+			@Test
+			void singleMockByName() {
+				Class<?> testClass = SingleMockByNameTestCase.class;
+				MockitoBean annotation = testClass.getAnnotation(MockitoBean.class);
+				List<BeanOverrideHandler> handlers = processor.createHandlers(annotation, testClass);
+
+				assertThat(handlers).singleElement().isInstanceOfSatisfying(MockitoBeanOverrideHandler.class, handler -> {
+					assertThat(handler.getField()).isNull();
+					assertThat(handler.getBeanName()).isEqualTo("enigma");
+					assertThat(handler.getBeanType().resolve()).isEqualTo(Integer.class);
+				});
+			}
+
+			@Test
+			void multipleMocks() {
+				Class<?> testClass = MultipleMocksTestCase.class;
+				MockitoBean annotation = testClass.getAnnotation(MockitoBean.class);
+				List<BeanOverrideHandler> handlers = processor.createHandlers(annotation, testClass);
+
+				assertThat(handlers).satisfiesExactly(
+						handler1 -> {
+							assertThat(handler1.getField()).isNull();
+							assertThat(handler1.getBeanName()).isNull();
+							assertThat(handler1.getBeanType().resolve()).isEqualTo(Integer.class);
+						},
+						handler2 -> {
+							assertThat(handler2.getField()).isNull();
+							assertThat(handler2.getBeanName()).isNull();
+							assertThat(handler2.getBeanType().resolve()).isEqualTo(Float.class);
+						}
+					);
+			}
+
+
+			@MockitoBean
+			static class MissingTypesTestCase {
+			}
+
+			@MockitoBean(name = "bogus", types = { Integer.class, Float.class })
+			static class NameNotSupportedWithMultipleTypesTestCase {
+			}
+
+			@MockitoBean(types = Integer.class)
+			static class SingleMockByTypeTestCase {
+			}
+
+			@MockitoBean(name = "enigma", types = Integer.class)
+			static class SingleMockByNameTestCase {
+			}
+
+			@MockitoBean(types = { Integer.class, Float.class })
+			static class MultipleMocksTestCase {
+			}
+		}
+
+		@Nested
+		class MockitoSpyBeanTests {
+
+			@Test
+			void missingTypes() {
+				Class<?> testClass = MissingTypesTestCase.class;
+				MockitoSpyBean annotation = testClass.getAnnotation(MockitoSpyBean.class);
+
+				assertThatIllegalStateException()
+						.isThrownBy(() -> processor.createHandlers(annotation, testClass))
+						.withMessage("The @MockitoSpyBean 'types' attribute must not be empty when declared on a class");
+			}
+
+			@Test
+			void nameNotSupportedWithMultipleTypes() {
+				Class<?> testClass = NameNotSupportedWithMultipleTypesTestCase.class;
+				MockitoSpyBean annotation = testClass.getAnnotation(MockitoSpyBean.class);
+
+				assertThatIllegalStateException()
+						.isThrownBy(() -> processor.createHandlers(annotation, testClass))
+						.withMessage("The @MockitoSpyBean 'name' attribute cannot be used when mocking multiple types");
+			}
+
+			@Test
+			void singleSpyByType() {
+				Class<?> testClass = SingleSpyByTypeTestCase.class;
+				MockitoSpyBean annotation = testClass.getAnnotation(MockitoSpyBean.class);
+				List<BeanOverrideHandler> handlers = processor.createHandlers(annotation, testClass);
+
+				assertThat(handlers).singleElement().isInstanceOfSatisfying(MockitoSpyBeanOverrideHandler.class, handler -> {
+					assertThat(handler.getField()).isNull();
+					assertThat(handler.getBeanName()).isNull();
+					assertThat(handler.getBeanType().resolve()).isEqualTo(Integer.class);
+				});
+			}
+
+			@Test
+			void singleSpyByName() {
+				Class<?> testClass = SingleSpyByNameTestCase.class;
+				MockitoSpyBean annotation = testClass.getAnnotation(MockitoSpyBean.class);
+				List<BeanOverrideHandler> handlers = processor.createHandlers(annotation, testClass);
+
+				assertThat(handlers).singleElement().isInstanceOfSatisfying(MockitoSpyBeanOverrideHandler.class, handler -> {
+					assertThat(handler.getField()).isNull();
+					assertThat(handler.getBeanName()).isEqualTo("enigma");
+					assertThat(handler.getBeanType().resolve()).isEqualTo(Integer.class);
+				});
+			}
+
+			@Test
+			void multipleSpies() {
+				Class<?> testClass = MultipleSpiesTestCase.class;
+				MockitoSpyBean annotation = testClass.getAnnotation(MockitoSpyBean.class);
+				List<BeanOverrideHandler> handlers = processor.createHandlers(annotation, testClass);
+
+				assertThat(handlers).satisfiesExactly(
+						handler1 -> {
+							assertThat(handler1.getField()).isNull();
+							assertThat(handler1.getBeanName()).isNull();
+							assertThat(handler1.getBeanType().resolve()).isEqualTo(Integer.class);
+						},
+						handler2 -> {
+							assertThat(handler2.getField()).isNull();
+							assertThat(handler2.getBeanName()).isNull();
+							assertThat(handler2.getBeanType().resolve()).isEqualTo(Float.class);
+						}
+					);
+			}
+
+
+			@MockitoSpyBean
+			static class MissingTypesTestCase {
+			}
+
+			@MockitoSpyBean(name = "bogus", types = { Integer.class, Float.class })
+			static class NameNotSupportedWithMultipleTypesTestCase {
+			}
+
+			@MockitoSpyBean(types = Integer.class)
+			static class SingleSpyByTypeTestCase {
+			}
+
+			@MockitoSpyBean(name = "enigma", types = Integer.class)
+			static class SingleSpyByNameTestCase {
+			}
+
+			@MockitoSpyBean(types = { Integer.class, Float.class })
+			static class MultipleSpiesTestCase {
+			}
+		}
+
 	}
 
 }

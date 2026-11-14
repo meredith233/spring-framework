@@ -4,7 +4,7 @@
 Dependency injection should make your code less dependent on the container than it would
 be with traditional J2EE / Java EE development. The POJOs that make up your application
 should be testable in JUnit or TestNG tests, with objects instantiated by using the `new`
-operator, without Spring or any other container. You can use xref:testing/unit.adoc#mock-objects[mock objects]
+operator, without Spring or any other container. You can use <<mock-objects,mock objects>>
 (in conjunction with other valuable testing techniques) to test your code in isolation.
 If you follow the architecture recommendations for Spring, the resulting clean layering
 and componentization of your codebase facilitate easier unit testing. For example,
@@ -19,17 +19,14 @@ however, the Spring Framework provides mock objects and testing support classes,
 are described in this chapter.
 
 
-
 [[mock-objects]]
 == Mock Objects
 
 Spring includes a number of packages dedicated to mocking:
 
-* xref:testing/unit.adoc#mock-objects-env[Environment]
-* xref:testing/unit.adoc#mock-objects-jndi[JNDI]
-* xref:testing/unit.adoc#mock-objects-servlet[Servlet API]
-* xref:testing/unit.adoc#mock-objects-web-reactive[Spring Web Reactive]
-
+* <<mock-objects-env,Environment>>
+* <<mock-objects-servlet,Servlet API>>
+* <<mock-objects-web-reactive,Spring Web Reactive>>
 
 [[mock-objects-env]]
 === Environment
@@ -41,36 +38,19 @@ and xref:core/beans/environment.adoc#beans-property-source-abstraction[`Property
 `MockEnvironment` and `MockPropertySource` are useful for developing
 out-of-container tests for code that depends on environment-specific properties.
 
-
-[[mock-objects-jndi]]
-=== JNDI
-
-The `org.springframework.mock.jndi` package contains a partial implementation of the JNDI
-SPI, which you can use to set up a simple JNDI environment for test suites or stand-alone
-applications. If, for example, JDBC `DataSource` instances get bound to the same JNDI
-names in test code as they do in a Jakarta EE container, you can reuse both application code
-and configuration in testing scenarios without modification.
-
-WARNING: The mock JNDI support in the `org.springframework.mock.jndi` package is
-officially deprecated as of Spring Framework 5.2 in favor of complete solutions from third
-parties such as https://github.com/h-thurow/Simple-JNDI[Simple-JNDI].
-
-
 [[mock-objects-servlet]]
 === Servlet API
 
 The `org.springframework.mock.web` package contains a comprehensive set of Servlet API
 mock objects that are useful for testing web contexts, controllers, and filters. These
 mock objects are targeted at usage with Spring's Web MVC framework and are generally more
-convenient to use than dynamic mock objects (such as https://easymock.org/[EasyMock])
-or alternative Servlet API mock objects (such as http://www.mockobjects.com[MockObjects]).
+convenient to use than dynamic mock objects (such as https://easymock.org/[EasyMock]).
 
-TIP: Since Spring Framework 6.0, the mock objects in `org.springframework.mock.web` are
-based on the Servlet 6.0 API.
+TIP: Since Spring Framework 7.0, the mock objects in `org.springframework.mock.web` are
+based on the Servlet 6.1 API.
 
-The Spring MVC Test framework builds on the mock Servlet API objects to provide an
-integration testing framework for Spring MVC. See xref:testing/spring-mvc-test-framework.adoc[MockMvc].
-
+MockMvc builds on the mock Servlet API objects to provide an integration testing
+framework for Spring MVC. See xref:testing/mockmvc.adoc[MockMvc].
 
 [[mock-objects-web-reactive]]
 === Spring Web Reactive
@@ -95,16 +75,14 @@ testing WebFlux applications without an HTTP server. The client can also be used
 end-to-end tests with a running server.
 
 
-
 [[unit-testing-support-classes]]
 == Unit Testing Support Classes
 
 Spring includes a number of classes that can help with unit testing. They fall into two
 categories:
 
-* xref:testing/unit.adoc#unit-testing-utilities[General Testing Utilities]
-* xref:testing/unit.adoc#unit-testing-spring-mvc[Spring MVC Testing Utilities]
-
+* <<unit-testing-utilities,General Testing Utilities>>
+* <<unit-testing-spring-mvc,Spring MVC Testing Utilities>>
 
 [[unit-testing-utilities]]
 === General Testing Utilities
@@ -120,6 +98,11 @@ and the mock is wrapped in a Spring proxy, you may need direct access to the und
 mock to configure expectations on it and perform verifications. For Spring's core AOP
 utilities, see {spring-framework-api}/aop/support/AopUtils.html[`AopUtils`] and
 {spring-framework-api}/aop/framework/AopProxyUtils.html[`AopProxyUtils`].
+
+TIP: For guidance on using `AopTestUtils` together with `@MockitoSpyBean` when the spied
+bean is wrapped in a Spring AOP proxy, see
+xref:testing/annotations/integration-spring/annotation-mockitobean.adoc#spring-testing-annotation-beanoverriding-mockitospybean-aop-proxies[`@MockitoSpyBean`
+and Spring AOP Proxies].
 
 {spring-framework-api}/test/util/ReflectionTestUtils.html[`ReflectionTestUtils`] is a
 collection of reflection-based utility methods. You can use these methods in testing
@@ -150,7 +133,6 @@ assigned by the operating system. To interact with that server, you should query
 server for the port it is currently using.
 ====
 
-
 [[unit-testing-spring-mvc]]
 === Spring MVC Testing Utilities
 
@@ -162,7 +144,7 @@ that deal with Spring MVC `ModelAndView` objects.
 .Unit testing Spring MVC Controllers
 TIP: To unit test your Spring MVC `Controller` classes as POJOs, use `ModelAndViewAssert`
 combined with `MockHttpServletRequest`, `MockHttpSession`, and so on from Spring's
-xref:testing/unit.adoc#mock-objects-servlet[Servlet API mocks]. For thorough integration testing of your
-Spring MVC and REST `Controller` classes in conjunction with your `WebApplicationContext`
-configuration for Spring MVC, use the
-xref:testing/spring-mvc-test-framework.adoc[Spring MVC Test Framework] instead.
+<<mock-objects-servlet,Servlet API mocks>>. For thorough integration
+testing of your Spring MVC and REST `Controller` classes in conjunction with your
+`WebApplicationContext` configuration for Spring MVC, use
+xref:testing/mockmvc.adoc[MockMvc] instead.

@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2022 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,17 +16,12 @@
 
 package org.springframework.test.web.client.samples.matchers;
 
-import java.net.URI;
-import java.util.List;
-
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
-import org.springframework.http.converter.StringHttpMessageConverter;
-import org.springframework.http.converter.json.MappingJackson2HttpMessageConverter;
 import org.springframework.test.web.Person;
 import org.springframework.test.web.client.MockRestServiceServer;
-import org.springframework.web.client.RestTemplate;
+import org.springframework.web.client.RestClient;
 
 import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 import static org.hamcrest.Matchers.startsWith;
@@ -44,15 +39,16 @@ import static org.springframework.test.web.client.response.MockRestResponseCreat
  */
 class ContentRequestMatchersIntegrationTests {
 
-	private final RestTemplate restTemplate = new RestTemplate();
+	private RestClient restClient;
 
-	private final MockRestServiceServer mockServer = MockRestServiceServer.createServer(this.restTemplate);
+	private MockRestServiceServer mockServer;
 
 
 	@BeforeEach
 	void setup() {
-		this.restTemplate.setMessageConverters(
-				List.of(new StringHttpMessageConverter(), new MappingJackson2HttpMessageConverter()));
+		RestClient.Builder clientBuilder = RestClient.builder();
+		this.mockServer = MockRestServiceServer.createServer(clientBuilder);
+		this.restClient = clientBuilder.build();
 	}
 
 
@@ -89,7 +85,7 @@ class ContentRequestMatchersIntegrationTests {
 	}
 
 	private void executeAndVerify(Object body) {
-		this.restTemplate.put(URI.create("/foo"), body);
+		this.restClient.put().uri("/foo").body(body).retrieve().toBodilessEntity();
 		this.mockServer.verify();
 	}
 

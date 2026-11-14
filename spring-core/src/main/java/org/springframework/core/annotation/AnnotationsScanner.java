@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -25,12 +25,13 @@ import java.util.Arrays;
 import java.util.Map;
 import java.util.function.Predicate;
 
+import org.jspecify.annotations.Nullable;
+
 import org.springframework.core.BridgeMethodResolver;
 import org.springframework.core.Ordered;
 import org.springframework.core.ResolvableType;
 import org.springframework.core.annotation.MergedAnnotations.Search;
 import org.springframework.core.annotation.MergedAnnotations.SearchStrategy;
-import org.springframework.lang.Nullable;
 import org.springframework.util.ConcurrentReferenceHashMap;
 import org.springframework.util.ObjectUtils;
 import org.springframework.util.ReflectionUtils;
@@ -46,7 +47,7 @@ import org.springframework.util.ReflectionUtils;
  */
 abstract class AnnotationsScanner {
 
-	private static final Annotation[] NO_ANNOTATIONS = {};
+	private static final @Nullable Annotation[] NO_ANNOTATIONS = {};
 
 	private static final Method[] NO_METHODS = {};
 
@@ -54,7 +55,7 @@ abstract class AnnotationsScanner {
 	private static final Map<AnnotatedElement, Annotation[]> declaredAnnotationCache =
 			new ConcurrentReferenceHashMap<>(256);
 
-	private static final Map<Class<?>, Method[]> baseTypeMethodsCache =
+	private static final Map<Class<?>, @Nullable Method[]> baseTypeMethodsCache =
 			new ConcurrentReferenceHashMap<>(256);
 
 
@@ -75,16 +76,14 @@ abstract class AnnotationsScanner {
 	 * @param processor the processor that receives the annotations
 	 * @return the result of {@link AnnotationsProcessor#finish(Object)}
 	 */
-	@Nullable
-	static <C, R> R scan(C context, AnnotatedElement source, SearchStrategy searchStrategy,
+	static <C, R> @Nullable R scan(C context, AnnotatedElement source, SearchStrategy searchStrategy,
 			Predicate<Class<?>> searchEnclosingClass, AnnotationsProcessor<C, R> processor) {
 
 		R result = process(context, source, searchStrategy, searchEnclosingClass, processor);
 		return processor.finish(result);
 	}
 
-	@Nullable
-	private static <C, R> R process(C context, AnnotatedElement source,
+	private static <C, R> @Nullable R process(C context, AnnotatedElement source,
 			SearchStrategy searchStrategy, Predicate<Class<?>> searchEnclosingClass,
 			AnnotationsProcessor<C, R> processor) {
 
@@ -97,37 +96,34 @@ abstract class AnnotationsScanner {
 		return processElement(context, source, processor);
 	}
 
-	@Nullable
-	private static <C, R> R processClass(C context, Class<?> source, SearchStrategy searchStrategy,
+	private static <C, R> @Nullable R processClass(C context, Class<?> source, SearchStrategy searchStrategy,
 			Predicate<Class<?>> searchEnclosingClass, AnnotationsProcessor<C, R> processor) {
 
 		return switch (searchStrategy) {
 			case DIRECT -> processElement(context, source, processor);
-			case INHERITED_ANNOTATIONS -> processClassInheritedAnnotations(context, source, searchStrategy, processor);
+			case INHERITED_ANNOTATIONS -> processClassInheritedAnnotations(context, source, processor);
 			case SUPERCLASS -> processClassHierarchy(context, source, processor, false, Search.never);
 			case TYPE_HIERARCHY -> processClassHierarchy(context, source, processor, true, searchEnclosingClass);
 		};
 	}
 
-	@Nullable
-	private static <C, R> R processClassInheritedAnnotations(C context, Class<?> source,
-			SearchStrategy searchStrategy, AnnotationsProcessor<C, R> processor) {
+	private static <C, R> @Nullable R processClassInheritedAnnotations(C context, Class<?> source,
+			AnnotationsProcessor<C, R> processor) {
 
 		try {
-			if (isWithoutHierarchy(source, searchStrategy, Search.never)) {
+			if (isWithoutHierarchy(source, Search.never)) {
 				return processElement(context, source, processor);
 			}
-			Annotation[] relevant = null;
+			@Nullable Annotation[] relevant = null;
 			int remaining = Integer.MAX_VALUE;
 			int aggregateIndex = 0;
 			Class<?> root = source;
-			while (source != null && source != Object.class && remaining > 0 &&
-					!hasPlainJavaAnnotationsOnly(source)) {
+			while (source != null && source != Object.class && remaining > 0 && !hasPlainJavaAnnotationsOnly(source)) {
 				R result = processor.doWithAggregate(context, aggregateIndex);
 				if (result != null) {
 					return result;
 				}
-				Annotation[] declaredAnns = getDeclaredAnnotations(source, true);
+				@Nullable Annotation[] declaredAnns = getDeclaredAnnotations(source, true);
 				if (declaredAnns.length > 0) {
 					if (relevant == null) {
 						relevant = root.getAnnotations();
@@ -137,6 +133,7 @@ abstract class AnnotationsScanner {
 						if (declaredAnns[i] != null) {
 							boolean isRelevant = false;
 							for (int relevantIndex = 0; relevantIndex < relevant.length; relevantIndex++) {
+								//noinspection DataFlowIssue
 								if (relevant[relevantIndex] != null &&
 										declaredAnns[i].annotationType() == relevant[relevantIndex].annotationType()) {
 									isRelevant = true;
@@ -165,8 +162,7 @@ abstract class AnnotationsScanner {
 		return null;
 	}
 
-	@Nullable
-	private static <C, R> R processClassHierarchy(C context, Class<?> source,
+	private static <C, R> @Nullable R processClassHierarchy(C context, Class<?> source,
 			AnnotationsProcessor<C, R> processor, boolean includeInterfaces,
 			Predicate<Class<?>> searchEnclosingClass) {
 
@@ -174,8 +170,7 @@ abstract class AnnotationsScanner {
 				includeInterfaces, searchEnclosingClass);
 	}
 
-	@Nullable
-	private static <C, R> R processClassHierarchy(C context, int[] aggregateIndex, Class<?> source,
+	private static <C, R> @Nullable R processClassHierarchy(C context, int[] aggregateIndex, Class<?> source,
 			AnnotationsProcessor<C, R> processor, boolean includeInterfaces,
 			Predicate<Class<?>> searchEnclosingClass) {
 
@@ -187,7 +182,7 @@ abstract class AnnotationsScanner {
 			if (hasPlainJavaAnnotationsOnly(source)) {
 				return null;
 			}
-			Annotation[] annotations = getDeclaredAnnotations(source, false);
+			@Nullable Annotation[] annotations = getDeclaredAnnotations(source, false);
 			result = processor.doWithAnnotations(context, aggregateIndex[0], source, annotations);
 			if (result != null) {
 				return result;
@@ -237,8 +232,7 @@ abstract class AnnotationsScanner {
 		return null;
 	}
 
-	@Nullable
-	private static <C, R> R processMethod(C context, Method source,
+	private static <C, R> @Nullable R processMethod(C context, Method source,
 			SearchStrategy searchStrategy, AnnotationsProcessor<C, R> processor) {
 
 		return switch (searchStrategy) {
@@ -250,8 +244,7 @@ abstract class AnnotationsScanner {
 		};
 	}
 
-	@Nullable
-	private static <C, R> R processMethodInheritedAnnotations(C context, Method source,
+	private static <C, R> @Nullable R processMethodInheritedAnnotations(C context, Method source,
 			AnnotationsProcessor<C, R> processor) {
 
 		try {
@@ -265,8 +258,7 @@ abstract class AnnotationsScanner {
 		return null;
 	}
 
-	@Nullable
-	private static <C, R> R processMethodHierarchy(C context, int[] aggregateIndex,
+	private static <C, R> @Nullable R processMethodHierarchy(C context, int[] aggregateIndex,
 			Class<?> sourceClass, AnnotationsProcessor<C, R> processor, Method rootMethod,
 			boolean includeInterfaces) {
 
@@ -299,7 +291,8 @@ abstract class AnnotationsScanner {
 					}
 				}
 			}
-			if (Modifier.isPrivate(rootMethod.getModifiers())) {
+			if (Modifier.isPrivate(rootMethod.getModifiers()) ||
+					Modifier.isStatic(rootMethod.getModifiers())) {
 				return null;
 			}
 			if (calledProcessor) {
@@ -329,16 +322,18 @@ abstract class AnnotationsScanner {
 		return null;
 	}
 
-	private static <C> Method[] getBaseTypeMethods(C context, Class<?> baseType) {
+	@SuppressWarnings("NullAway") // Dataflow analysis limitation
+	private static <C> @Nullable Method[] getBaseTypeMethods(C context, Class<?> baseType) {
 		if (baseType == Object.class || hasPlainJavaAnnotationsOnly(baseType)) {
 			return NO_METHODS;
 		}
 
-		Method[] methods = baseTypeMethodsCache.get(baseType);
+		@Nullable Method[] methods = baseTypeMethodsCache.get(baseType);
 		if (methods == null) {
 			methods = ReflectionUtils.getDeclaredMethods(baseType);
 			int cleared = 0;
 			for (int i = 0; i < methods.length; i++) {
+				//noinspection DataFlowIssue
 				if (Modifier.isPrivate(methods[i].getModifiers()) ||
 						hasPlainJavaAnnotationsOnly(methods[i]) ||
 						getDeclaredAnnotations(methods[i], false).length == 0) {
@@ -354,36 +349,86 @@ abstract class AnnotationsScanner {
 		return methods;
 	}
 
-	private static boolean isOverride(Method rootMethod, Method candidateMethod) {
+	/**
+	 * Determine if the supplied root method overrides the supplied candidate
+	 * method declared in a supertype of the root method's declaring class.
+	 * <p>Static methods never override or get overridden, and private candidate
+	 * methods cannot be overridden. A package-private candidate method can only
+	 * be overridden by a method declared in the same package or transitively via
+	 * a {@code public} or {@code protected} overriding method declared in an
+	 * intermediate superclass in that package (see JLS §8.4.8.1). Generic
+	 * parameter types of the candidate method are resolved against the root
+	 * method's declaring class.
+	 * @param rootMethod the potentially overriding method
+	 * @param candidateMethod the potentially overridden method
+	 * @return {@code true} if the root method overrides the candidate method
+	 * @since 7.1
+	 */
+	static boolean isOverride(Method rootMethod, Method candidateMethod) {
 		return (!Modifier.isPrivate(candidateMethod.getModifiers()) &&
+				!Modifier.isStatic(rootMethod.getModifiers()) &&
+				!Modifier.isStatic(candidateMethod.getModifiers()) &&
+				candidateMethod.getParameterCount() == rootMethod.getParameterCount() &&
 				candidateMethod.getName().equals(rootMethod.getName()) &&
-				hasSameParameterTypes(rootMethod, candidateMethod));
+				hasSameParameterTypes(rootMethod, candidateMethod) &&
+				isOverridable(rootMethod, candidateMethod));
+	}
+
+	private static boolean isOverridable(Method rootMethod, Method candidateMethod) {
+		if (isPublicOrProtected(candidateMethod)) {
+			return true;
+		}
+		Class<?> rootDeclaringClass = rootMethod.getDeclaringClass();
+		Class<?> candidateDeclaringClass = candidateMethod.getDeclaringClass();
+		String packageName = candidateDeclaringClass.getPackageName();
+		// Declared in the same package?
+		if (rootDeclaringClass.getPackageName().equals(packageName)) {
+			return true;
+		}
+		// Else, search for a public or protected override in an intermediate superclass
+		// in the same package as the package-private candidate method.
+		Class<?> clazz = rootDeclaringClass.getSuperclass();
+		while (clazz != null && clazz != candidateDeclaringClass) {
+			if (clazz.getPackageName().equals(packageName)) {
+				for (Method method : clazz.getDeclaredMethods()) {
+					if (isPublicOrProtected(method) && !Modifier.isStatic(method.getModifiers()) &&
+							method.getParameterCount() == rootMethod.getParameterCount() &&
+							method.getName().equals(rootMethod.getName()) &&
+							hasSameParameterTypes(rootMethod, method)) {
+						return true;
+					}
+				}
+			}
+			clazz = clazz.getSuperclass();
+		}
+		return false;
+	}
+
+	private static boolean isPublicOrProtected(Method method) {
+		int modifiers = method.getModifiers();
+		return (Modifier.isPublic(modifiers) || Modifier.isProtected(modifiers));
 	}
 
 	private static boolean hasSameParameterTypes(Method rootMethod, Method candidateMethod) {
-		if (candidateMethod.getParameterCount() != rootMethod.getParameterCount()) {
-			return false;
-		}
 		Class<?>[] rootParameterTypes = rootMethod.getParameterTypes();
 		Class<?>[] candidateParameterTypes = candidateMethod.getParameterTypes();
 		if (Arrays.equals(candidateParameterTypes, rootParameterTypes)) {
 			return true;
 		}
-		return hasSameGenericTypeParameters(rootMethod, candidateMethod,
-				rootParameterTypes);
+		return hasSameGenericTypeParameters(rootMethod, candidateMethod, rootParameterTypes);
 	}
 
 	private static boolean hasSameGenericTypeParameters(
 			Method rootMethod, Method candidateMethod, Class<?>[] rootParameterTypes) {
 
-		Class<?> sourceDeclaringClass = rootMethod.getDeclaringClass();
+		Class<?> rootDeclaringClass = rootMethod.getDeclaringClass();
 		Class<?> candidateDeclaringClass = candidateMethod.getDeclaringClass();
-		if (!candidateDeclaringClass.isAssignableFrom(sourceDeclaringClass)) {
+		if (!candidateDeclaringClass.isAssignableFrom(rootDeclaringClass)) {
 			return false;
 		}
 		for (int i = 0; i < rootParameterTypes.length; i++) {
 			Class<?> resolvedParameterType = ResolvableType.forMethodParameter(
-					candidateMethod, i, sourceDeclaringClass).resolve();
+					candidateMethod, i, rootDeclaringClass).toClass();
 			if (rootParameterTypes[i] != resolvedParameterType) {
 				return false;
 			}
@@ -391,18 +436,17 @@ abstract class AnnotationsScanner {
 		return true;
 	}
 
-	@Nullable
-	private static <C, R> R processMethodAnnotations(C context, int aggregateIndex, Method source,
+	private static <C, R> @Nullable R processMethodAnnotations(C context, int aggregateIndex, Method source,
 			AnnotationsProcessor<C, R> processor) {
 
-		Annotation[] annotations = getDeclaredAnnotations(source, false);
+		@Nullable Annotation[] annotations = getDeclaredAnnotations(source, false);
 		R result = processor.doWithAnnotations(context, aggregateIndex, source, annotations);
 		if (result != null) {
 			return result;
 		}
 		Method bridgedMethod = BridgeMethodResolver.findBridgedMethod(source);
 		if (bridgedMethod != source) {
-			Annotation[] bridgedAnnotations = getDeclaredAnnotations(bridgedMethod, true);
+			@Nullable Annotation[] bridgedAnnotations = getDeclaredAnnotations(bridgedMethod, true);
 			for (int i = 0; i < bridgedAnnotations.length; i++) {
 				if (ObjectUtils.containsElement(annotations, bridgedAnnotations[i])) {
 					bridgedAnnotations[i] = null;
@@ -413,8 +457,7 @@ abstract class AnnotationsScanner {
 		return null;
 	}
 
-	@Nullable
-	private static <C, R> R processElement(C context, AnnotatedElement source,
+	private static <C, R> @Nullable R processElement(C context, AnnotatedElement source,
 			AnnotationsProcessor<C, R> processor) {
 
 		try {
@@ -429,9 +472,8 @@ abstract class AnnotationsScanner {
 	}
 
 	@SuppressWarnings("unchecked")
-	@Nullable
-	static <A extends Annotation> A getDeclaredAnnotation(AnnotatedElement source, Class<A> annotationType) {
-		Annotation[] annotations = getDeclaredAnnotations(source, false);
+	static <A extends Annotation> @Nullable A getDeclaredAnnotation(AnnotatedElement source, Class<A> annotationType) {
+		@Nullable Annotation[] annotations = getDeclaredAnnotations(source, false);
 		for (Annotation annotation : annotations) {
 			if (annotation != null && annotationType == annotation.annotationType()) {
 				return (A) annotation;
@@ -440,9 +482,10 @@ abstract class AnnotationsScanner {
 		return null;
 	}
 
-	static Annotation[] getDeclaredAnnotations(AnnotatedElement source, boolean defensive) {
+	@SuppressWarnings("NullAway") // Dataflow analysis limitation
+	static @Nullable Annotation[] getDeclaredAnnotations(AnnotatedElement source, boolean defensive) {
 		boolean cached = false;
-		Annotation[] annotations = declaredAnnotationCache.get(source);
+		@Nullable Annotation[] annotations = declaredAnnotationCache.get(source);
 		if (annotations != null) {
 			cached = true;
 		}
@@ -452,8 +495,9 @@ abstract class AnnotationsScanner {
 				boolean allIgnored = true;
 				for (int i = 0; i < annotations.length; i++) {
 					Annotation annotation = annotations[i];
+					//noinspection DataFlowIssue
 					if (isIgnorable(annotation.annotationType()) ||
-							!AttributeMethods.forAnnotationType(annotation.annotationType()).canLoad(annotation)) {
+							!AttributeMethods.forAnnotationType(annotation.annotationType()).canLoad(annotation, source)) {
 						annotations[i] = null;
 					}
 					else {
@@ -462,6 +506,7 @@ abstract class AnnotationsScanner {
 				}
 				annotations = (allIgnored ? NO_ANNOTATIONS : annotations);
 				if (source instanceof Class || source instanceof Member) {
+					//noinspection NullableProblems
 					declaredAnnotationCache.put(source, annotations);
 					cached = true;
 				}
@@ -483,7 +528,7 @@ abstract class AnnotationsScanner {
 		if (hasPlainJavaAnnotationsOnly(source)) {
 			return true;
 		}
-		if (searchStrategy == SearchStrategy.DIRECT || isWithoutHierarchy(source, searchStrategy, searchEnclosingClass)) {
+		if (searchStrategy == SearchStrategy.DIRECT || isWithoutHierarchy(source, searchEnclosingClass)) {
 			if (source instanceof Method method && method.isBridge()) {
 				return false;
 			}
@@ -508,9 +553,7 @@ abstract class AnnotationsScanner {
 		return (type.getName().startsWith("java.") || type == Ordered.class);
 	}
 
-	private static boolean isWithoutHierarchy(AnnotatedElement source, SearchStrategy searchStrategy,
-			Predicate<Class<?>> searchEnclosingClass) {
-
+	private static boolean isWithoutHierarchy(AnnotatedElement source, Predicate<Class<?>> searchEnclosingClass) {
 		if (source == Object.class) {
 			return true;
 		}
@@ -522,7 +565,7 @@ abstract class AnnotationsScanner {
 		}
 		if (source instanceof Method sourceMethod) {
 			return (Modifier.isPrivate(sourceMethod.getModifiers()) ||
-					isWithoutHierarchy(sourceMethod.getDeclaringClass(), searchStrategy, searchEnclosingClass));
+					isWithoutHierarchy(sourceMethod.getDeclaringClass(), searchEnclosingClass));
 		}
 		return true;
 	}

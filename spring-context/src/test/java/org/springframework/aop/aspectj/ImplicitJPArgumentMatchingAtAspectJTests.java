@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2023 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -34,7 +34,7 @@ import org.springframework.context.support.ClassPathXmlApplicationContext;
 class ImplicitJPArgumentMatchingAtAspectJTests {
 
 	@Test
-	void testAspect() {
+	void aspect() {
 		// nothing to really test; it is enough if we don't get error while creating the app context
 		new ClassPathXmlApplicationContext(getClass().getSimpleName() + ".xml", getClass());
 	}

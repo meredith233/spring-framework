@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -55,6 +55,7 @@ class ResourceHandlerFunctionTests {
 	private ServerResponse.Context context;
 
 	private ResourceHttpMessageConverter messageConverter;
+
 
 	@BeforeEach
 	void createContext() {
@@ -115,6 +116,53 @@ class ResourceHandlerFunctionTests {
 		assertThat(servletResponse.getContentType()).isEqualTo(MediaType.TEXT_PLAIN_VALUE);
 		assertThat(servletResponse.getContentLength()).isEqualTo(6);
 		assertThat(servletResponse.getHeader(HttpHeaders.ACCEPT_RANGES)).isEqualTo("bytes");
+	}
+
+	@Test
+	void ignoreRangeWhenIfRangeETagDoesNotMatch() throws IOException, ServletException {
+		ResourceHandlerFunction handlerFunction = new ResourceHandlerFunction(
+				this.resource, (resource, headers) -> headers.setETag("\"current\""));
+		MockHttpServletRequest servletRequest = PathPatternsTestUtils.initRequest("GET", "/", true);
+		servletRequest.addHeader(HttpHeaders.RANGE, "bytes=0-5");
+		servletRequest.addHeader(HttpHeaders.IF_RANGE, "\"stale\"");
+		ServerRequest request = new DefaultServerRequest(
+				servletRequest, Collections.singletonList(this.messageConverter));
+
+		ServerResponse response = handlerFunction.handle(request);
+		MockHttpServletResponse servletResponse = new MockHttpServletResponse();
+		ModelAndView mav = response.writeTo(servletRequest, servletResponse, this.context);
+
+		assertThat(mav).isNull();
+		assertThat(servletResponse.getStatus()).isEqualTo(200);
+		assertThat(servletResponse.getHeader(HttpHeaders.ETAG)).isEqualTo("\"current\"");
+		assertThat(servletResponse.getHeader(HttpHeaders.CONTENT_RANGE)).isNull();
+		assertThat(servletResponse.getContentAsByteArray())
+				.isEqualTo(Files.readAllBytes(this.resource.getFile().toPath()));
+	}
+
+	@Test
+	void getRangeWhenIfRangeETagMatches() throws IOException, ServletException {
+		ResourceHandlerFunction handlerFunction = new ResourceHandlerFunction(
+				this.resource, (resource, headers) -> headers.setETag("\"current\""));
+		MockHttpServletRequest servletRequest = PathPatternsTestUtils.initRequest("GET", "/", true);
+		servletRequest.addHeader(HttpHeaders.RANGE, "bytes=0-5");
+		servletRequest.addHeader(HttpHeaders.IF_RANGE, "\"current\"");
+		ServerRequest request = new DefaultServerRequest(
+				servletRequest, Collections.singletonList(this.messageConverter));
+
+		ServerResponse response = handlerFunction.handle(request);
+		MockHttpServletResponse servletResponse = new MockHttpServletResponse();
+		ModelAndView mav = response.writeTo(servletRequest, servletResponse, this.context);
+
+		assertThat(mav).isNull();
+		assertThat(servletResponse.getStatus()).isEqualTo(206);
+		assertThat(servletResponse.getHeader(HttpHeaders.CONTENT_RANGE))
+				.isEqualTo("bytes 0-5/" + this.resource.contentLength());
+		byte[] expectedBytes = new byte[6];
+		try (InputStream inputStream = this.resource.getInputStream()) {
+			inputStream.read(expectedBytes);
+		}
+		assertThat(servletResponse.getContentAsByteArray()).isEqualTo(expectedBytes);
 	}
 
 	@Test

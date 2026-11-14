@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,11 +16,12 @@
 
 package org.springframework.expression.spel;
 
-import java.lang.annotation.Annotation;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 
 import org.junit.jupiter.api.Test;
@@ -32,6 +33,8 @@ import org.springframework.expression.MethodResolver;
 import org.springframework.expression.spel.standard.SpelExpression;
 import org.springframework.expression.spel.standard.SpelExpressionParser;
 import org.springframework.expression.spel.support.StandardEvaluationContext;
+import org.springframework.expression.spel.support.StandardTypeLocator;
+import org.springframework.expression.spel.testresources.Inventor;
 import org.springframework.expression.spel.testresources.PlaceOfBirth;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -44,16 +47,18 @@ import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
  * @author Andy Clement
  * @author Phillip Webb
  * @author Sam Brannen
+ * @see ConstructorInvocationTests
+ * @see VariableAndFunctionTests
  */
 class MethodInvocationTests extends AbstractExpressionTests {
 
 	@Test
-	void testSimpleAccess01() {
+	void simpleAccess() {
 		evaluate("getPlaceOfBirth().getCity()", "Smiljan", String.class);
 	}
 
 	@Test
-	void testStringClass() {
+	void stringClass() {
 		evaluate("new java.lang.String('hello').charAt(2)", 'l', Character.class);
 		evaluate("new java.lang.String('hello').charAt(2).equals('l'.charAt(0))", true, Boolean.class);
 		evaluate("'HELLO'.toLowerCase()", "hello", String.class);
@@ -61,13 +66,13 @@ class MethodInvocationTests extends AbstractExpressionTests {
 	}
 
 	@Test
-	void testNonExistentMethods() {
+	void nonExistentMethods() {
 		// name is ok but madeup() does not exist
 		evaluateAndCheckError("name.madeup()", SpelMessage.METHOD_NOT_FOUND, 5);
 	}
 
 	@Test
-	void testWidening01() {
+	void widening() {
 		// widening of int 3 to double 3 is OK
 		evaluate("new Double(3.0d).compareTo(8)", -1, Integer.class);
 		evaluate("new Double(3.0d).compareTo(3)", 0, Integer.class);
@@ -75,18 +80,19 @@ class MethodInvocationTests extends AbstractExpressionTests {
 	}
 
 	@Test
-	void testArgumentConversion01() {
+	void argumentConversion() {
 		// Rely on Double>String conversion for calling startsWith()
 		evaluate("new String('hello 2.0 to you').startsWith(7.0d)", false, Boolean.class);
 		evaluate("new String('7.0 foobar').startsWith(7.0d)", true, Boolean.class);
 	}
 
-	@Test
-	void testMethodThrowingException_SPR6760() {
+	@Test  // SPR-6760
+	void methodThrowingException() {
 		// Test method on inventor: throwException()
-		// On 1 it will throw an IllegalArgumentException
-		// On 2 it will throw a RuntimeException
-		// On 3 it will exit normally
+		// On 1 it will throw an IllegalArgumentException.
+		// On 2 it will throw a RuntimeException.
+		// On 4 it will throw a TestException.
+		// Otherwise, it will exit normally.
 		// In each case it increments the Inventor field 'counter' when invoked
 
 		SpelExpressionParser parser = new SpelExpressionParser();
@@ -115,7 +121,6 @@ class MethodInvocationTests extends AbstractExpressionTests {
 		assertThat(o).isEqualTo(3);
 		assertThat(parser.parseExpression("counter").getValue(eContext)).isEqualTo(2);
 
-
 		// Now cause it to throw an exception:
 		eContext.setVariable("bar", 1);
 		assertThatException()
@@ -135,12 +140,13 @@ class MethodInvocationTests extends AbstractExpressionTests {
 	/**
 	 * Check on first usage (when the cachedExecutor in MethodReference is null) that the exception is not wrapped.
 	 */
-	@Test
-	void testMethodThrowingException_SPR6941() {
+	@Test  // SPR-6941
+	void methodThrowingRuntimeException() {
 		// Test method on inventor: throwException()
-		// On 1 it will throw an IllegalArgumentException
-		// On 2 it will throw a RuntimeException
-		// On 3 it will exit normally
+		// On 1 it will throw an IllegalArgumentException.
+		// On 2 it will throw a RuntimeException.
+		// On 4 it will throw a TestException.
+		// Otherwise, it will exit normally.
 		// In each case it increments the Inventor field 'counter' when invoked
 
 		SpelExpressionParser parser = new SpelExpressionParser();
@@ -152,12 +158,13 @@ class MethodInvocationTests extends AbstractExpressionTests {
 			.isNotInstanceOf(SpelEvaluationException.class);
 	}
 
-	@Test
-	void testMethodThrowingException_SPR6941_2() {
+	@Test  // SPR-6941
+	void methodThrowingCustomException() {
 		// Test method on inventor: throwException()
-		// On 1 it will throw an IllegalArgumentException
-		// On 2 it will throw a RuntimeException
-		// On 3 it will exit normally
+		// On 1 it will throw an IllegalArgumentException.
+		// On 2 it will throw a RuntimeException.
+		// On 4 it will throw a TestException.
+		// Otherwise, it will exit normally.
 		// In each case it increments the Inventor field 'counter' when invoked
 
 		SpelExpressionParser parser = new SpelExpressionParser();
@@ -166,17 +173,16 @@ class MethodInvocationTests extends AbstractExpressionTests {
 		context.setVariable("bar", 4);
 		assertThatExceptionOfType(ExpressionInvocationTargetException.class)
 			.isThrownBy(() -> expr.getValue(context))
-			.satisfies(ex -> assertThat(ex.getCause().getClass().getName()).isEqualTo(
-					"org.springframework.expression.spel.testresources.Inventor$TestException"));
+			.withCauseExactlyInstanceOf(Inventor.TestException.class);
 	}
 
-	@Test
-	void testMethodFiltering_SPR6764() {
+	@Test  // SPR-6764
+	void methodFiltering() {
 		SpelExpressionParser parser = new SpelExpressionParser();
 		StandardEvaluationContext context = new StandardEvaluationContext();
 		context.setRootObject(new TestObject());
 		LocalFilter filter = new LocalFilter();
-		context.registerMethodFilter(TestObject.class,filter);
+		context.registerMethodFilter(TestObject.class, filter);
 
 		// Filter will be called but not do anything, so first doit() will be invoked
 		SpelExpression expr = (SpelExpression) parser.parseExpression("doit(1)");
@@ -202,7 +208,7 @@ class MethodInvocationTests extends AbstractExpressionTests {
 
 		// check de-registration works
 		filter.filterCalled = false;
-		context.registerMethodFilter(TestObject.class,null);//clear filter
+		context.registerMethodFilter(TestObject.class, null); // clear filter
 		context.setRootObject(new TestObject());
 		expr = (SpelExpression) parser.parseExpression("doit(1)");
 		result = expr.getValue(context, String.class);
@@ -211,7 +217,7 @@ class MethodInvocationTests extends AbstractExpressionTests {
 	}
 
 	@Test
-	void testAddingMethodResolvers() {
+	void addingMethodResolvers() {
 		StandardEvaluationContext ctx = new StandardEvaluationContext();
 
 		// reflective method accessor is the only one by default
@@ -235,7 +241,7 @@ class MethodInvocationTests extends AbstractExpressionTests {
 	}
 
 	@Test
-	void testVarargsInvocation01() {
+	void varargsInvocation01() {
 		// Calling 'public String aVarargsMethod(String... strings)'
 		evaluate("aVarargsMethod('a','b','c')", "[a, b, c]", String.class);
 		evaluate("aVarargsMethod('a')", "[a]", String.class);
@@ -245,13 +251,14 @@ class MethodInvocationTests extends AbstractExpressionTests {
 		evaluate("aVarargsMethod(1,'a',3.0d)", "[1, a, 3.0]", String.class); // first and last need conversion
 		evaluate("aVarargsMethod(new String[]{'a','b','c'})", "[a, b, c]", String.class);
 		evaluate("aVarargsMethod(new String[]{})", "[]", String.class);
+		evaluate("aVarargsMethod(new int[]{1, 2, 3})", "[1, 2, 3]", String.class); // needs int[] to String[] conversion
 		evaluate("aVarargsMethod(null)", "[null]", String.class);
 		evaluate("aVarargsMethod(null,'a')", "[null, a]", String.class);
 		evaluate("aVarargsMethod('a',null,'b')", "[a, null, b]", String.class);
 	}
 
 	@Test
-	void testVarargsInvocation02() {
+	void varargsInvocation02() {
 		// Calling 'public String aVarargsMethod2(int i, String... strings)'
 		evaluate("aVarargsMethod2(5,'a','b','c')", "5-[a, b, c]", String.class);
 		evaluate("aVarargsMethod2(2,'a')", "2-[a]", String.class);
@@ -266,7 +273,7 @@ class MethodInvocationTests extends AbstractExpressionTests {
 	}
 
 	@Test
-	void testVarargsInvocation03() {
+	void varargsInvocation03() {
 		// Calling 'public int aVarargsMethod3(String str1, String... strings)' - returns all strings concatenated with "-"
 
 		// No conversion necessary
@@ -293,8 +300,91 @@ class MethodInvocationTests extends AbstractExpressionTests {
 		evaluate("aVarargsMethod3('foo', 'bar,baz')", "foo-bar,baz", String.class);
 	}
 
+	@Test  // gh-33013
+	void varargsWithObjectArrayType() {
+		// Calling 'public String formatObjectVarargs(String format, Object... args)' -> String.format(format, args)
+
+		// No var-args and no conversion necessary
+		evaluate("formatObjectVarargs('x')", "x", String.class);
+
+		// No var-args but conversion necessary
+		evaluate("formatObjectVarargs(9)", "9", String.class);
+
+		// No conversion necessary
+		evaluate("formatObjectVarargs('x -> %s', '')", "x -> ", String.class);
+		evaluate("formatObjectVarargs('x -> %s', ' ')", "x ->  ", String.class);
+		evaluate("formatObjectVarargs('x -> %s', 'a')", "x -> a", String.class);
+		evaluate("formatObjectVarargs('x -> %s %s %s', 'a', 'b', 'c')", "x -> a b c", String.class);
+		evaluate("formatObjectVarargs('x -> %s', new Object[]{''})", "x -> ", String.class);
+		evaluate("formatObjectVarargs('x -> %s', new String[]{''})", "x -> ", String.class);
+		evaluate("formatObjectVarargs('x -> %s', new Object[]{' '})", "x ->  ", String.class);
+		evaluate("formatObjectVarargs('x -> %s', new String[]{' '})", "x ->  ", String.class);
+		evaluate("formatObjectVarargs('x -> %s', new Object[]{'a'})", "x -> a", String.class);
+		evaluate("formatObjectVarargs('x -> %s', new String[]{'a'})", "x -> a", String.class);
+		evaluate("formatObjectVarargs('x -> %s %s %s', new Object[]{'a', 'b', 'c'})", "x -> a b c", String.class);
+		evaluate("formatObjectVarargs('x -> %s %s %s', new String[]{'a', 'b', 'c'})", "x -> a b c", String.class);
+
+		// Conversion necessary
+		evaluate("formatObjectVarargs('x -> %s %s', 2, 3)", "x -> 2 3", String.class);
+		evaluate("formatObjectVarargs('x -> %s %s', 'a', 3.0d)", "x -> a 3.0", String.class);
+		evaluate("formatObjectVarargs('x -> %s %s %s', new Integer[]{1, 2, 3})", "x -> 1 2 3", String.class);
+
+		// Individual string contains a comma with multiple varargs arguments
+		evaluate("formatObjectVarargs('foo -> %s %s', ',', 'baz')", "foo -> , baz", String.class);
+		evaluate("formatObjectVarargs('foo -> %s %s', 'bar', ',baz')", "foo -> bar ,baz", String.class);
+		evaluate("formatObjectVarargs('foo -> %s %s', 'bar,', 'baz')", "foo -> bar, baz", String.class);
+
+		// Individual string contains a comma with single varargs argument.
+		evaluate("formatObjectVarargs('foo -> %s', ',')", "foo -> ,", String.class);
+		evaluate("formatObjectVarargs('foo -> %s', ',bar')", "foo -> ,bar", String.class);
+		evaluate("formatObjectVarargs('foo -> %s', 'bar,')", "foo -> bar,", String.class);
+		evaluate("formatObjectVarargs('foo -> %s', 'bar,baz')", "foo -> bar,baz", String.class);
+	}
+
 	@Test
-	void testVarargsOptionalInvocation() {
+	void varargsWithPrimitiveArrayType() {
+		// Calling 'public String formatPrimitiveVarargs(String format, int... nums)' -> effectively String.format(format, args)
+
+		// No var-args and no conversion necessary
+		evaluate("formatPrimitiveVarargs(9)", "9", String.class);
+
+		// No var-args but conversion necessary
+		evaluate("formatPrimitiveVarargs('7')", "7", String.class);
+
+		// No conversion necessary
+		evaluate("formatPrimitiveVarargs('x -> %s', 9)", "x -> 9", String.class);
+		evaluate("formatPrimitiveVarargs('x -> %s %s %s', 1, 2, 3)", "x -> 1 2 3", String.class);
+		evaluate("formatPrimitiveVarargs('x -> %s', new int[]{1})", "x -> 1", String.class);
+		evaluate("formatPrimitiveVarargs('x -> %s %s %s', new int[]{1, 2, 3})", "x -> 1 2 3", String.class);
+
+		// Conversion necessary
+		evaluate("formatPrimitiveVarargs('x -> %s %s', '2', '3')", "x -> 2 3", String.class);
+		evaluate("formatPrimitiveVarargs('x -> %s %s', '2', 3.0d)", "x -> 2 3", String.class);
+	}
+
+	@Test
+	void varargsWithPrimitiveArrayToObjectArrayConversion() {
+		evaluate("formatObjectVarargs('x -> %s %s %s', new short[]{1, 2, 3})", "x -> 1 2 3", String.class); // short[] to Object[]
+		evaluate("formatObjectVarargs('x -> %s %s %s', new int[]{1, 2, 3})", "x -> 1 2 3", String.class); // int[] to Object[]
+	}
+
+	@Test  // gh-33315
+	void varargsWithListConvertedToVarargsArray() {
+		((StandardTypeLocator) context.getTypeLocator()).registerImport("java.util");
+
+		// Calling 'public String aVarargsMethod(String... strings)' -> Arrays.toString(strings)
+		String expected = "[a, b, c]";
+		evaluate("aVarargsMethod(T(List).of('a', 'b', 'c'))", expected, String.class);
+		evaluate("aVarargsMethod({'a', 'b', 'c'})", expected, String.class);
+
+		// Calling 'public String formatObjectVarargs(String format, Object... args)' -> String.format(format, args)
+		expected = "x -> a b c";
+		evaluate("formatObjectVarargs('x -> %s %s %s', T(List).of('a', 'b', 'c'))", expected, String.class);
+		evaluate("formatObjectVarargs('x -> %s %s %s', {'a', 'b', 'c'})", expected, String.class);
+	}
+
+	@Test
+	void varargsOptionalInvocation() {
 		// Calling 'public String optionalVarargsMethod(Optional<String>... values)'
 		evaluate("optionalVarargsMethod()", "[]", String.class);
 		evaluate("optionalVarargsMethod(new String[0])", "[]", String.class);
@@ -310,15 +400,35 @@ class MethodInvocationTests extends AbstractExpressionTests {
 	}
 
 	@Test
-	void testInvocationOnNullContextObject() {
+	void invocationOnNullContextObject() {
 		evaluateAndCheckError("null.toString()",SpelMessage.METHOD_CALL_ON_NULL_OBJECT_NOT_ALLOWED);
 	}
 
 	@Test
-	void testMethodOfClass() {
+	void methodOfJavaLangClass() {
 		Expression expression = parser.parseExpression("getName()");
 		Object value = expression.getValue(new StandardEvaluationContext(String.class));
 		assertThat(value).isEqualTo("java.lang.String");
+	}
+
+	@Test
+	void methodOfJavaLangObject() {
+		Expression expression = parser.parseExpression("toString()");
+		Object value = expression.getValue(new StandardEvaluationContext(42));
+		assertThat(value).isEqualTo("42");
+	}
+
+	@Test  // gh-33216
+	void methodOfJavaLangObjectDeclaredInNonPublicType() throws Exception {
+		Expression expression = parser.parseExpression("toString()");
+		List<String> unmodifiableList = Collections.unmodifiableList(Arrays.asList("foo", "bar"));
+		Method toStringMethod = unmodifiableList.getClass().getMethod("toString");
+
+		// Prerequisite for this use case:
+		assertThat(toStringMethod.getDeclaringClass()).isPackagePrivate();
+
+		Object value = expression.getValue(new StandardEvaluationContext(unmodifiableList));
+		assertThat(value).isEqualTo(unmodifiableList.toString());
 	}
 
 	@Test
@@ -336,32 +446,20 @@ class MethodInvocationTests extends AbstractExpressionTests {
 	// Simple filter
 	static class LocalFilter implements MethodFilter {
 
-		public boolean removeIfNotAnnotated = false;
+		boolean removeIfNotAnnotated = false;
 
-		public boolean filterCalled = false;
+		boolean filterCalled = false;
 
 		private boolean isAnnotated(Method method) {
-			Annotation[] anns = method.getAnnotations();
-			if (anns == null) {
-				return false;
-			}
-			for (Annotation ann : anns) {
-				String name = ann.annotationType().getName();
-				if (name.endsWith("Anno")) {
-					return true;
-				}
-			}
-			return false;
+			return method.isAnnotationPresent(Anno.class);
 		}
 
 		@Override
 		public List<Method> filter(List<Method> methods) {
-			filterCalled = true;
+			this.filterCalled = true;
 			List<Method> forRemoval = new ArrayList<>();
-			for (Method method: methods) {
-				if (removeIfNotAnnotated && !isAnnotated(method)) {
-					forRemoval.add(method);
-				}
+			if (this.removeIfNotAnnotated) {
+				methods.stream().filter(method -> !isAnnotated(method)).forEach(forRemoval::add);
 			}
 			for (Method method: forRemoval) {
 				methods.remove(method);
@@ -384,7 +482,7 @@ class MethodInvocationTests extends AbstractExpressionTests {
 
 		@Anno
 		public String doit(double d) {
-			return "double "+d;
+			return "double " + d;
 		}
 	}
 

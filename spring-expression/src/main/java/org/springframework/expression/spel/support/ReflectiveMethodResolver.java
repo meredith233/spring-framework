@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -27,6 +27,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import org.jspecify.annotations.Nullable;
+
 import org.springframework.core.BridgeMethodResolver;
 import org.springframework.core.MethodParameter;
 import org.springframework.core.convert.TypeDescriptor;
@@ -39,7 +41,7 @@ import org.springframework.expression.MethodResolver;
 import org.springframework.expression.TypeConverter;
 import org.springframework.expression.spel.SpelEvaluationException;
 import org.springframework.expression.spel.SpelMessage;
-import org.springframework.lang.Nullable;
+import org.springframework.expression.spel.support.ReflectionHelper.ArgumentsMatchKind;
 
 /**
  * Reflection-based {@link MethodResolver} used by default in {@link StandardEvaluationContext}
@@ -58,8 +60,7 @@ public class ReflectiveMethodResolver implements MethodResolver {
 	// more closely following the Java rules.
 	private final boolean useDistance;
 
-	@Nullable
-	private Map<Class<?>, MethodFilter> filters;
+	private @Nullable Map<Class<?>, MethodFilter> filters;
 
 
 	public ReflectiveMethodResolver() {
@@ -112,8 +113,7 @@ public class ReflectiveMethodResolver implements MethodResolver {
 	 * </ol>
 	 */
 	@Override
-	@Nullable
-	public MethodExecutor resolve(EvaluationContext context, Object targetObject, String name,
+	public @Nullable MethodExecutor resolve(EvaluationContext context, Object targetObject, String name,
 			List<TypeDescriptor> argumentTypes) throws AccessException {
 
 		try {
@@ -169,20 +169,20 @@ public class ReflectiveMethodResolver implements MethodResolver {
 				for (int i = 0; i < paramCount; i++) {
 					paramDescriptors.add(new TypeDescriptor(new MethodParameter(method, i)));
 				}
-				ReflectionHelper.ArgumentsMatchInfo matchInfo = null;
+				ArgumentsMatchKind matchKind = null;
 				if (method.isVarArgs() && argumentTypes.size() >= (paramCount - 1)) {
 					// *sigh* complicated
-					matchInfo = ReflectionHelper.compareArgumentsVarargs(paramDescriptors, argumentTypes, typeConverter);
+					matchKind = ReflectionHelper.compareArgumentsVarargs(paramDescriptors, argumentTypes, typeConverter);
 				}
 				else if (paramCount == argumentTypes.size()) {
 					// Name and parameter number match, check the arguments
-					matchInfo = ReflectionHelper.compareArguments(paramDescriptors, argumentTypes, typeConverter);
+					matchKind = ReflectionHelper.compareArguments(paramDescriptors, argumentTypes, typeConverter);
 				}
-				if (matchInfo != null) {
-					if (matchInfo.isExactMatch()) {
+				if (matchKind != null) {
+					if (matchKind.isExactMatch()) {
 						return new ReflectiveMethodExecutor(method, type);
 					}
-					else if (matchInfo.isCloseMatch()) {
+					else if (matchKind.isCloseMatch()) {
 						if (this.useDistance) {
 							int matchDistance = ReflectionHelper.getTypeDifferenceWeight(paramDescriptors, argumentTypes);
 							if (closeMatch == null || matchDistance < closeMatchDistance) {
@@ -198,7 +198,7 @@ public class ReflectiveMethodResolver implements MethodResolver {
 							}
 						}
 					}
-					else if (matchInfo.isMatchRequiringConversion()) {
+					else if (matchKind.isMatchRequiringConversion()) {
 						if (matchRequiringConversion != null) {
 							multipleOptions = true;
 						}
@@ -227,7 +227,7 @@ public class ReflectiveMethodResolver implements MethodResolver {
 	private Set<Method> getMethods(Class<?> type, Object targetObject) {
 		if (targetObject instanceof Class) {
 			Set<Method> result = new LinkedHashSet<>();
-			// Add these so that static methods are invocable on the type: e.g. Float.valueOf(..)
+			// Add these so that static methods are invocable on the type: for example, Float.valueOf(..)
 			for (Method method : getMethods(type)) {
 				if (Modifier.isStatic(method.getModifiers())) {
 					result.add(method);
@@ -269,7 +269,7 @@ public class ReflectiveMethodResolver implements MethodResolver {
 	/**
 	 * Return the set of methods for this type. The default implementation returns the
 	 * result of {@link Class#getMethods()} for the given {@code type}, but subclasses
-	 * may override in order to alter the results, e.g. specifying static methods
+	 * may override in order to alter the results, for example, specifying static methods
 	 * declared elsewhere.
 	 * @param type the class for which to return the methods
 	 * @since 3.1.1

@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,10 +23,11 @@ import java.util.concurrent.ConcurrentHashMap;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.jspecify.annotations.Nullable;
 
 import org.springframework.aop.support.AopUtils;
+import org.springframework.beans.factory.BeanFactoryAware;
 import org.springframework.core.MethodClassKey;
-import org.springframework.lang.Nullable;
 import org.springframework.util.ReflectionUtils;
 
 /**
@@ -59,13 +60,11 @@ public abstract class AbstractFallbackJCacheOperationSource implements JCacheOpe
 	}
 
 	@Override
-	@Nullable
-	public JCacheOperation<?> getCacheOperation(Method method, @Nullable Class<?> targetClass) {
+	public @Nullable JCacheOperation<?> getCacheOperation(Method method, @Nullable Class<?> targetClass) {
 		return getCacheOperation(method, targetClass, true);
 	}
 
-	@Nullable
-	private JCacheOperation<?> getCacheOperation(Method method, @Nullable Class<?> targetClass, boolean cacheNull) {
+	private @Nullable JCacheOperation<?> getCacheOperation(Method method, @Nullable Class<?> targetClass, boolean cacheNull) {
 		if (ReflectionUtils.isObjectMethod(method)) {
 			return null;
 		}
@@ -91,10 +90,13 @@ public abstract class AbstractFallbackJCacheOperationSource implements JCacheOpe
 		}
 	}
 
-	@Nullable
-	private JCacheOperation<?> computeCacheOperation(Method method, @Nullable Class<?> targetClass) {
+	private @Nullable JCacheOperation<?> computeCacheOperation(Method method, @Nullable Class<?> targetClass) {
 		// Don't allow non-public methods, as configured.
 		if (allowPublicMethodsOnly() && !Modifier.isPublic(method.getModifiers())) {
+			return null;
+		}
+		// Skip setBeanFactory method on BeanFactoryAware.
+		if (method.getDeclaringClass() == BeanFactoryAware.class) {
 			return null;
 		}
 
@@ -126,8 +128,7 @@ public abstract class AbstractFallbackJCacheOperationSource implements JCacheOpe
 	 * @return the cache operation associated with this method
 	 * (or {@code null} if none)
 	 */
-	@Nullable
-	protected abstract JCacheOperation<?> findCacheOperation(Method method, @Nullable Class<?> targetType);
+	protected abstract @Nullable JCacheOperation<?> findCacheOperation(Method method, @Nullable Class<?> targetType);
 
 	/**
 	 * Should only public methods be allowed to have caching semantics?

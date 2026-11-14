@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2023 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,7 +21,8 @@ import java.util.Collection;
 import java.util.Map;
 import java.util.Optional;
 
-import org.springframework.lang.Nullable;
+import org.jspecify.annotations.Nullable;
+
 import org.springframework.util.MultiValueMap;
 
 /**
@@ -72,7 +73,7 @@ public interface UriBuilder {
 	/**
 	 * Set the URI port. Use this method only when the port needs to be
 	 * parameterized with a URI variable. Otherwise use {@link #port(int)}.
-	 * Passing {@code null} will clear the port of this builder.
+	 * Passing {@code null} or an empty String will clear the port of this builder.
 	 * @param port the URI port
 	 */
 	UriBuilder port(@Nullable String port);
@@ -143,9 +144,10 @@ public interface UriBuilder {
 	UriBuilder pathSegment(String... pathSegments) throws IllegalArgumentException;
 
 	/**
-	 * Parse the given query string into query parameters where parameters are
-	 * separated with {@code '&'} and their values, if any, with {@code '='}.
-	 * The query may contain URI template variables.
+	 * Parse the given query string into query parameters, and append them to
+	 * the query string. Query parameters are separated with {@code '&'} while
+	 * their values, if any, are separated with {@code '='}. The query string
+	 * may contain URI template variables.
 	 * <p><strong>Note: </strong> please, review the Javadoc of
 	 * {@link #queryParam(String, Object...)} for further notes on the treatment
 	 * and encoding of individual query parameters.
@@ -166,7 +168,7 @@ public interface UriBuilder {
 	 * Append the given query parameter. Both the parameter name and values may
 	 * contain URI template variables to be expanded later from values. If no
 	 * values are given, the resulting URI will contain the query parameter name
-	 * only, e.g. {@code "?foo"} instead of {@code "?foo=bar"}.
+	 * only, for example, {@code "?foo"} instead of {@code "?foo=bar"}.
 	 * <p><strong>Note:</strong> encoding, if applied, will only encode characters
 	 * that are illegal in a query parameter name or value such as {@code "="}
 	 * or {@code "&"}. All others that are legal as per syntax rules in
@@ -260,7 +262,7 @@ public interface UriBuilder {
 	 * @param uriVariables the map of URI variables
 	 * @return the URI
 	 */
-	URI build(Object... uriVariables);
+	URI build(@Nullable Object... uriVariables);
 
 	/**
 	 * Build a {@link URI} instance and replaces URI template variables
@@ -268,7 +270,7 @@ public interface UriBuilder {
 	 * @param uriVariables the map of URI variables
 	 * @return the URI
 	 */
-	URI build(Map<String, ?> uriVariables);
+	URI build(Map<String, ? extends @Nullable Object> uriVariables);
 
 	/**
 	 * Return a String representation of the URI by concatenating all URI

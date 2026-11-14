@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -103,6 +103,14 @@ class AcceptHeaderLocaleResolverTests {
 		request.addHeader("Accept-Language", US.toLanguageTag());
 		request.setPreferredLocales(Collections.singletonList(US));
 		assertThat(this.resolver.resolveLocale(request)).isEqualTo(US);
+	}
+
+	@Test
+	void defaultLocaleWithBlankAcceptLanguageHeader() {
+		this.resolver.setDefaultLocale(JAPANESE);
+		MockHttpServletRequest request = new MockHttpServletRequest();
+		request.addHeader("Accept-Language", "");
+		assertThat(this.resolver.resolveLocale(request)).isEqualTo(JAPANESE);
 	}
 
 

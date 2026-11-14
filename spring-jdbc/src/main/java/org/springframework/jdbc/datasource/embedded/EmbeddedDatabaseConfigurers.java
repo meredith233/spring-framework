@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -38,6 +38,7 @@ public abstract class EmbeddedDatabaseConfigurers {
 	 * @return the configurer instance
 	 * @throws IllegalStateException if the driver for the specified database type is not available
 	 */
+	@SuppressWarnings("removal")
 	public static EmbeddedDatabaseConfigurer getConfigurer(EmbeddedDatabaseType type) {
 		Assert.notNull(type, "EmbeddedDatabaseType is required");
 		try {

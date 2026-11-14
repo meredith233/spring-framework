@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -31,7 +31,6 @@ import reactor.test.StepVerifier;
 import org.springframework.core.annotation.AnnotatedElementUtils;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.server.PathContainer;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.CrossOrigin;
@@ -113,7 +112,7 @@ class HandlerMethodMappingTests {
 	}
 
 	@Test // gh-26490
-	public void ambiguousMatchOnPreFlightRequestWithoutCorsConfig() {
+	void ambiguousMatchOnPreFlightRequestWithoutCorsConfig() {
 		this.mapping.registerMapping("/f?o", this.handler, this.method1);
 		this.mapping.registerMapping("/fo?", this.handler, this.method2);
 
@@ -124,13 +123,16 @@ class HandlerMethodMappingTests {
 
 		this.mapping.getHandler(exchange).block();
 
-		assertThat(exchange.getResponse().getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+		MockServerHttpResponse response = exchange.getResponse();
+		assertThat(response.getStatusCode()).isNull();
+		assertThat(response.getHeaders().getAccessControlAllowOrigin()).isNull();
+		assertThat(response.getHeaders().getAccessControlAllowMethods()).isEmpty();
 	}
 
 	@Test // gh-26490
-	public void ambiguousMatchOnPreFlightRequestWithCorsConfig() throws Exception {
-		this.mapping.registerMapping("/f?o", this.handler, this.method1);
-		this.mapping.registerMapping("/fo?", this.handler, this.handler.getClass().getMethod("corsHandlerMethod"));
+	void ambiguousMatchOnPreFlightRequestWithCorsConfig() throws Exception {
+		this.mapping.registerMapping("/f?o", this.handler, this.handler.getClass().getMethod("corsHandlerMethod1"));
+		this.mapping.registerMapping("/fo?", this.handler, this.handler.getClass().getMethod("corsHandlerMethod2"));
 
 		MockServerWebExchange exchange = MockServerWebExchange.from(
 				MockServerHttpRequest.options("https://example.org/foo")
@@ -254,7 +256,12 @@ class HandlerMethodMappingTests {
 
 		@RequestMapping
 		@CrossOrigin(originPatterns = "*")
-		public void corsHandlerMethod() {
+		public void corsHandlerMethod1() {
+		}
+
+		@RequestMapping
+		@CrossOrigin(originPatterns = "*")
+		public void corsHandlerMethod2() {
 		}
 	}
 

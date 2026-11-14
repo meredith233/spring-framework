@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,19 +21,20 @@ import java.nio.charset.StandardCharsets;
 import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.Set;
-import java.util.concurrent.locks.Lock;
-import java.util.concurrent.locks.ReentrantLock;
+
+import org.jspecify.annotations.Nullable;
 
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.server.ServerHttpResponse;
-import org.springframework.lang.Nullable;
 import org.springframework.util.ObjectUtils;
 import org.springframework.util.StringUtils;
+import org.springframework.web.servlet.ModelAndView;
+import org.springframework.web.util.SseUtils;
 
 /**
  * A specialization of {@link ResponseBodyEmitter} for sending
- * <a href="https://www.w3.org/TR/eventsource/">Server-Sent Events</a>.
+ * <a href="https://html.spec.whatwg.org/multipage/server-sent-events.html">Server-Sent Events</a>.
  *
  * @author Rossen Stoyanchev
  * @author Juergen Hoeller
@@ -45,10 +46,6 @@ public class SseEmitter extends ResponseBodyEmitter {
 
 	private static final MediaType TEXT_PLAIN = new MediaType("text", "plain", StandardCharsets.UTF_8);
 
-	/**
-	 * Guards access to write operations on the response.
-	 */
-	private final Lock writeLock = new ReentrantLock();
 
 	/**
 	 * Create a new SseEmitter instance.
@@ -200,17 +197,21 @@ public class SseEmitter extends ResponseBodyEmitter {
 
 		private final Set<DataWithMediaType> dataToSend = new LinkedHashSet<>(4);
 
-		@Nullable
-		private StringBuilder sb;
+		private final StringBuilder sb = new StringBuilder();
+
+		private boolean hasName;
 
 		@Override
 		public SseEventBuilder id(String id) {
+			SseUtils.assertNoLineSeparator(id);
 			append("id:").append(id).append('\n');
 			return this;
 		}
 
 		@Override
 		public SseEventBuilder name(String name) {
+			SseUtils.assertNoLineSeparator(name);
+			this.hasName = true;
 			append("event:").append(name).append('\n');
 			return this;
 		}
@@ -223,7 +224,9 @@ public class SseEmitter extends ResponseBodyEmitter {
 
 		@Override
 		public SseEventBuilder comment(String comment) {
-			append(':').append(comment).append('\n');
+			append(':');
+			SseUtils.appendFieldValue("", comment, this.sb);
+			append('\n');
 			return this;
 		}
 
@@ -234,28 +237,37 @@ public class SseEmitter extends ResponseBodyEmitter {
 
 		@Override
 		public SseEventBuilder data(Object object, @Nullable MediaType mediaType) {
-			append("data:");
-			saveAppendedText();
-			if (object instanceof String text) {
-				object = StringUtils.replace(text, "\n", "\ndata:");
+			if (object instanceof ModelAndView mav && !this.hasName && mav.getViewName() != null) {
+				name(mav.getViewName());
 			}
-			this.dataToSend.add(new DataWithMediaType(object, mediaType));
+			append("data: ");
+			saveAppendedText(TEXT_PLAIN);
+			if (object instanceof String text) {
+				writeStringData(text, mediaType);
+			}
+			else {
+				this.dataToSend.add(new DataWithMediaType(object, mediaType));
+			}
 			append('\n');
 			return this;
 		}
 
-		SseEventBuilderImpl append(String text) {
-			if (this.sb == null) {
-				this.sb = new StringBuilder();
+		private void writeStringData(String input, @Nullable MediaType mediaType) {
+			if (input.indexOf('\n') == -1 && input.indexOf('\r') == -1) {
+				this.dataToSend.add(new DataWithMediaType(input, mediaType));
 			}
+			else {
+				SseUtils.appendFieldValue("data", input, this.sb);
+				saveAppendedText(mediaType);
+			}
+		}
+
+		SseEventBuilderImpl append(String text) {
 			this.sb.append(text);
 			return this;
 		}
 
 		SseEventBuilderImpl append(char ch) {
-			if (this.sb == null) {
-				this.sb = new StringBuilder();
-			}
 			this.sb.append(ch);
 			return this;
 		}
@@ -266,14 +278,14 @@ public class SseEmitter extends ResponseBodyEmitter {
 				return Collections.emptySet();
 			}
 			append('\n');
-			saveAppendedText();
+			saveAppendedText(TEXT_PLAIN);
 			return this.dataToSend;
 		}
 
-		private void saveAppendedText() {
-			if (this.sb != null) {
-				this.dataToSend.add(new DataWithMediaType(this.sb.toString(), TEXT_PLAIN));
-				this.sb = null;
+		private void saveAppendedText(@Nullable MediaType mediaType) {
+			if (StringUtils.hasLength(this.sb)) {
+				this.dataToSend.add(new DataWithMediaType(this.sb.toString(), mediaType));
+				this.sb.setLength(0);
 			}
 		}
 	}

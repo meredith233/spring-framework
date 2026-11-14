@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -27,7 +27,7 @@ import static org.springframework.beans.factory.support.BeanDefinitionBuilder.ro
 
 /**
  * Unit tests covering cases where a user defines an invalid Configuration
- * class, e.g.: forgets to annotate with {@link Configuration} or declares
+ * class, for example: forgets to annotate with {@link Configuration} or declares
  * a Configuration class as final.
  *
  * @author Chris Beams
@@ -37,16 +37,18 @@ class InvalidConfigurationClassDefinitionTests {
 	@Test
 	void configurationClassesMayNotBeFinal() {
 		@Configuration
-		final class Config { }
+		final class Config {
+			@Bean String dummy() { return "dummy"; }
+		}
 
 		BeanDefinition configBeanDef = rootBeanDefinition(Config.class).getBeanDefinition();
 		DefaultListableBeanFactory beanFactory = new DefaultListableBeanFactory();
 		beanFactory.registerBeanDefinition("config", configBeanDef);
 
 		ConfigurationClassPostProcessor pp = new ConfigurationClassPostProcessor();
-		assertThatExceptionOfType(BeanDefinitionParsingException.class).isThrownBy(() ->
-				pp.postProcessBeanFactory(beanFactory))
-			.withMessageContaining("Remove the final modifier");
+		assertThatExceptionOfType(BeanDefinitionParsingException.class)
+				.isThrownBy(() -> pp.postProcessBeanFactory(beanFactory))
+				.withMessageContaining("Remove the final modifier");
 	}
 
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,9 +22,11 @@ import java.util.List;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
+import java.util.function.Consumer;
 
 import jakarta.jms.Connection;
 import jakarta.jms.JMSException;
+import org.jspecify.annotations.Nullable;
 
 import org.springframework.beans.factory.BeanNameAware;
 import org.springframework.beans.factory.DisposableBean;
@@ -33,7 +35,6 @@ import org.springframework.jms.JmsException;
 import org.springframework.jms.connection.ConnectionFactoryUtils;
 import org.springframework.jms.support.JmsUtils;
 import org.springframework.jms.support.destination.JmsDestinationAccessor;
-import org.springframework.lang.Nullable;
 import org.springframework.util.ClassUtils;
 
 /**
@@ -65,18 +66,15 @@ import org.springframework.util.ClassUtils;
 public abstract class AbstractJmsListeningContainer extends JmsDestinationAccessor
 		implements BeanNameAware, DisposableBean, SmartLifecycle {
 
-	@Nullable
-	private String clientId;
+	private @Nullable String clientId;
 
 	private boolean autoStartup = true;
 
 	private int phase = DEFAULT_PHASE;
 
-	@Nullable
-	private String beanName;
+	private @Nullable String beanName;
 
-	@Nullable
-	private Connection sharedConnection;
+	private @Nullable Connection sharedConnection;
 
 	private boolean sharedConnectionStarted = false;
 
@@ -110,8 +108,7 @@ public abstract class AbstractJmsListeningContainer extends JmsDestinationAccess
 	 * Return the JMS client ID for the shared Connection created and used
 	 * by this container, if any.
 	 */
-	@Nullable
-	public String getClientId() {
+	public @Nullable String getClientId() {
 		return this.clientId;
 	}
 
@@ -158,8 +155,7 @@ public abstract class AbstractJmsListeningContainer extends JmsDestinationAccess
 	 * Return the bean name that this listener container has been assigned
 	 * in its containing bean factory, if any.
 	 */
-	@Nullable
-	protected final String getBeanName() {
+	protected final @Nullable String getBeanName() {
 		return this.beanName;
 	}
 
@@ -197,9 +193,7 @@ public abstract class AbstractJmsListeningContainer extends JmsDestinationAccess
 
 	/**
 	 * Initialize this container.
-	 * <p>Creates a JMS Connection, starts the {@link jakarta.jms.Connection}
-	 * (if {@link #setAutoStartup(boolean) "autoStartup"} hasn't been turned off),
-	 * and calls {@link #doInitialize()}.
+	 * <p>Marks the container as active and calls {@link #doInitialize()}.
 	 * @throws org.springframework.jms.JmsException if startup failed
 	 */
 	public void initialize() throws JmsException {
@@ -410,15 +404,34 @@ public abstract class AbstractJmsListeningContainer extends JmsDestinationAccess
 
 	/**
 	 * Refresh the shared Connection that this container holds.
-	 * <p>Called on startup and also after an infrastructure exception
-	 * that occurred during invoker setup and/or execution.
+	 * <p>Called on startup.
 	 * @throws JMSException if thrown by JMS API methods
 	 */
 	protected final void refreshSharedConnection() throws JMSException {
+		refreshSharedConnection(con -> {});
+	}
+
+	/**
+	 * Refresh the shared Connection that this container holds.
+	 * <p>Called after an infrastructure exception that occurred during
+	 * invoker setup and/or execution.
+	 * @param connectionValidator a callback to test the refreshed connection
+	 * @throws JMSException if thrown by JMS API methods
+	 * @since 7.0.4
+	 */
+	void refreshSharedConnection(Consumer<Connection> connectionValidator) throws JMSException {
 		this.sharedConnectionLock.lock();
 		try {
 			releaseSharedConnection();
-			this.sharedConnection = createSharedConnection();
+			Connection con = createSharedConnection();
+			try {
+				connectionValidator.accept(con);
+			}
+			catch (RuntimeException | Error ex) {
+				JmsUtils.closeConnection(con);
+				throw ex;
+			}
+			this.sharedConnection = con;
 			if (this.sharedConnectionStarted) {
 				this.sharedConnection.start();
 			}
@@ -489,7 +502,7 @@ public abstract class AbstractJmsListeningContainer extends JmsDestinationAccess
 	/**
 	 * Stop the shared Connection.
 	 * @throws JMSException if thrown by JMS API methods
-	 * @see jakarta.jms.Connection#start()
+	 * @see jakarta.jms.Connection#stop()
 	 */
 	protected void stopSharedConnection() throws JMSException {
 		this.sharedConnectionLock.lock();

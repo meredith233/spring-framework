@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,18 +20,22 @@ import java.lang.reflect.Method;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.IdentityHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
+import io.micrometer.observation.ObservationRegistry;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.jspecify.annotations.Nullable;
 
 import org.springframework.aop.framework.AopInfrastructureBean;
 import org.springframework.aop.framework.AopProxyUtils;
@@ -43,6 +47,7 @@ import org.springframework.beans.factory.DisposableBean;
 import org.springframework.beans.factory.ListableBeanFactory;
 import org.springframework.beans.factory.SmartInitializingSingleton;
 import org.springframework.beans.factory.config.DestructionAwareBeanPostProcessor;
+import org.springframework.beans.factory.config.SingletonBeanRegistry;
 import org.springframework.beans.factory.support.MergedBeanDefinitionPostProcessor;
 import org.springframework.beans.factory.support.RootBeanDefinition;
 import org.springframework.context.ApplicationContext;
@@ -57,7 +62,8 @@ import org.springframework.core.Ordered;
 import org.springframework.core.annotation.AnnotatedElementUtils;
 import org.springframework.core.annotation.AnnotationAwareOrderComparator;
 import org.springframework.core.annotation.AnnotationUtils;
-import org.springframework.lang.Nullable;
+import org.springframework.format.annotation.DurationFormat;
+import org.springframework.format.datetime.standard.DurationFormatterUtils;
 import org.springframework.scheduling.TaskScheduler;
 import org.springframework.scheduling.Trigger;
 import org.springframework.scheduling.config.CronTask;
@@ -87,7 +93,7 @@ import org.springframework.util.StringValueResolver;
  *
  * <p>Autodetects any {@link SchedulingConfigurer} instances in the container,
  * allowing for customization of the scheduler to be used or for fine-grained
- * control over task registration (e.g. registration of {@link Trigger} tasks).
+ * control over task registration (for example, registration of {@link Trigger} tasks).
  * See the {@link EnableScheduling @EnableScheduling} javadocs for complete usage
  * details.
  *
@@ -98,6 +104,7 @@ import org.springframework.util.StringValueResolver;
  * @author Victor Brown
  * @author Sam Brannen
  * @author Simon Baslé
+ * @author Yanming Zhou
  * @since 3.0
  * @see Scheduled
  * @see EnableScheduling
@@ -123,36 +130,32 @@ public class ScheduledAnnotationBeanPostProcessor
 	/**
 	 * Reactive Streams API present on the classpath?
 	 */
-	private static final boolean reactiveStreamsPresent = ClassUtils.isPresent(
+	private static final boolean REACTIVE_STREAMS_PRESENT = ClassUtils.isPresent(
 			"org.reactivestreams.Publisher", ScheduledAnnotationBeanPostProcessor.class.getClassLoader());
 
 	protected final Log logger = LogFactory.getLog(getClass());
 
 	private final ScheduledTaskRegistrar registrar;
 
-	@Nullable
-	private Object scheduler;
+	private @Nullable Object scheduler;
 
-	@Nullable
-	private StringValueResolver embeddedValueResolver;
+	private @Nullable StringValueResolver embeddedValueResolver;
 
-	@Nullable
-	private String beanName;
+	private @Nullable String beanName;
 
-	@Nullable
-	private BeanFactory beanFactory;
+	private @Nullable BeanFactory beanFactory;
 
-	@Nullable
-	private ApplicationContext applicationContext;
+	private @Nullable ApplicationContext applicationContext;
 
-	@Nullable
-	private TaskSchedulerRouter localScheduler;
+	private @Nullable TaskSchedulerRouter localScheduler;
 
 	private final Set<Class<?>> nonAnnotatedClasses = ConcurrentHashMap.newKeySet(64);
 
 	private final Map<Object, Set<ScheduledTask>> scheduledTasks = new IdentityHashMap<>(16);
 
 	private final Map<Object, List<Runnable>> reactiveSubscriptions = new IdentityHashMap<>(16);
+
+	private final Set<Object> manualCancellationOnContextClose = Collections.newSetFromMap(new IdentityHashMap<>(16));
 
 
 	/**
@@ -304,30 +307,34 @@ public class ScheduledAnnotationBeanPostProcessor
 					logger.trace(annotatedMethods.size() + " @Scheduled methods processed on bean '" + beanName +
 							"': " + annotatedMethods);
 				}
+				if ((this.beanFactory != null &&
+						(!this.beanFactory.containsBean(beanName) || !this.beanFactory.isSingleton(beanName)) ||
+						(this.beanFactory instanceof SingletonBeanRegistry sbr && sbr.containsSingleton(beanName)))) {
+					// Either a prototype/scoped bean or a FactoryBean with a pre-existing managed singleton
+					// -> trigger manual cancellation when ContextClosedEvent comes in
+					this.manualCancellationOnContextClose.add(bean);
+				}
 			}
 		}
 		return bean;
 	}
 
 	/**
-	 * Process the given {@code @Scheduled} method declaration on the given bean,
-	 * attempting to distinguish {@linkplain #processScheduledAsync(Scheduled, Method, Object)
-	 * reactive} methods from {@linkplain #processScheduledSync(Scheduled, Method, Object)
-	 * synchronous} methods.
+	 * Process the given {@code @Scheduled} method declaration on the given bean.
 	 * @param scheduled the {@code @Scheduled} annotation
 	 * @param method the method that the annotation has been declared on
 	 * @param bean the target bean instance
-	 * @see #processScheduledSync(Scheduled, Method, Object)
-	 * @see #processScheduledAsync(Scheduled, Method, Object)
 	 */
 	protected void processScheduled(Scheduled scheduled, Method method, Object bean) {
+		Object key = AopProxyUtils.ultimateSingletonTarget(bean);
+
 		// Is the method a Kotlin suspending function? Throws if true and the reactor bridge isn't on the classpath.
 		// Does the method return a reactive type? Throws if true and it isn't a deferred Publisher type.
-		if (reactiveStreamsPresent && ScheduledAnnotationReactiveSupport.isReactive(method)) {
-			processScheduledAsync(scheduled, method, bean);
+		if (REACTIVE_STREAMS_PRESENT && ScheduledAnnotationReactiveSupport.isReactive(method)) {
+			processScheduledAsync(scheduled, method, bean, key);
 			return;
 		}
-		processScheduledSync(scheduled, method, bean);
+		processScheduledSync(scheduled, method, bean, key);
 	}
 
 	/**
@@ -338,8 +345,9 @@ public class ScheduledAnnotationBeanPostProcessor
 	 * @param scheduled the {@code @Scheduled} annotation
 	 * @param method the method that the annotation has been declared on
 	 * @param bean the target bean instance
+	 * @param key a cache key for the target bean instance
 	 */
-	private void processScheduledSync(Scheduled scheduled, Method method, Object bean) {
+	private void processScheduledSync(Scheduled scheduled, Method method, Object bean, Object key) {
 		Runnable task;
 		try {
 			task = createRunnable(bean, method, scheduled.scheduler());
@@ -348,7 +356,8 @@ public class ScheduledAnnotationBeanPostProcessor
 			throw new IllegalStateException("Could not create recurring task for @Scheduled method '" +
 					method.getName() + "': " + ex.getMessage());
 		}
-		processScheduledTask(scheduled, task, method, bean);
+
+		processScheduledTask(scheduled, task, method, key);
 	}
 
 	/**
@@ -363,33 +372,35 @@ public class ScheduledAnnotationBeanPostProcessor
 	 * @param method the method that the annotation has been declared on, which
 	 * must either return a Publisher-adaptable type or be a Kotlin suspending function
 	 * @param bean the target bean instance
+	 * @param key a cache key for the target bean (potentially the raw singleton target)
 	 * @see ScheduledAnnotationReactiveSupport
 	 */
-	private void processScheduledAsync(Scheduled scheduled, Method method, Object bean) {
+	private void processScheduledAsync(Scheduled scheduled, Method method, Object bean, Object key) {
 		Runnable task;
 		try {
 			task = ScheduledAnnotationReactiveSupport.createSubscriptionRunnable(method, bean, scheduled,
-					this.registrar::getObservationRegistry,
-					this.reactiveSubscriptions.computeIfAbsent(bean, k -> new CopyOnWriteArrayList<>()));
+					this::resolveObservationRegistry,
+					this.reactiveSubscriptions.computeIfAbsent(key, k -> new CopyOnWriteArrayList<>()));
 		}
 		catch (IllegalArgumentException ex) {
 			throw new IllegalStateException("Could not create recurring task for @Scheduled method '" +
 					method.getName() + "': " + ex.getMessage());
 		}
-		processScheduledTask(scheduled, task, method, bean);
+
+		processScheduledTask(scheduled, task, method, key);
 	}
 
 	/**
 	 * Parse the {@code Scheduled} annotation and schedule the provided {@code Runnable}
 	 * accordingly. The Runnable can represent either a synchronous method invocation
-	 * (see {@link #processScheduledSync(Scheduled, Method, Object)}) or an asynchronous
-	 * one (see {@link #processScheduledAsync(Scheduled, Method, Object)}).
+	 * (see {@link #processScheduledSync}) or an asynchronous one (see
+	 * {@link #processScheduledAsync}).
 	 * @param scheduled the {@code @Scheduled} annotation
 	 * @param runnable the runnable to be scheduled
 	 * @param method the method that the annotation has been declared on
-	 * @param bean the target bean instance
+	 * @param key a cache key for the target bean (potentially the raw singleton target)
 	 */
-	private void processScheduledTask(Scheduled scheduled, Runnable runnable, Method method, Object bean) {
+	private void processScheduledTask(Scheduled scheduled, Runnable runnable, Method method, Object key) {
 		try {
 			boolean processedSchedule = false;
 			String errorMessage = "Exactly one of the 'cron', 'fixedDelay' or 'fixedRate' attributes is required";
@@ -410,7 +421,7 @@ public class ScheduledAnnotationBeanPostProcessor
 					}
 					catch (RuntimeException ex) {
 						throw new IllegalArgumentException(
-								"Invalid initialDelayString value \"" + initialDelayString + "\" - cannot parse into long");
+								"Invalid initialDelayString value \"" + initialDelayString + "\"; " + ex);
 					}
 				}
 			}
@@ -434,7 +445,8 @@ public class ScheduledAnnotationBeanPostProcessor
 						else {
 							trigger = new CronTrigger(cron);
 						}
-						tasks.add(this.registrar.scheduleCronTask(new CronTask(runnable, trigger)));
+						tasks.add(Objects.requireNonNull(
+								this.registrar.scheduleCronTask(new CronTask(runnable, trigger))));
 					}
 				}
 			}
@@ -447,7 +459,8 @@ public class ScheduledAnnotationBeanPostProcessor
 			if (!fixedDelay.isNegative()) {
 				Assert.isTrue(!processedSchedule, errorMessage);
 				processedSchedule = true;
-				tasks.add(this.registrar.scheduleFixedDelayTask(new FixedDelayTask(runnable, fixedDelay, delayToUse)));
+				tasks.add(Objects.requireNonNull(
+						this.registrar.scheduleFixedDelayTask(new FixedDelayTask(runnable, fixedDelay, delayToUse))));
 			}
 			String fixedDelayString = scheduled.fixedDelayString();
 			if (StringUtils.hasText(fixedDelayString)) {
@@ -462,9 +475,10 @@ public class ScheduledAnnotationBeanPostProcessor
 					}
 					catch (RuntimeException ex) {
 						throw new IllegalArgumentException(
-								"Invalid fixedDelayString value \"" + fixedDelayString + "\" - cannot parse into long");
+								"Invalid fixedDelayString value \"" + fixedDelayString + "\"; " + ex);
 					}
-					tasks.add(this.registrar.scheduleFixedDelayTask(new FixedDelayTask(runnable, fixedDelay, delayToUse)));
+					tasks.add(Objects.requireNonNull(
+							this.registrar.scheduleFixedDelayTask(new FixedDelayTask(runnable, fixedDelay, delayToUse))));
 				}
 			}
 
@@ -473,7 +487,8 @@ public class ScheduledAnnotationBeanPostProcessor
 			if (!fixedRate.isNegative()) {
 				Assert.isTrue(!processedSchedule, errorMessage);
 				processedSchedule = true;
-				tasks.add(this.registrar.scheduleFixedRateTask(new FixedRateTask(runnable, fixedRate, delayToUse)));
+				tasks.add(Objects.requireNonNull(
+						this.registrar.scheduleFixedRateTask(new FixedRateTask(runnable, fixedRate, delayToUse))));
 			}
 			String fixedRateString = scheduled.fixedRateString();
 			if (StringUtils.hasText(fixedRateString)) {
@@ -488,9 +503,10 @@ public class ScheduledAnnotationBeanPostProcessor
 					}
 					catch (RuntimeException ex) {
 						throw new IllegalArgumentException(
-								"Invalid fixedRateString value \"" + fixedRateString + "\" - cannot parse into long");
+								"Invalid fixedRateString value \"" + fixedRateString + "\"; " + ex);
 					}
-					tasks.add(this.registrar.scheduleFixedRateTask(new FixedRateTask(runnable, fixedRate, delayToUse)));
+					tasks.add(Objects.requireNonNull(
+							this.registrar.scheduleFixedRateTask(new FixedRateTask(runnable, fixedRate, delayToUse))));
 				}
 			}
 
@@ -498,12 +514,13 @@ public class ScheduledAnnotationBeanPostProcessor
 				if (initialDelay.isNegative()) {
 					throw new IllegalArgumentException("One-time task only supported with specified initial delay");
 				}
-				tasks.add(this.registrar.scheduleOneTimeTask(new OneTimeTask(runnable, delayToUse)));
+				tasks.add(Objects.requireNonNull(
+						this.registrar.scheduleOneTimeTask(new OneTimeTask(runnable, delayToUse))));
 			}
 
 			// Finally register the scheduled tasks
 			synchronized (this.scheduledTasks) {
-				Set<ScheduledTask> regTasks = this.scheduledTasks.computeIfAbsent(bean, key -> new LinkedHashSet<>(4));
+				Set<ScheduledTask> regTasks = this.scheduledTasks.computeIfAbsent(key, k -> new LinkedHashSet<>(4));
 				regTasks.addAll(tasks);
 			}
 		}
@@ -529,7 +546,7 @@ public class ScheduledAnnotationBeanPostProcessor
 		}
 		Assert.isTrue(method.getParameterCount() == 0, "Only no-arg methods may be annotated with @Scheduled");
 		Method invocableMethod = AopUtils.selectInvocableMethod(method, target.getClass());
-		return new ScheduledMethodRunnable(target, invocableMethod, qualifier, this.registrar::getObservationRegistry);
+		return new ScheduledMethodRunnable(target, invocableMethod, qualifier, this::resolveObservationRegistry);
 	}
 
 	/**
@@ -541,36 +558,9 @@ public class ScheduledAnnotationBeanPostProcessor
 	 * @deprecated in favor of {@link #createRunnable(Object, Method, String)}
 	 */
 	@Deprecated(since = "6.1")
-	@Nullable
-	protected Runnable createRunnable(Object target, Method method) {
+	protected @Nullable Runnable createRunnable(Object target, Method method) {
 		return null;
 	}
-
-	private static Duration toDuration(long value, TimeUnit timeUnit) {
-		try {
-			return Duration.of(value, timeUnit.toChronoUnit());
-		}
-		catch (Exception ex) {
-			throw new IllegalArgumentException(
-					"Unsupported unit " + timeUnit + " for value \"" + value + "\": " + ex.getMessage());
-		}
-	}
-
-	private static Duration toDuration(String value, TimeUnit timeUnit) {
-		if (isDurationString(value)) {
-			return Duration.parse(value);
-		}
-		return toDuration(Long.parseLong(value), timeUnit);
-	}
-
-	private static boolean isDurationString(String value) {
-		return (value.length() > 1 && (isP(value.charAt(0)) || isP(value.charAt(1))));
-	}
-
-	private static boolean isP(char ch) {
-		return (ch == 'P' || ch == 'p');
-	}
-
 
 	/**
 	 * Return all currently scheduled tasks, from {@link Scheduled} methods
@@ -594,6 +584,22 @@ public class ScheduledAnnotationBeanPostProcessor
 
 	@Override
 	public void postProcessBeforeDestruction(Object bean, String beanName) {
+		cancelScheduledTasks(bean);
+		this.manualCancellationOnContextClose.remove(bean);
+	}
+
+	@Override
+	public boolean requiresDestruction(Object bean) {
+		synchronized (this.scheduledTasks) {
+			return (this.scheduledTasks.containsKey(bean) || this.reactiveSubscriptions.containsKey(bean));
+		}
+	}
+
+	private ObservationRegistry resolveObservationRegistry() {
+		return Objects.requireNonNullElse(this.registrar.getObservationRegistry(), ObservationRegistry.NOOP);
+	}
+
+	private void cancelScheduledTasks(Object bean) {
 		Set<ScheduledTask> tasks;
 		List<Runnable> liveSubscriptions;
 		synchronized (this.scheduledTasks) {
@@ -613,13 +619,6 @@ public class ScheduledAnnotationBeanPostProcessor
 	}
 
 	@Override
-	public boolean requiresDestruction(Object bean) {
-		synchronized (this.scheduledTasks) {
-			return (this.scheduledTasks.containsKey(bean) || this.reactiveSubscriptions.containsKey(bean));
-		}
-	}
-
-	@Override
 	public void destroy() {
 		synchronized (this.scheduledTasks) {
 			Collection<Set<ScheduledTask>> allTasks = this.scheduledTasks.values();
@@ -635,7 +634,10 @@ public class ScheduledAnnotationBeanPostProcessor
 					liveSubscription.run();  // equivalent to cancelling the subscription
 				}
 			}
+			this.reactiveSubscriptions.clear();
+			this.manualCancellationOnContextClose.clear();
 		}
+
 		this.registrar.destroy();
 		if (this.localScheduler != null) {
 			this.localScheduler.destroy();
@@ -654,21 +656,26 @@ public class ScheduledAnnotationBeanPostProcessor
 			if (event instanceof ContextRefreshedEvent) {
 				// Running in an ApplicationContext -> register tasks this late...
 				// giving other ContextRefreshedEvent listeners a chance to perform
-				// their work at the same time (e.g. Spring Batch's job registration).
+				// their work at the same time (for example, Spring Batch's job registration).
 				finishRegistration();
 			}
 			else if (event instanceof ContextClosedEvent) {
-				synchronized (this.scheduledTasks) {
-					Collection<Set<ScheduledTask>> allTasks = this.scheduledTasks.values();
-					for (Set<ScheduledTask> tasks : allTasks) {
-						for (ScheduledTask task : tasks) {
-							// At this early point, let in-progress tasks complete still
-							task.cancel(false);
-						}
-					}
+				for (Object bean : this.manualCancellationOnContextClose) {
+					cancelScheduledTasks(bean);
 				}
+				this.manualCancellationOnContextClose.clear();
 			}
 		}
+	}
+
+
+	private static Duration toDuration(long value, TimeUnit timeUnit) {
+		return Duration.of(value, timeUnit.toChronoUnit());
+	}
+
+	private static Duration toDuration(String value, TimeUnit timeUnit) {
+		DurationFormat.Unit unit = DurationFormat.Unit.fromChronoUnit(timeUnit.toChronoUnit());
+		return DurationFormatterUtils.detectAndParse(value, unit);
 	}
 
 }

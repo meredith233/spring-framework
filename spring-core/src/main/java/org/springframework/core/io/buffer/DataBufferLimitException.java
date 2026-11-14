@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2021 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,9 +19,9 @@ package org.springframework.core.io.buffer;
 /**
  * Exception that indicates the cumulative number of bytes consumed from a
  * stream of {@link DataBuffer DataBuffer}'s exceeded some pre-configured limit.
- * This can be raised when data buffers are cached and aggregated, e.g.
+ * This can be raised when data buffers are cached and aggregated, for example,
  * {@link DataBufferUtils#join}. Or it could also be raised when data buffers
- * have been released but a parsed representation is being aggregated, e.g. async
+ * have been released but a parsed representation is being aggregated, for example, async
  * parsing with Jackson, SSE parsing and aggregating lines per event.
  *
  * @author Rossen Stoyanchev
@@ -31,8 +31,19 @@ package org.springframework.core.io.buffer;
 public class DataBufferLimitException extends IllegalStateException {
 
 
+	/**
+	 * Create an instance with the given message.
+	 */
 	public DataBufferLimitException(String message) {
 		super(message);
+	}
+
+	/**
+	 * Create an instance with a message and a cause, e.g. {@link OutOfMemoryError}.
+	 * @since 6.2.12
+	 */
+	public DataBufferLimitException(String message, Throwable cause) {
+		super(message, cause);
 	}
 
 }

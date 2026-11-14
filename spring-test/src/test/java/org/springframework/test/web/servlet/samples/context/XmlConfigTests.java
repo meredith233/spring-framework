@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2023 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -50,8 +50,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 	@ContextConfiguration("root-context.xml"),
 	@ContextConfiguration("servlet-context.xml")
 })
-@DisabledInAotMode // @ContextHierarchy is not supported in AOT.
-public class XmlConfigTests {
+@DisabledInAotMode("@ContextHierarchy is not supported in AOT")
+class XmlConfigTests {
 
 	@Autowired
 	private WebApplicationContext wac;
@@ -63,17 +63,17 @@ public class XmlConfigTests {
 
 
 	@BeforeEach
-	public void setup() {
+	void setup() {
 		this.mockMvc = MockMvcBuilders.webAppContextSetup(this.wac).build();
 		given(this.personDao.getPerson(5L)).willReturn(new Person("Joe"));
 	}
 
 	@Test
-	public void person() throws Exception {
+	void person() throws Exception {
 		this.mockMvc.perform(get("/person/5").accept(MediaType.APPLICATION_JSON))
 			.andDo(print())
 			.andExpect(status().isOk())
-			.andExpect(content().string("{\"name\":\"Joe\",\"someDouble\":0.0,\"someBoolean\":false}"));
+			.andExpect(content().string("{\"name\":\"Joe\",\"someBoolean\":false,\"someDouble\":0.0}"));
 	}
 
 }

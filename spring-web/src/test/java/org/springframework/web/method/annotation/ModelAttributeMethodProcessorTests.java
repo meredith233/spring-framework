@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,6 +21,7 @@ import java.lang.annotation.Target;
 import java.lang.reflect.Method;
 import java.util.List;
 
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -29,7 +30,6 @@ import org.springframework.core.MethodParameter;
 import org.springframework.core.ResolvableType;
 import org.springframework.core.annotation.SynthesizingMethodParameter;
 import org.springframework.format.support.DefaultFormattingConversionService;
-import org.springframework.lang.Nullable;
 import org.springframework.validation.BindingResult;
 import org.springframework.validation.Errors;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -196,7 +196,7 @@ class ModelAttributeMethodProcessorTests {
 		Object target = new TestBean();
 		this.container.addAttribute(name, target);
 
-		// Declare binding disabled (e.g. via @ModelAttribute method)
+		// Declare binding disabled (for example, via @ModelAttribute method)
 		this.container.setBindingDisabled(name);
 
 		StubRequestDataBinder dataBinder = new StubRequestDataBinder(target, name);
@@ -247,7 +247,7 @@ class ModelAttributeMethodProcessorTests {
 	}
 
 	@Test  // SPR-9378
-	public void resolveArgumentOrdering() throws Exception {
+	void resolveArgumentOrdering() throws Exception {
 		String name = "testBean";
 		Object testBean = new TestBean(name);
 		this.container.addAttribute(name, testBean);
@@ -282,7 +282,7 @@ class ModelAttributeMethodProcessorTests {
 	}
 
 	@Test  // gh-25182
-	public void resolveConstructorListArgumentFromCommaSeparatedRequestParameter() throws Exception {
+	void resolveConstructorListArgumentFromCommaSeparatedRequestParameter() throws Exception {
 		MockHttpServletRequest mockRequest = new MockHttpServletRequest();
 		mockRequest.addParameter("listOfStrings", "1,2");
 		ServletWebRequest requestWithParam = new ServletWebRequest(mockRequest);

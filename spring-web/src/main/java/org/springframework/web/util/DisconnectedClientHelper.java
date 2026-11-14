@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,21 +16,27 @@
 
 package org.springframework.web.util;
 
+import java.util.Locale;
 import java.util.Set;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.jspecify.annotations.Nullable;
 
 import org.springframework.core.NestedExceptionUtils;
 import org.springframework.util.Assert;
+import org.springframework.util.ClassUtils;
+import org.springframework.util.CollectionUtils;
 
 /**
- * Utility methods to assist with identifying and logging exceptions that indicate
- * the client has gone away. Such exceptions fill logs with unnecessary stack
- * traces. The utility methods help to log a single line message at DEBUG level,
- * and a full stacktrace at TRACE level.
+ * Utility methods to assist with identifying and logging exceptions that
+ * indicate the server response connection is lost, for example because the
+ * client has gone away. This class helps to identify such exceptions and
+ * minimize logging to a single line at DEBUG level, while making the full
+ * error stacktrace at TRACE level.
  *
  * @author Rossen Stoyanchev
+ * @author Yanming Zhou
  * @since 6.1
  */
 public class DisconnectedClientHelper {
@@ -41,6 +47,16 @@ public class DisconnectedClientHelper {
 	private static final Set<String> EXCEPTION_TYPE_NAMES =
 			Set.of("AbortedException", "ClientAbortException",
 					"EOFException", "EofException", "AsyncRequestNotUsableException");
+
+	private static final Set<Class<?>> EXCLUDED_EXCEPTION_TYPES = CollectionUtils.newLinkedHashSet(4);
+
+	static {
+		addExcludedExceptionType("org.springframework.web.client.RestClientException");
+		addExcludedExceptionType("org.springframework.web.reactive.function.client.WebClientException");
+		addExcludedExceptionType("org.springframework.dao.DataAccessException");
+		addExcludedExceptionType("org.springframework.messaging.MessagingException");
+	}
+
 
 	private final Log logger;
 
@@ -73,24 +89,55 @@ public class DisconnectedClientHelper {
 
 	/**
 	 * Whether the given exception indicates the client has gone away.
-	 * Known cases covered:
+	 * <p>Known cases covered:
 	 * <ul>
 	 * <li>ClientAbortException or EOFException for Tomcat
 	 * <li>EofException for Jetty
 	 * <li>IOException "Broken pipe" or "connection reset by peer"
 	 * </ul>
 	 */
-	public static boolean isClientDisconnectedException(Throwable ex) {
+	public static boolean isClientDisconnectedException(@Nullable Throwable ex) {
+		if (ex == null) {
+			return false;
+		}
+
+		Throwable currentEx = ex;
+		Throwable lastEx = null;
+		while (currentEx != null && currentEx != lastEx) {
+			// Ignore onward connection issues to other servers (500 error)
+			for (Class<?> exceptionType : EXCLUDED_EXCEPTION_TYPES) {
+				if (exceptionType.isInstance(currentEx)) {
+					return false;
+				}
+			}
+			if (EXCEPTION_TYPE_NAMES.contains(currentEx.getClass().getSimpleName())) {
+				return true;
+			}
+			lastEx = currentEx;
+			currentEx = currentEx.getCause();
+		}
+
 		String message = NestedExceptionUtils.getMostSpecificCause(ex).getMessage();
 		if (message != null) {
-			String text = message.toLowerCase();
+			String text = message.toLowerCase(Locale.ROOT);
 			for (String phrase : EXCEPTION_PHRASES) {
 				if (text.contains(phrase)) {
 					return true;
 				}
 			}
 		}
-		return EXCEPTION_TYPE_NAMES.contains(ex.getClass().getSimpleName());
+
+		return false;
+	}
+
+	private static void addExcludedExceptionType(String type) {
+		try {
+			ClassLoader classLoader = DisconnectedClientHelper.class.getClassLoader();
+			EXCLUDED_EXCEPTION_TYPES.add(ClassUtils.forName(type, classLoader));
+		}
+		catch (ClassNotFoundException ex) {
+			// ignore
+		}
 	}
 
 }

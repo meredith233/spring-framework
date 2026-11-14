@@ -9,6 +9,7 @@ ivy-cache
 argfile*
 activemq-data/
 classes/
+.cursor/
 
 # Log files
 jxl.log
@@ -38,11 +39,12 @@ bin
 .springBeans
 spring-*/src/main/java/META-INF/MANIFEST.MF
 
-# IDEA artifacts and output dirs
+# IntelliJ IDEA artifacts and output dirs
 *.iml
 *.ipr
 *.iws
-.idea
+.idea/*
+!.idea/icon.svg
 out
 test-output
 atlassian-ide-plugin.xml
@@ -50,4 +52,10 @@ atlassian-ide-plugin.xml
 # VS Code
 .vscode/
 
+# Claude artifacts
+.claude/*
+
 cached-antora-playbook.yml
+
+node_modules
+/.kotlin/

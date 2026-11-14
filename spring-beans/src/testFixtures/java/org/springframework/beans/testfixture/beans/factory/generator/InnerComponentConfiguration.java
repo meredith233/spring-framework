@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2022 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,14 +23,31 @@ public class InnerComponentConfiguration {
 	public class NoDependencyComponent {
 
 		public NoDependencyComponent() {
-
 		}
 	}
 
 	public class EnvironmentAwareComponent {
 
-		public EnvironmentAwareComponent(Environment environment) {
+		final Environment environment;
 
+		public EnvironmentAwareComponent(Environment environment) {
+			this.environment = environment;
 		}
 	}
+
+	public class NoDependencyComponentWithoutPublicConstructor {
+
+		NoDependencyComponentWithoutPublicConstructor() {
+		}
+	}
+
+	public class EnvironmentAwareComponentWithoutPublicConstructor {
+
+		final Environment environment;
+
+		EnvironmentAwareComponentWithoutPublicConstructor(Environment environment) {
+			this.environment = environment;
+		}
+	}
+
 }

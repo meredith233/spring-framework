@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2023 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -24,9 +24,10 @@ import java.util.Map;
 import java.util.Queue;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
-import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BiConsumer;
+
+import org.jspecify.annotations.Nullable;
 
 import org.springframework.expression.EvaluationContext;
 import org.springframework.expression.Expression;
@@ -36,7 +37,6 @@ import org.springframework.expression.TypedValue;
 import org.springframework.expression.spel.SpelEvaluationException;
 import org.springframework.expression.spel.standard.SpelExpressionParser;
 import org.springframework.expression.spel.support.SimpleEvaluationContext;
-import org.springframework.lang.Nullable;
 import org.springframework.messaging.Message;
 import org.springframework.messaging.MessageHeaders;
 import org.springframework.messaging.simp.SimpMessageHeaderAccessor;
@@ -73,15 +73,15 @@ public class DefaultSubscriptionRegistry extends AbstractSubscriptionRegistry {
 
 	/** Static evaluation context to reuse. */
 	private static final EvaluationContext messageEvalContext =
-			SimpleEvaluationContext.forPropertyAccessors(new SimpMessageHeaderPropertyAccessor()).build();
+			SimpleEvaluationContext.forPropertyAccessors(new SimpMessageHeaderPropertyAccessor())
+					.withAssignmentDisabled().build();
 
 
 	private PathMatcher pathMatcher = new AntPathMatcher();
 
 	private int cacheLimit = DEFAULT_CACHE_LIMIT;
 
-	@Nullable
-	private String selectorHeaderName;
+	private @Nullable String selectorHeaderName;
 
 	private volatile boolean selectorHeaderInUse;
 
@@ -148,8 +148,7 @@ public class DefaultSubscriptionRegistry extends AbstractSubscriptionRegistry {
 	 * @since 4.2
 	 * @see #setSelectorHeaderName(String)
 	 */
-	@Nullable
-	public String getSelectorHeaderName() {
+	public @Nullable String getSelectorHeaderName() {
 		return this.selectorHeaderName;
 	}
 
@@ -165,8 +164,7 @@ public class DefaultSubscriptionRegistry extends AbstractSubscriptionRegistry {
 		this.destinationCache.updateAfterNewSubscription(sessionId, subscription);
 	}
 
-	@Nullable
-	private Expression getSelectorExpression(MessageHeaders headers) {
+	private @Nullable Expression getSelectorExpression(MessageHeaders headers) {
 		if (getSelectorHeaderName() == null) {
 			return null;
 		}
@@ -305,6 +303,9 @@ public class DefaultSubscriptionRegistry extends AbstractSubscriptionRegistry {
 					return Collections.singletonList(subscriptionId);
 				}
 				else {
+					if (subscriptionIds.contains(subscriptionId)) {
+						return subscriptionIds;
+					}
 					List<String> result = new ArrayList<>(subscriptionIds.size() + 1);
 					result.addAll(subscriptionIds);
 					result.add(subscriptionId);
@@ -390,10 +391,9 @@ public class DefaultSubscriptionRegistry extends AbstractSubscriptionRegistry {
 	 */
 	private static final class SessionRegistry {
 
-		private final ConcurrentMap<String, SessionInfo> sessions = new ConcurrentHashMap<>();
+		private final Map<String, SessionInfo> sessions = new ConcurrentHashMap<>();
 
-		@Nullable
-		public SessionInfo getSession(String sessionId) {
+		public @Nullable SessionInfo getSession(String sessionId) {
 			return this.sessions.get(sessionId);
 		}
 
@@ -407,8 +407,7 @@ public class DefaultSubscriptionRegistry extends AbstractSubscriptionRegistry {
 			info.addSubscription(subscription);
 		}
 
-		@Nullable
-		public SessionInfo removeSubscriptions(String sessionId) {
+		public @Nullable SessionInfo removeSubscriptions(String sessionId) {
 			return this.sessions.remove(sessionId);
 		}
 	}
@@ -425,8 +424,7 @@ public class DefaultSubscriptionRegistry extends AbstractSubscriptionRegistry {
 			return this.subscriptionMap.values();
 		}
 
-		@Nullable
-		public Subscription getSubscription(String subscriptionId) {
+		public @Nullable Subscription getSubscription(String subscriptionId) {
 			return this.subscriptionMap.get(subscriptionId);
 		}
 
@@ -434,8 +432,7 @@ public class DefaultSubscriptionRegistry extends AbstractSubscriptionRegistry {
 			this.subscriptionMap.putIfAbsent(subscription.getId(), subscription);
 		}
 
-		@Nullable
-		public Subscription removeSubscription(String subscriptionId) {
+		public @Nullable Subscription removeSubscription(String subscriptionId) {
 			return this.subscriptionMap.remove(subscriptionId);
 		}
 	}
@@ -451,8 +448,7 @@ public class DefaultSubscriptionRegistry extends AbstractSubscriptionRegistry {
 
 		private final boolean isPattern;
 
-		@Nullable
-		private final Expression selector;
+		private final @Nullable Expression selector;
 
 		public Subscription(String id, String destination, boolean isPattern, @Nullable Expression selector) {
 			Assert.notNull(id, "Subscription id must not be null");
@@ -475,8 +471,7 @@ public class DefaultSubscriptionRegistry extends AbstractSubscriptionRegistry {
 			return this.isPattern;
 		}
 
-		@Nullable
-		public Expression getSelector() {
+		public @Nullable Expression getSelector() {
 			return this.selector;
 		}
 

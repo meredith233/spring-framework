@@ -1,9 +1,7 @@
 /**
  * Support for class instrumentation on Tomcat.
  */
-@NonNullApi
-@NonNullFields
+@NullUnmarked
 package org.springframework.instrument.classloading.tomcat;
 
-import org.springframework.lang.NonNullApi;
-import org.springframework.lang.NonNullFields;
+import org.jspecify.annotations.NullUnmarked;

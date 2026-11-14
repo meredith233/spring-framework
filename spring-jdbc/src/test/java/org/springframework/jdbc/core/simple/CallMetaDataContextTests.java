@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,6 +18,8 @@ package org.springframework.jdbc.core.simple;
 
 import java.sql.Connection;
 import java.sql.DatabaseMetaData;
+import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.sql.Types;
 import java.util.ArrayList;
 import java.util.List;
@@ -41,9 +43,10 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 
 /**
- * Mock object based tests for CallMetaDataContext.
+ * Mock object based tests for {@link CallMetaDataContext}.
  *
  * @author Thomas Risberg
+ * @author Sam Brannen
  */
 class CallMetaDataContextTests {
 
@@ -69,7 +72,7 @@ class CallMetaDataContextTests {
 
 
 	@Test
-	void testMatchParameterValuesAndSqlInOutParameters() throws Exception {
+	void matchParameterValuesAndSqlInOutParameters() throws Exception {
 		final String TABLE = "customers";
 		final String USER = "me";
 		given(databaseMetaData.getDatabaseProductName()).willReturn("MyDB");
@@ -94,14 +97,63 @@ class CallMetaDataContextTests {
 		assertThat(inParameters).as("Wrong number of matched in parameter values").hasSize(2);
 		assertThat(inParameters.containsKey("id")).as("in parameter value missing").isTrue();
 		assertThat(inParameters.containsKey("name")).as("in out parameter value missing").isTrue();
-		boolean condition = !inParameters.containsKey("customer_no");
-		assertThat(condition).as("out parameter value matched").isTrue();
+		assertThat(inParameters.containsKey("customer_no")).as("out parameter value matched").isFalse();
 
 		List<String> names = context.getOutParameterNames();
 		assertThat(names).as("Wrong number of out parameters").hasSize(2);
 
 		List<SqlParameter> callParameters = context.getCallParameters();
 		assertThat(callParameters).as("Wrong number of call parameters").hasSize(3);
+	}
+
+	@Test  // gh-37206
+	void reconcileParametersMatchesFunctionReturnParameterDeclaredBeforeOutParameter() throws Exception {
+		initializeGetTotalFunctionMetaData();
+
+		List<SqlParameter> parameters = List.of(
+				new SqlOutParameter("RESULT", Types.INTEGER),
+				new SqlOutParameter("out_status", Types.INTEGER));
+
+		context.setFunction(true);
+		context.setProcedureName("GET_TOTAL");
+		context.initializeMetaData(dataSource);
+		context.processParameters(parameters);
+
+		assertThat(context.getCallParameters()).extracting(SqlParameter::getName)
+				.containsExactly("RESULT", "AMOUNT", "out_status");
+	}
+
+	@Test  // gh-37206
+	void reconcileParametersMatchesFunctionReturnParameterDeclaredAfterOutParameter() throws Exception {
+		initializeGetTotalFunctionMetaData();
+
+		List<SqlParameter> parameters = List.of(
+				new SqlOutParameter("out_status", Types.INTEGER),
+				new SqlOutParameter("RESULT", Types.INTEGER));
+
+		context.setFunction(true);
+		context.setProcedureName("GET_TOTAL");
+		context.initializeMetaData(dataSource);
+		context.processParameters(parameters);
+
+		assertThat(context.getCallParameters()).extracting(SqlParameter::getName)
+				.containsExactly("RESULT", "AMOUNT", "out_status");
+	}
+
+	private void initializeGetTotalFunctionMetaData() throws SQLException {
+		ResultSet proceduresResultSet = mock();
+		ResultSet procedureColumnsResultSet = mock();
+		given(databaseMetaData.getDatabaseProductName()).willReturn("Oracle");
+		given(databaseMetaData.getUserName()).willReturn("ME");
+		given(databaseMetaData.storesUpperCaseIdentifiers()).willReturn(true);
+		given(databaseMetaData.getProcedures("", "ME", "GET_TOTAL")).willReturn(proceduresResultSet);
+		given(databaseMetaData.getProcedureColumns("", "ME", "GET_TOTAL", null)).willReturn(procedureColumnsResultSet);
+		given(proceduresResultSet.next()).willReturn(true, false);
+		given(proceduresResultSet.getString("PROCEDURE_NAME")).willReturn("GET_TOTAL");
+		given(procedureColumnsResultSet.next()).willReturn(true, true, true, false);
+		given(procedureColumnsResultSet.getInt("DATA_TYPE")).willReturn(Types.INTEGER);
+		given(procedureColumnsResultSet.getString("COLUMN_NAME")).willReturn(null, "amount", "out_status");
+		given(procedureColumnsResultSet.getInt("COLUMN_TYPE")).willReturn(5, 1, 4);
 	}
 
 }

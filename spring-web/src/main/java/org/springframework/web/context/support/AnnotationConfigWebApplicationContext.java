@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2023 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,14 +20,17 @@ import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.Set;
 
+import org.jspecify.annotations.Nullable;
+
+import org.springframework.beans.factory.BeanRegistrar;
 import org.springframework.beans.factory.support.BeanNameGenerator;
+import org.springframework.beans.factory.support.BeanRegistryAdapter;
 import org.springframework.beans.factory.support.DefaultListableBeanFactory;
 import org.springframework.context.annotation.AnnotatedBeanDefinitionReader;
 import org.springframework.context.annotation.AnnotationConfigRegistry;
 import org.springframework.context.annotation.AnnotationConfigUtils;
 import org.springframework.context.annotation.ClassPathBeanDefinitionScanner;
 import org.springframework.context.annotation.ScopeMetadataResolver;
-import org.springframework.lang.Nullable;
 import org.springframework.util.Assert;
 import org.springframework.util.ClassUtils;
 import org.springframework.util.StringUtils;
@@ -53,10 +56,8 @@ import org.springframework.web.context.ContextLoader;
  * {@code registerBean(...)} methods available in a {@code GenericApplicationContext}.
  * If you wish to register annotated <em>component classes</em> with a
  * {@code GenericApplicationContext} in a web environment, you may use a
- * {@code GenericWebApplicationContext} with an
- * {@link org.springframework.context.annotation.AnnotatedBeanDefinitionReader
- * AnnotatedBeanDefinitionReader}. See the Javadoc for {@link GenericWebApplicationContext}
- * for details and an example.
+ * {@code GenericWebApplicationContext} with an {@link AnnotatedBeanDefinitionReader}.
+ * See the Javadoc for {@link GenericWebApplicationContext} for details and an example.
  *
  * <p>To make use of this application context, the
  * {@linkplain ContextLoader#CONTEXT_CLASS_PARAM "contextClass"} context-param for
@@ -99,11 +100,11 @@ import org.springframework.web.context.ContextLoader;
 public class AnnotationConfigWebApplicationContext extends AbstractRefreshableWebApplicationContext
 		implements AnnotationConfigRegistry {
 
-	@Nullable
-	private BeanNameGenerator beanNameGenerator;
+	private @Nullable BeanNameGenerator beanNameGenerator;
 
-	@Nullable
-	private ScopeMetadataResolver scopeMetadataResolver;
+	private @Nullable ScopeMetadataResolver scopeMetadataResolver;
+
+	private final Set<BeanRegistrar> beanRegistrars = new LinkedHashSet<>();
 
 	private final Set<Class<?>> componentClasses = new LinkedHashSet<>();
 
@@ -113,9 +114,19 @@ public class AnnotationConfigWebApplicationContext extends AbstractRefreshableWe
 	/**
 	 * Set a custom {@link BeanNameGenerator} for use with {@link AnnotatedBeanDefinitionReader}
 	 * and/or {@link ClassPathBeanDefinitionScanner}.
-	 * <p>Default is {@link org.springframework.context.annotation.AnnotationBeanNameGenerator}.
+	 * <p>Default is an {@link org.springframework.context.annotation.AnnotationBeanNameGenerator
+	 * AnnotationBeanNameGenerator}.
+	 * <p>When processing {@link org.springframework.context.annotation.Configuration @Configuration}
+	 * classes, a {@link org.springframework.context.annotation.ConfigurationBeanNameGenerator
+	 * ConfigurationBeanNameGenerator} (such as
+	 * {@link org.springframework.context.annotation.FullyQualifiedConfigurationBeanNameGenerator
+	 * FullyQualifiedConfigurationBeanNameGenerator}) also determines the default
+	 * names for {@link org.springframework.context.annotation.Bean @Bean} methods
+	 * without an explicit {@code name} attribute.
 	 * @see AnnotatedBeanDefinitionReader#setBeanNameGenerator
 	 * @see ClassPathBeanDefinitionScanner#setBeanNameGenerator
+	 * @see org.springframework.context.annotation.FullyQualifiedAnnotationBeanNameGenerator
+	 * @see org.springframework.context.annotation.FullyQualifiedConfigurationBeanNameGenerator
 	 */
 	public void setBeanNameGenerator(@Nullable BeanNameGenerator beanNameGenerator) {
 		this.beanNameGenerator = beanNameGenerator;
@@ -125,8 +136,7 @@ public class AnnotationConfigWebApplicationContext extends AbstractRefreshableWe
 	 * Return the custom {@link BeanNameGenerator} for use with {@link AnnotatedBeanDefinitionReader}
 	 * and/or {@link ClassPathBeanDefinitionScanner}, if any.
 	 */
-	@Nullable
-	protected BeanNameGenerator getBeanNameGenerator() {
+	protected @Nullable BeanNameGenerator getBeanNameGenerator() {
 		return this.beanNameGenerator;
 	}
 
@@ -145,18 +155,31 @@ public class AnnotationConfigWebApplicationContext extends AbstractRefreshableWe
 	 * Return the custom {@link ScopeMetadataResolver} for use with {@link AnnotatedBeanDefinitionReader}
 	 * and/or {@link ClassPathBeanDefinitionScanner}, if any.
 	 */
-	@Nullable
-	protected ScopeMetadataResolver getScopeMetadataResolver() {
+	protected @Nullable ScopeMetadataResolver getScopeMetadataResolver() {
 		return this.scopeMetadataResolver;
 	}
 
+
+	/**
+	 * Invoke the given registrars for registering their beans with this
+	 * application context.
+	 * <p>Note that {@link #refresh()} must be called in order for the context
+	 * to fully process the new classes.
+	 * @param registrars one or more {@link BeanRegistrar} instances
+	 * @since 7.0
+	 */
+	@Override
+	public void register(BeanRegistrar... registrars) {
+		Assert.notEmpty(registrars, "At least one BeanRegistrar must be specified");
+		Collections.addAll(this.beanRegistrars, registrars);
+	}
 
 	/**
 	 * Register one or more component classes to be processed.
 	 * <p>Note that {@link #refresh()} must be called in order for the context
 	 * to fully process the new classes.
 	 * @param componentClasses one or more component classes,
-	 * e.g. {@link org.springframework.context.annotation.Configuration @Configuration} classes
+	 * for example, {@link org.springframework.context.annotation.Configuration @Configuration} classes
 	 * @see #scan(String...)
 	 * @see #loadBeanDefinitions(DefaultListableBeanFactory)
 	 * @see #setConfigLocation(String)
@@ -223,6 +246,16 @@ public class AnnotationConfigWebApplicationContext extends AbstractRefreshableWe
 		if (scopeMetadataResolver != null) {
 			reader.setScopeMetadataResolver(scopeMetadataResolver);
 			scanner.setScopeMetadataResolver(scopeMetadataResolver);
+		}
+
+		if (!this.beanRegistrars.isEmpty()) {
+			if (logger.isDebugEnabled()) {
+				logger.debug("Applying bean registrars: [" +
+						StringUtils.collectionToCommaDelimitedString(this.beanRegistrars) + "]");
+			}
+			for (BeanRegistrar registrar : this.beanRegistrars) {
+				new BeanRegistryAdapter(beanFactory, getEnvironment(), registrar.getClass()).register(registrar);
+			}
 		}
 
 		if (!this.componentClasses.isEmpty()) {

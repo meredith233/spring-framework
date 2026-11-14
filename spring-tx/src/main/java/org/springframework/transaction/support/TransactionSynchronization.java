@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -32,9 +32,9 @@ import org.springframework.core.Ordered;
  * allowing for fine-grained interaction with their execution order (if necessary).
  *
  * <p>Implements the {@link Ordered} interface to enable the execution order of
- * synchronizations to be controlled declaratively, as of 5.3. The default
- * {@link #getOrder() order} is {@link Ordered#LOWEST_PRECEDENCE}, indicating
- * late execution; return a lower value for earlier execution.
+ * synchronizations to be controlled declaratively. The default {@link #getOrder()
+ * order} is {@link Ordered#LOWEST_PRECEDENCE}, indicating late execution; return
+ * a lower value for earlier execution.
  *
  * @author Juergen Hoeller
  * @since 02.06.2003
@@ -118,7 +118,7 @@ public interface TransactionSynchronization extends Ordered, Flushable {
 
 	/**
 	 * Invoked before transaction commit (before "beforeCompletion").
-	 * Can e.g. flush transactional O/R Mapping sessions to the database.
+	 * Can, for example, flush transactional O/R Mapping sessions to the database.
 	 * <p>This callback does <i>not</i> mean that the transaction will actually be committed.
 	 * A rollback decision can still occur after this method has been called. This callback
 	 * is rather meant to perform work that's only relevant if a commit still has a chance
@@ -150,7 +150,7 @@ public interface TransactionSynchronization extends Ordered, Flushable {
 	/**
 	 * Invoked after transaction commit. Can perform further operations right
 	 * <i>after</i> the main transaction has <i>successfully</i> committed.
-	 * <p>Can e.g. commit further operations that are supposed to follow on a successful
+	 * <p>Can, for example, commit further operations that are supposed to follow on a successful
 	 * commit of the main transaction, like confirmation messages or emails.
 	 * <p><b>NOTE:</b> The transaction will have been committed already, but the
 	 * transactional resources might still be active and accessible. As a consequence,

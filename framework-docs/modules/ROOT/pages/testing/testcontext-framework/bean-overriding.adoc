@@ -1,53 +1,157 @@
-[[spring-testing-beanoverriding]]
+[[testcontext-bean-overriding]]
 = Bean Overriding in Tests
 
-Bean Overriding in Tests refers to the ability to override specific beans in the Context
-for a test class, by annotating one or more fields in said test class.
+Bean overriding in tests refers to the ability to override specific beans in the
+`ApplicationContext` for a test class, by annotating the test class, one or more
+non-static fields in the test class, or one or more parameters in the constructor for the
+test class.
 
-NOTE: This is intended as a less risky alternative to the practice of registering a bean via
-`@Bean` with the `DefaultListableBeanFactory` `setAllowBeanDefinitionOverriding` set to
-`true`.
+NOTE: This feature is intended as a less risky alternative to the practice of registering
+a bean via `@Bean` with the `DefaultListableBeanFactory`
+`setAllowBeanDefinitionOverriding` flag set to `true`.
 
-The Spring Testing Framework provides two sets of annotations:
-xref:testing/annotations/integration-spring/annotation-testbean.adoc[`@TestBean`],
-xref:testing/annotations/integration-spring/annotation-mockitobean.adoc[`@MockitoBean` and
-`@MockitoSpyBean`]. The former relies purely on Spring, while the later set relies on
-the https://site.mockito.org/[Mockito] third party library.
+The Spring TestContext framework provides two sets of annotations for bean overriding.
 
-[[spring-testing-beanoverriding-extending]]
-== Extending bean override with a custom annotation
+* xref:testing/annotations/integration-spring/annotation-testbean.adoc[`@TestBean`]
+* xref:testing/annotations/integration-spring/annotation-mockitobean.adoc[`@MockitoBean` and `@MockitoSpyBean`]
 
-The three annotations mentioned above build upon the `@BeanOverride` meta-annotation
-and associated infrastructure, which allows to define custom bean overriding variants.
+The former relies purely on Spring, while the latter set relies on the
+https://site.mockito.org/[Mockito] third-party library.
 
-To create an extension, the following is needed:
+[[testcontext-bean-overriding-custom]]
+== Custom Bean Override Support
 
-- An annotation meta-annotated with `@BeanOverride` that defines the
-`BeanOverrideProcessor` to use.
-- The `BeanOverrideProcessor` implementation itself.
-- One or more concrete `OverrideMetadata` implementations provided by the processor.
+The three annotations mentioned above build upon the `@BeanOverride` meta-annotation and
+associated infrastructure, which allows one to define custom bean overriding variants.
 
-The Spring TestContext Framework includes infrastructure classes that support bean
-overriding: a `BeanFactoryPostProcessor`, a `TestExecutionListener` and a
-`ContextCustomizerFactory`.
-The later two are automatically registered via the Spring TestContext Framework
-`spring.factories` file, and are responsible for setting up the rest of the infrastructure.
+To implement custom bean override support, the following is needed:
 
-The test classes are parsed looking for any field meta-annotated with `@BeanOverride`,
-instantiating the relevant `BeanOverrideProcessor` in order to register an
-`OverrideMetadata`.
+* An annotation meta-annotated with `@BeanOverride` that defines the
+  `BeanOverrideProcessor` to use
+* A custom `BeanOverrideProcessor` implementation
+* One or more concrete `BeanOverrideHandler` implementations created by the processor
 
-Then the `BeanOverrideBeanFactoryPostProcessor` will use that information to alter the
-context, registering and replacing bean definitions as defined by each metadata
-`BeanOverrideStrategy`:
+The Spring TestContext framework includes implementations of the following APIs that
+support bean overriding and are responsible for setting up the rest of the infrastructure.
 
-- `REPLACE_DEFINITION`: replaces the bean definition. If it is not present in the
-context, an exception is thrown.
-- `CREATE_OR_REPLACE_DEFINITION`: replaces the bean definition if the bean definition
-does not exist, or create one if it is not.
-- `WRAP_BEAN`: get the original instance early so that it can be wrapped.
+* a `BeanFactoryPostProcessor`
+* a `ContextCustomizerFactory`
+* a `TestExecutionListener`
 
-NOTE: The Bean Overriding infrastructure does not include any bean resolution step,
-unlike an `@Autowired`-annotated field for instance. As such, the name of the bean to
-override must be somehow provided to or computed by the `BeanOverrideProcessor`.
-Typically, the user provides the name one way or the other.
+The `spring-test` module registers implementations of the latter two
+(`BeanOverrideContextCustomizerFactory` and `BeanOverrideTestExecutionListener`) in its
+{spring-framework-code}/spring-test/src/main/resources/META-INF/spring.factories[`META-INF/spring.factories`
+properties file].
+
+The bean overriding infrastructure searches for annotations on test classes, non-static
+fields in test classes, and parameters in test class constructors that are meta-annotated
+with `@BeanOverride`, and instantiates the corresponding `BeanOverrideProcessor` which is
+responsible for creating an appropriate `BeanOverrideHandler`.
+
+The internal `BeanOverrideBeanFactoryPostProcessor` then uses bean override handlers to
+alter the test's `ApplicationContext` by creating, replacing, or wrapping beans as
+defined by the corresponding `BeanOverrideStrategy`:
+
+[[testcontext-bean-overriding-strategy]]
+`REPLACE`::
+  Replaces the bean. Throws an exception if a corresponding bean does not exist.
+`REPLACE_OR_CREATE`::
+  Replaces the bean if it exists. Creates a new bean if a corresponding bean does not
+  exist.
+`WRAP`::
+  Retrieves the original bean and wraps it.
+
+[TIP]
+====
+When replacing a non-singleton bean, the non-singleton bean will be replaced with a
+singleton bean corresponding to bean override instance created by the applicable
+`BeanOverrideHandler`, and the corresponding bean definition will be converted to a
+`singleton`. Consequently, if a handler overrides a `prototype` or scoped bean, the
+overridden bean will be treated as a `singleton`.
+
+When replacing a bean created by a `FactoryBean`, the `FactoryBean` itself will be
+replaced with a singleton bean corresponding to bean override instance created by the
+applicable `BeanOverrideHandler`.
+
+When wrapping a bean created by a `FactoryBean`, the object created by the `FactoryBean`
+will be wrapped, not the `FactoryBean` itself.
+====
+
+[NOTE]
+====
+In contrast to Spring's autowiring mechanism (for example, resolution of an `@Autowired`
+field), the bean overriding infrastructure in the TestContext framework has limited
+heuristics it can perform to locate a bean. Either the `BeanOverrideProcessor` can compute
+the name of the bean to override, or it can be unambiguously selected given the type of
+the annotated field and its qualifying annotations.
+
+Typically, the bean is selected "by type" by the `BeanOverrideFactoryPostProcessor`.
+Alternatively, the user can directly provide the bean name in the custom annotation.
+
+`BeanOverrideProcessor` implementations may also internally compute a bean name based on
+a convention or some other method.
+====
+
+[[testcontext-bean-overriding-aop-proxies]]
+== Bean Overrides and Spring AOP Proxies
+
+Beans in a Spring `ApplicationContext` are frequently wrapped in an AOP proxy — for
+example, to support `@Transactional`, `@Cacheable`, or `@Retryable` semantics. Whether an
+overridden bean retains such a proxy depends on the `BeanOverrideStrategy` used to create
+the override.
+
+* Overrides that use the `REPLACE` or `REPLACE_OR_CREATE` strategy (such as `@TestBean`
+  and `@MockitoBean`) register their override instance directly as a manual singleton,
+  which bypasses the container's normal bean post-processing. Consequently, the override
+  instance is a bare object: none of the AOP advice that would otherwise apply to the
+  original bean (`@Transactional`, `@Cacheable`, `@Retryable`, method security, and so
+  on) is present.
+* Overrides that use the `WRAP` strategy (such as `@MockitoSpyBean`) capture an early
+  reference to the original bean and use it to create the override instance, before the
+  rest of the container's post-processors — including the one responsible for creating
+  AOP proxies — have run. Consequently, if the original bean would have been proxied,
+  that proxy is still created, but it now wraps the override instance instead of the
+  original bean. The bean that ends up in the `ApplicationContext`, and that is injected
+  into collaborating beans and test classes, is therefore the AOP proxy, with the
+  override instance as its target — not the bare override instance itself.
+
+The following diagrams illustrate the resulting shape of the bean for each strategy, from
+the perspective of a caller invoking a method on the injected bean.
+
+With the `REPLACE` or `REPLACE_OR_CREATE` strategy, there is no AOP proxy at all: the
+caller invokes the override instance directly.
+
+[source]
+----
+caller
+  │
+  ▼
+[ override instance ]
+----
+
+With the `WRAP` strategy, any AOP proxy that would normally have wrapped the original
+bean is still created, but now wraps the override instance instead:
+
+[source]
+----
+caller
+  │
+  ▼
+[ AOP proxy ]          (for example, retry, caching, or transaction advice)
+  │
+  │  delegates to its target
+  ▼
+[ override instance ]  (for example, a Mockito spy created by @MockitoSpyBean)
+----
+
+For a `WRAP`-based override such as `@MockitoSpyBean`, the "wrapping" performed by the
+AOP proxy is unrelated to the manner in which the resulting Mockito spy itself "wraps"
+the original bean instance it was created from. The proxy shown above determines which
+object a caller actually invokes, whereas the spy's relationship to the original
+instance only determines what happens when an unstubbed method is invoked on the spy: it
+falls through to that instance's real behavior.
+
+This distinction has practical consequences when combining bean overrides with Mockito's
+stubbing and verification APIs. See
+xref:testing/annotations/integration-spring/annotation-mockitobean.adoc#spring-testing-annotation-beanoverriding-mockitospybean-aop-proxies[`@MockitoSpyBean`
+and Spring AOP Proxies] for details.

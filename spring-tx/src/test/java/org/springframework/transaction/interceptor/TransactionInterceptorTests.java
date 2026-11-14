@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,13 +19,13 @@ package org.springframework.transaction.interceptor;
 import java.io.Serializable;
 import java.util.Properties;
 
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 
 import org.springframework.aop.framework.ProxyFactory;
 import org.springframework.beans.factory.BeanFactory;
 import org.springframework.beans.factory.NoSuchBeanDefinitionException;
 import org.springframework.core.testfixture.io.SerializationTestUtils;
-import org.springframework.lang.Nullable;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.TransactionException;
@@ -116,11 +116,11 @@ class TransactionInterceptorTests extends AbstractTransactionAspectTests {
 		ti.setTransactionManager(ptm);
 		ti = SerializationTestUtils.serializeAndDeserialize(ti);
 
-		assertThat(ti.getTransactionManager() instanceof SerializableTransactionManager).isTrue();
-		assertThat(ti.getTransactionAttributeSource() instanceof CompositeTransactionAttributeSource).isTrue();
+		assertThat(ti.getTransactionManager()).isInstanceOf(SerializableTransactionManager.class);
+		assertThat(ti.getTransactionAttributeSource()).isInstanceOf(CompositeTransactionAttributeSource.class);
 		CompositeTransactionAttributeSource ctas = (CompositeTransactionAttributeSource) ti.getTransactionAttributeSource();
-		assertThat(ctas.getTransactionAttributeSources()[0] instanceof NameMatchTransactionAttributeSource).isTrue();
-		assertThat(ctas.getTransactionAttributeSources()[1] instanceof NameMatchTransactionAttributeSource).isTrue();
+		assertThat(ctas.getTransactionAttributeSources()[0]).isInstanceOf(NameMatchTransactionAttributeSource.class);
+		assertThat(ctas.getTransactionAttributeSources()[1]).isInstanceOf(NameMatchTransactionAttributeSource.class);
 	}
 
 	@Test
@@ -296,6 +296,7 @@ class TransactionInterceptorTests extends AbstractTransactionAspectTests {
 	private PlatformTransactionManager associateTransactionManager(BeanFactory beanFactory, String name) {
 		PlatformTransactionManager transactionManager = mock();
 		given(beanFactory.containsBean(name)).willReturn(true);
+		given(beanFactory.isTypeMatch(name, TransactionManager.class)).willReturn(true);
 		given(beanFactory.getBean(name, TransactionManager.class)).willReturn(transactionManager);
 		return transactionManager;
 	}

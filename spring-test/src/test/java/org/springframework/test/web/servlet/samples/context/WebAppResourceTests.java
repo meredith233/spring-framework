@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2023 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -49,8 +49,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 	@ContextConfiguration("root-context.xml"),
 	@ContextConfiguration("servlet-context.xml")
 })
-@DisabledInAotMode // @ContextHierarchy is not supported in AOT.
-public class WebAppResourceTests {
+@DisabledInAotMode("@ContextHierarchy is not supported in AOT")
+class WebAppResourceTests {
 
 	@Autowired
 	private WebApplicationContext wac;
@@ -58,23 +58,23 @@ public class WebAppResourceTests {
 	private MockMvc mockMvc;
 
 	@BeforeEach
-	public void setup() {
+	void setup() {
 		this.mockMvc = MockMvcBuilders.webAppContextSetup(this.wac).alwaysExpect(status().isOk()).build();
 	}
 
 	// Resources served via <mvc:resources/>
 
 	@Test
-	public void resourceRequest() throws Exception {
+	void resourceRequest() throws Exception {
 		this.mockMvc.perform(get("/resources/Spring.js"))
-			.andExpect(content().contentType("application/javascript"))
+			.andExpect(content().contentType("text/javascript"))
 			.andExpect(content().string(containsString("Spring={};")));
 	}
 
 	// Forwarded to the "default" servlet via <mvc:default-servlet-handler/>
 
 	@Test
-	public void resourcesViaDefaultServlet() throws Exception {
+	void resourcesViaDefaultServlet() throws Exception {
 		this.mockMvc.perform(get("/unknown/resource"))
 			.andExpect(handler().handlerType(DefaultServletHttpRequestHandler.class))
 			.andExpect(forwardedUrl("default"));

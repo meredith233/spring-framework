@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2019 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -35,7 +35,7 @@ import static org.springframework.web.reactive.function.server.RouterFunctions.r
  * @author Rossen Stoyanchev
  * @since 5.0
  */
-public class HttpServerTests {
+class HttpServerTests {
 
 	private ReactorHttpServer server;
 
@@ -43,7 +43,7 @@ public class HttpServerTests {
 
 
 	@BeforeEach
-	public void start() throws Exception {
+	void start() throws Exception {
 		HttpHandler httpHandler = RouterFunctions.toHttpHandler(
 				route(GET("/test"), request -> ServerResponse.ok().bodyValue("It works!")));
 
@@ -58,13 +58,13 @@ public class HttpServerTests {
 	}
 
 	@AfterEach
-	public void stop() {
+	void stop() {
 		this.server.stop();
 	}
 
 
 	@Test
-	public void test() {
+	void test() {
 		this.client.get().uri("/test")
 				.exchange()
 				.expectStatus().isOk()

@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2020 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -46,7 +46,7 @@ class RequestResultMatchersDsl internal constructor (private val actions: Result
 	/**
 	 * @see RequestResultMatchers.asyncResult
 	 */
-	fun <T> asyncResult(matcher: Matcher<T>) {
+	fun <T : Any> asyncResult(matcher: Matcher<T>) {
 		actions.andExpect(matchers.asyncResult(matcher))
 	}
 
@@ -60,7 +60,7 @@ class RequestResultMatchersDsl internal constructor (private val actions: Result
 	/**
 	 * @see RequestResultMatchers.attribute
 	 */
-	fun <T> attribute(name: String, matcher: Matcher<T>) {
+	fun <T : Any> attribute(name: String, matcher: Matcher<T>) {
 		actions.andExpect(matchers.attribute(name, matcher))
 	}
 
@@ -74,7 +74,7 @@ class RequestResultMatchersDsl internal constructor (private val actions: Result
 	/**
 	 * @see RequestResultMatchers.sessionAttribute
 	 */
-	fun <T> sessionAttribute(name: String, matcher: Matcher<T>) {
+	fun <T : Any> sessionAttribute(name: String, matcher: Matcher<T>) {
 		actions.andExpect(matchers.sessionAttribute(name, matcher))
 	}
 

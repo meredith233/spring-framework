@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2019 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -83,7 +83,7 @@ public class TomcatHttpServer extends AbstractHttpServer {
 		File base = new File(System.getProperty("java.io.tmpdir"));
 		Context rootContext = tomcatServer.addContext(this.contextPath, base.getAbsolutePath());
 		Tomcat.addServlet(rootContext, "httpHandlerServlet", servlet).setAsyncSupported(true);
-		rootContext.addServletMappingDecoded(this.servletMapping, "httpHandlerServlet");
+		rootContext.addServletMapping(this.servletMapping, "httpHandlerServlet", false);
 		if (wsListener != null) {
 			rootContext.addApplicationListener(wsListener.getName());
 		}

@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,6 +19,7 @@ package org.springframework.core.testfixture.codec;
 import java.util.Map;
 import java.util.function.Consumer;
 
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.reactivestreams.Publisher;
 import reactor.core.publisher.Flux;
@@ -29,7 +30,6 @@ import org.springframework.core.codec.Encoder;
 import org.springframework.core.io.buffer.DataBuffer;
 import org.springframework.core.io.buffer.DataBufferUtils;
 import org.springframework.core.testfixture.io.buffer.AbstractLeakCheckingTests;
-import org.springframework.lang.Nullable;
 import org.springframework.util.Assert;
 import org.springframework.util.MimeType;
 
@@ -187,7 +187,7 @@ public abstract class AbstractEncoderTests<E extends Encoder<?>> extends Abstrac
 	}
 
 	/**
-	 * Test a {@link Encoder#encode encode} scenario where the input stream is canceled.
+	 * Test a {@link Encoder#encode encode} scenario where the input stream is cancelled.
 	 * This test method will feed the first element of the {@code input} stream to the decoder,
 	 * followed by a cancel signal.
 	 * The result is expected to contain one "normal" element.
@@ -251,7 +251,7 @@ public abstract class AbstractEncoderTests<E extends Encoder<?>> extends Abstrac
 		return dataBuffer -> {
 			String actual = dataBuffer.toString(UTF_8);
 			release(dataBuffer);
-			assertThat(actual).isEqualTo(expected);
+			assertThat(actual).isEqualToNormalizingNewlines(expected);
 		};
 	}
 

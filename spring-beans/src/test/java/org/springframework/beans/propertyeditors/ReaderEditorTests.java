@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -35,13 +35,13 @@ import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException
 class ReaderEditorTests {
 
 	@Test
-	void testCtorWithNullResourceEditor() {
+	void ctorWithNullResourceEditor() {
 		assertThatIllegalArgumentException().isThrownBy(() ->
 				new ReaderEditor(null));
 	}
 
 	@Test
-	void testSunnyDay() throws IOException {
+	void sunnyDay() throws IOException {
 		Reader reader = null;
 		try {
 			String resource = "classpath:" + ClassUtils.classPackageAsResourcePath(getClass()) +
@@ -62,7 +62,7 @@ class ReaderEditorTests {
 	}
 
 	@Test
-	void testWhenResourceDoesNotExist() {
+	void whenResourceDoesNotExist() {
 		String resource = "classpath:bingo!";
 		ReaderEditor editor = new ReaderEditor();
 		assertThatIllegalArgumentException().isThrownBy(() ->
@@ -70,7 +70,7 @@ class ReaderEditorTests {
 	}
 
 	@Test
-	void testGetAsTextReturnsNullByDefault() {
+	void getAsTextReturnsNullByDefault() {
 		assertThat(new ReaderEditor().getAsText()).isNull();
 		String resource = "classpath:" + ClassUtils.classPackageAsResourcePath(getClass()) +
 				"/" + ClassUtils.getShortName(getClass()) + ".class";

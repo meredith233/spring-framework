@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2020 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -34,7 +34,7 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 /**
  * {@link jakarta.servlet.Filter} to handle CORS pre-flight requests and intercept
  * CORS simple and actual requests with a {@link CorsProcessor}, and to update
- * the response, e.g. with CORS response headers, based on the policy matched
+ * the response, for example, with CORS response headers, based on the policy matched
  * through the provided {@link CorsConfigurationSource}.
  *
  * <p>This is an alternative to configuring CORS in the Spring MVC Java config

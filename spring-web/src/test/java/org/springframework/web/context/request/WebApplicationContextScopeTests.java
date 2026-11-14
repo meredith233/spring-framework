@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -49,7 +49,7 @@ class WebApplicationContextScopeTests {
 	}
 
 	@Test
-	void testRequestScope() {
+	void requestScope() {
 		WebApplicationContext ac = initApplicationContext(WebApplicationContext.SCOPE_REQUEST);
 		MockHttpServletRequest request = new MockHttpServletRequest();
 		ServletRequestAttributes requestAttributes = new ServletRequestAttributes(request);
@@ -68,7 +68,7 @@ class WebApplicationContextScopeTests {
 	}
 
 	@Test
-	void testSessionScope() {
+	void sessionScope() {
 		WebApplicationContext ac = initApplicationContext(WebApplicationContext.SCOPE_SESSION);
 		MockHttpServletRequest request = new MockHttpServletRequest();
 		ServletRequestAttributes requestAttributes = new ServletRequestAttributes(request);
@@ -87,7 +87,7 @@ class WebApplicationContextScopeTests {
 	}
 
 	@Test
-	void testApplicationScope() {
+	void applicationScope() {
 		WebApplicationContext ac = initApplicationContext(WebApplicationContext.SCOPE_APPLICATION);
 		assertThat(ac.getServletContext().getAttribute(NAME)).isNull();
 		DerivedTestBean bean = ac.getBean(NAME, DerivedTestBean.class);

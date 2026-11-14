@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,6 +20,7 @@ import org.junit.jupiter.api.Test;
 
 import org.springframework.beans.factory.BeanDefinitionStoreException;
 import org.springframework.context.ApplicationContextException;
+import org.springframework.context.annotation.Gh23206Tests.ConditionalConfiguration.NestedConfiguration;
 import org.springframework.context.annotation.componentscan.simple.SimpleComponent;
 import org.springframework.core.type.AnnotatedTypeMetadata;
 
@@ -30,7 +31,7 @@ import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
  *
  * @author Stephane Nicoll
  */
-public class Gh23206Tests {
+class Gh23206Tests {
 
 	@Test
 	void componentScanShouldFailWithRegisterBeanCondition() {
@@ -39,7 +40,9 @@ public class Gh23206Tests {
 		assertThatExceptionOfType(BeanDefinitionStoreException.class).isThrownBy(context::refresh)
 				.withMessageContaining(ConditionalComponentScanConfiguration.class.getName())
 				.havingCause().isInstanceOf(ApplicationContextException.class)
-				.withMessageContaining("Component scan could not be used with conditions in REGISTER_BEAN phase");
+				.withMessageStartingWith("Component scan for configuration class [")
+				.withMessageContaining(ConditionalComponentScanConfiguration.class.getName())
+				.withMessageContaining("could not be used with conditions in REGISTER_BEAN phase");
 	}
 
 	@Test
@@ -49,7 +52,9 @@ public class Gh23206Tests {
 		assertThatExceptionOfType(BeanDefinitionStoreException.class).isThrownBy(context::refresh)
 				.withMessageContaining(ConditionalConfiguration.class.getName())
 				.havingCause().isInstanceOf(ApplicationContextException.class)
-				.withMessageContaining("Component scan could not be used with conditions in REGISTER_BEAN phase");
+				.withMessageStartingWith("Component scan for configuration class [")
+				.withMessageContaining(NestedConfiguration.class.getName())
+				.withMessageContaining("could not be used with conditions in REGISTER_BEAN phase");
 	}
 
 

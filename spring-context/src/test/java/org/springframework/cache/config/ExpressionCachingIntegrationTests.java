@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -27,20 +27,21 @@ import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.ParameterizedTypeReference;
 
 /**
  * @author Stephane Nicoll
+ * @author Yanming Zhou
  */
 class ExpressionCachingIntegrationTests {
 
 	@Test  // SPR-11692
-	@SuppressWarnings("unchecked")
-	public void expressionIsCacheBasedOnActualMethod() {
+	void expressionIsCacheBasedOnActualMethod() {
 		ConfigurableApplicationContext context =
 				new AnnotationConfigApplicationContext(SharedConfig.class, Spr11692Config.class);
 
-		BaseDao<User> userDao = (BaseDao<User>) context.getBean("userDao");
-		BaseDao<Order> orderDao = (BaseDao<Order>) context.getBean("orderDao");
+		BaseDao<User> userDao = context.getBean("userDao", new ParameterizedTypeReference<>() {});
+		BaseDao<Order> orderDao = context.getBean("orderDao", new ParameterizedTypeReference<>() {});
 
 		userDao.persist(new User("1"));
 		orderDao.persist(new Order("2"));

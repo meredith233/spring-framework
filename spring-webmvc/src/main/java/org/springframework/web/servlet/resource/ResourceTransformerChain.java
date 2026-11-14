@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2018 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -34,7 +34,7 @@ public interface ResourceTransformerChain {
 	/**
 	 * Return the {@code ResourceResolverChain} that was used to resolve the
 	 * {@code Resource} being transformed. This may be needed for resolving
-	 * related resources, e.g. links to other resources.
+	 * related resources, for example, links to other resources.
 	 */
 	ResourceResolverChain getResolverChain();
 

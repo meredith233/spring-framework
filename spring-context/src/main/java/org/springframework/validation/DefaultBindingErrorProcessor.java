@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2018 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,6 +15,10 @@
  */
 
 package org.springframework.validation;
+
+import java.io.Serializable;
+
+import org.jspecify.annotations.Nullable;
 
 import org.springframework.beans.PropertyAccessException;
 import org.springframework.context.support.DefaultMessageSourceResolvable;
@@ -59,14 +63,13 @@ public class DefaultBindingErrorProcessor implements BindingErrorProcessor {
 		String fixedField = bindingResult.getNestedPath() + missingField;
 		String[] codes = bindingResult.resolveMessageCodes(MISSING_FIELD_ERROR_CODE, missingField);
 		Object[] arguments = getArgumentsForBindError(bindingResult.getObjectName(), fixedField);
-		FieldError error = new FieldError(bindingResult.getObjectName(), fixedField, "", true,
-				codes, arguments, "Field '" + fixedField + "' is required");
-		bindingResult.addError(error);
+		bindingResult.addError(new BindingFieldError(
+				bindingResult.getObjectName(), fixedField, "", codes, arguments));
 	}
 
 	@Override
 	public void processPropertyAccessException(PropertyAccessException ex, BindingResult bindingResult) {
-		// Create field error with the exceptions's code, e.g. "typeMismatch".
+		// Create field error with the code of the exception, for example, "typeMismatch".
 		String field = ex.getPropertyName();
 		Assert.state(field != null, "No field in exception");
 		String[] codes = bindingResult.resolveMessageCodes(ex.getErrorCode(), field);
@@ -75,10 +78,8 @@ public class DefaultBindingErrorProcessor implements BindingErrorProcessor {
 		if (ObjectUtils.isArray(rejectedValue)) {
 			rejectedValue = StringUtils.arrayToCommaDelimitedString(ObjectUtils.toObjectArray(rejectedValue));
 		}
-		FieldError error = new FieldError(bindingResult.getObjectName(), field, rejectedValue, true,
-				codes, arguments, ex.getLocalizedMessage());
-		error.wrap(ex);
-		bindingResult.addError(error);
+		bindingResult.addError(new BindingFieldError(
+				bindingResult.getObjectName(), field, rejectedValue, codes, arguments, ex));
 	}
 
 	/**
@@ -95,6 +96,33 @@ public class DefaultBindingErrorProcessor implements BindingErrorProcessor {
 	protected Object[] getArgumentsForBindError(String objectName, String field) {
 		String[] codes = new String[] {objectName + Errors.NESTED_PATH_SEPARATOR + field, field};
 		return new Object[] {new DefaultMessageSourceResolvable(codes, field)};
+	}
+
+
+	/**
+	 * Subclass of {@code FieldError} with Spring-style default message rendering.
+	 */
+	@SuppressWarnings("serial")
+	private static class BindingFieldError extends FieldError implements Serializable {
+
+		public BindingFieldError(String objectName, String field, @Nullable Object rejectedValue, String[] codes,
+				Object[] arguments) {
+
+			super(objectName, field, rejectedValue, true, codes, arguments,
+					"Field '" + field + "' is required");
+		}
+
+		public BindingFieldError(String objectName, String field, @Nullable Object rejectedValue, String[] codes,
+				Object[] arguments, PropertyAccessException ex) {
+
+			super(objectName, field, rejectedValue, true, codes, arguments, ex.getLocalizedMessage());
+			wrap(ex);
+		}
+
+		@Override
+		public boolean shouldRenderDefaultMessage() {
+			return false;
+		}
 	}
 
 }

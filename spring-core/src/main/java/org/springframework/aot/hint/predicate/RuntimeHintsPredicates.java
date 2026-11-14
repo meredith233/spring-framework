@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2022 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -46,6 +46,7 @@ public abstract class RuntimeHintsPredicates {
 
 	private static final ResourceHintsPredicates resource = new ResourceHintsPredicates();
 
+	@SuppressWarnings("removal")
 	private static final SerializationHintsPredicates serialization = new SerializationHintsPredicates();
 
 	private static final ProxyHintsPredicates proxies = new ProxyHintsPredicates();
@@ -73,7 +74,10 @@ public abstract class RuntimeHintsPredicates {
 	/**
 	 * Return a predicate generator for {@link SerializationHints serialization hints}.
 	 * @return the predicate generator
+	 * @deprecated in favor of {@link #reflection()}
 	 */
+	@Deprecated(since = "7.0.6", forRemoval = true)
+	@SuppressWarnings("removal")
 	public static SerializationHintsPredicates serialization() {
 		return serialization;
 	}

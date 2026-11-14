@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2018 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,16 +16,11 @@
 
 package org.springframework.aop.framework;
 
-import java.io.Closeable;
+import org.jspecify.annotations.Nullable;
 
-import org.springframework.beans.factory.Aware;
 import org.springframework.beans.factory.BeanClassLoaderAware;
-import org.springframework.beans.factory.DisposableBean;
-import org.springframework.beans.factory.InitializingBean;
 import org.springframework.core.Ordered;
-import org.springframework.lang.Nullable;
 import org.springframework.util.ClassUtils;
-import org.springframework.util.ObjectUtils;
 
 /**
  * Base class with common functionality for proxy processors, in particular
@@ -45,8 +40,7 @@ public class ProxyProcessorSupport extends ProxyConfig implements Ordered, BeanC
 	 */
 	private int order = Ordered.LOWEST_PRECEDENCE;
 
-	@Nullable
-	private ClassLoader proxyClassLoader = ClassUtils.getDefaultClassLoader();
+	private @Nullable ClassLoader proxyClassLoader = ClassUtils.getDefaultClassLoader();
 
 	private boolean classLoaderConfigured = false;
 
@@ -80,8 +74,7 @@ public class ProxyProcessorSupport extends ProxyConfig implements Ordered, BeanC
 	/**
 	 * Return the configured proxy ClassLoader for this processor.
 	 */
-	@Nullable
-	protected ClassLoader getProxyClassLoader() {
+	protected @Nullable ClassLoader getProxyClassLoader() {
 		return this.proxyClassLoader;
 	}
 
@@ -131,8 +124,7 @@ public class ProxyProcessorSupport extends ProxyConfig implements Ordered, BeanC
 	 * @return whether the given interface is just a container callback
 	 */
 	protected boolean isConfigurationCallbackInterface(Class<?> ifc) {
-		return (InitializingBean.class == ifc || DisposableBean.class == ifc || Closeable.class == ifc ||
-				AutoCloseable.class == ifc || ObjectUtils.containsElement(ifc.getInterfaces(), Aware.class));
+		return AopProxyUtils.isConfigurationCallbackInterface(ifc);
 	}
 
 	/**
@@ -146,7 +138,8 @@ public class ProxyProcessorSupport extends ProxyConfig implements Ordered, BeanC
 	protected boolean isInternalLanguageInterface(Class<?> ifc) {
 		return (ifc.getName().equals("groovy.lang.GroovyObject") ||
 				ifc.getName().endsWith(".cglib.proxy.Factory") ||
-				ifc.getName().endsWith(".bytebuddy.MockAccess"));
+				ifc.getName().endsWith(".bytebuddy.MockAccess") ||  // Mockito < 5.16.1
+				ifc.getName().endsWith(".bytebuddy.access.MockAccess"));  // Mockito >= 5.16.1
 	}
 
 }

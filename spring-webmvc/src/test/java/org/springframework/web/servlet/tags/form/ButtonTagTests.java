@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -27,6 +27,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * @author Rossen Stoyanchev
+ * @author Sebastien Deleuze
  */
 class ButtonTagTests extends AbstractFormTagTests {
 
@@ -59,6 +60,20 @@ class ButtonTagTests extends AbstractFormTagTests {
 	}
 
 	@Test
+	void value() throws Exception {
+		this.tag.setValue("\"My Button\"");
+
+		assertThat(this.tag.doStartTag()).isEqualTo(Tag.EVAL_BODY_INCLUDE);
+		assertThat(this.tag.doEndTag()).isEqualTo(Tag.EVAL_PAGE);
+
+		String output = getOutput();
+		assertTagOpened(output);
+		assertTagClosed(output);
+
+		assertContainsAttribute(output, "value", "&quot;My Button&quot;");
+	}
+
+	@Test
 	void disabled() throws Exception {
 		this.tag.setDisabled(true);
 
@@ -85,6 +100,7 @@ class ButtonTagTests extends AbstractFormTagTests {
 		assertThat(output).as("Tag not opened properly").startsWith("<button ");
 	}
 
+	@SuppressWarnings("serial")
 	protected ButtonTag createTag(final Writer writer) {
 		return new ButtonTag() {
 			@Override

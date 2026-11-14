@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -90,7 +90,7 @@ class FailingBeforeAndAfterMethodsSpringExtensionTests {
 		// something else like an error in the @Configuration class, etc.
 		if (getExpectedFailedCount(testClass) > 0) {
 			events.assertThatEvents().haveExactly(1,
-				event(test("testNothing"),
+				event(test("dummyTest"),
 					finishedWithFailure(
 						instanceOf(AssertionError.class),
 						message(msg -> msg.contains("always failing")))));
@@ -106,8 +106,8 @@ class FailingBeforeAndAfterMethodsSpringExtensionTests {
 	}
 
 	private int getExpectedFailedCount(Class<?> testClass) {
-		if (testClass == AlwaysFailingBeforeTestClassTestCase.class
-				|| testClass == AlwaysFailingAfterTestClassTestCase.class) {
+		if (testClass == AlwaysFailingBeforeTestClassTestCase.class ||
+				testClass == AlwaysFailingAfterTestClassTestCase.class) {
 			return 0;
 		}
 		return 1;
@@ -177,7 +177,7 @@ class FailingBeforeAndAfterMethodsSpringExtensionTests {
 	private abstract static class BaseTestCase {
 
 		@Test
-		void testNothing() {
+		void dummyTest() {
 		}
 	}
 
@@ -215,7 +215,7 @@ class FailingBeforeAndAfterMethodsSpringExtensionTests {
 	static class FailingBeforeTransactionTestCase {
 
 		@Test
-		void testNothing() {
+		void dummyTest() {
 		}
 
 		@BeforeTransaction
@@ -230,7 +230,7 @@ class FailingBeforeAndAfterMethodsSpringExtensionTests {
 	static class FailingAfterTransactionTestCase {
 
 		@Test
-		void testNothing() {
+		void dummyTest() {
 		}
 
 		@AfterTransaction

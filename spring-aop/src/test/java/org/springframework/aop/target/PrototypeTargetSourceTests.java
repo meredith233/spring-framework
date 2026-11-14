@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -39,7 +39,7 @@ class PrototypeTargetSourceTests {
 
 
 	@BeforeEach
-	public void setup() {
+	void setup() {
 		this.beanFactory = new DefaultListableBeanFactory();
 		new XmlBeanDefinitionReader(this.beanFactory).loadBeanDefinitions(
 				qualifiedResource(PrototypeTargetSourceTests.class, "context.xml"));
@@ -52,7 +52,7 @@ class PrototypeTargetSourceTests {
 	 * With the singleton, there will be change.
 	 */
 	@Test
-	void testPrototypeAndSingletonBehaveDifferently() {
+	void prototypeAndSingletonBehaveDifferently() {
 		SideEffectBean singleton = (SideEffectBean) beanFactory.getBean("singleton");
 		assertThat(singleton.getCount()).isEqualTo(INITIAL_COUNT);
 		singleton.doWork();

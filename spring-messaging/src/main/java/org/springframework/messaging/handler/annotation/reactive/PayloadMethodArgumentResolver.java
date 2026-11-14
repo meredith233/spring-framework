@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2023 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,10 +20,12 @@ import java.lang.annotation.Annotation;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.function.Consumer;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Publisher;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
@@ -37,7 +39,6 @@ import org.springframework.core.codec.Decoder;
 import org.springframework.core.codec.DecodingException;
 import org.springframework.core.io.buffer.DataBuffer;
 import org.springframework.core.io.buffer.DataBufferUtils;
-import org.springframework.lang.Nullable;
 import org.springframework.messaging.Message;
 import org.springframework.messaging.MessageHeaders;
 import org.springframework.messaging.handler.annotation.Payload;
@@ -79,8 +80,7 @@ public class PayloadMethodArgumentResolver implements HandlerMethodArgumentResol
 
 	private final List<Decoder<?>> decoders;
 
-	@Nullable
-	private final Validator validator;
+	private final @Nullable Validator validator;
 
 	private final ReactiveAdapterRegistry adapterRegistry;
 
@@ -108,8 +108,7 @@ public class PayloadMethodArgumentResolver implements HandlerMethodArgumentResol
 	/**
 	 * Return the configured validator, if any.
 	 */
-	@Nullable
-	public Validator getValidator() {
+	public @Nullable Validator getValidator() {
 		return this.validator;
 	}
 
@@ -196,8 +195,7 @@ public class PayloadMethodArgumentResolver implements HandlerMethodArgumentResol
 	 * {@link MimeType} value or a String to parse to a {@link MimeType}.
 	 * @param message the input message
 	 */
-	@Nullable
-	protected MimeType getMimeType(Message<?> message) {
+	protected @Nullable MimeType getMimeType(Message<?> message) {
 		Object headerValue = message.getHeaders().get(MessageHeaders.CONTENT_TYPE);
 		if (headerValue == null) {
 			return null;
@@ -230,7 +228,7 @@ public class PayloadMethodArgumentResolver implements HandlerMethodArgumentResol
 				if (adapter != null && adapter.isMultiValue()) {
 					Flux<?> flux = content
 							.filter(this::nonEmptyDataBuffer)
-							.map(buffer -> decoder.decode(buffer, elementType, mimeType, hints))
+							.map(buffer -> Objects.requireNonNull(decoder.decode(buffer, elementType, mimeType, hints)))
 							.onErrorMap(ex -> handleReadError(parameter, message, ex));
 					if (isContentRequired) {
 						flux = flux.switchIfEmpty(Flux.error(() -> handleMissingBody(parameter, message)));
@@ -244,7 +242,7 @@ public class PayloadMethodArgumentResolver implements HandlerMethodArgumentResol
 					// Single-value (with or without reactive type wrapper)
 					Mono<?> mono = content.next()
 							.filter(this::nonEmptyDataBuffer)
-							.map(buffer -> decoder.decode(buffer, elementType, mimeType, hints))
+							.map(buffer -> Objects.requireNonNull(decoder.decode(buffer, elementType, mimeType, hints)))
 							.onErrorMap(ex -> handleReadError(parameter, message, ex));
 					if (isContentRequired) {
 						mono = mono.switchIfEmpty(Mono.error(() -> handleMissingBody(parameter, message)));
@@ -279,8 +277,7 @@ public class PayloadMethodArgumentResolver implements HandlerMethodArgumentResol
 				"Payload content is missing: " + param.getExecutable().toGenericString());
 	}
 
-	@Nullable
-	private Consumer<Object> getValidator(Message<?> message, MethodParameter parameter) {
+	private @Nullable Consumer<Object> getValidator(Message<?> message, MethodParameter parameter) {
 		if (this.validator == null) {
 			return null;
 		}

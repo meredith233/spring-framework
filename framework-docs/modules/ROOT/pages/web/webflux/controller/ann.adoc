@@ -16,7 +16,7 @@ your Java configuration, as the following example shows:
 ======
 Java::
 +
-[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+[source,java,indent=0,subs="verbatim,quotes"]
 ----
 	@Configuration
 	@ComponentScan("org.example.web") // <1>
@@ -29,7 +29,7 @@ Java::
 
 Kotlin::
 +
-[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+[source,kotlin,indent=0,subs="verbatim,quotes"]
 ----
 	@Configuration
 	@ComponentScan("org.example.web") // <1>
@@ -45,7 +45,6 @@ Kotlin::
 itself meta-annotated with `@Controller` and `@ResponseBody`, indicating a controller whose
 every method inherits the type-level `@ResponseBody` annotation and, therefore, writes
 directly to the response body versus view resolution and rendering with an HTML template.
-
 
 
 [[webflux-ann-requestmapping-proxying]]
@@ -67,7 +66,3 @@ NOTE: Keep in mind that as of 6.0, with interface proxying, Spring WebFlux no lo
 controllers based solely on a type-level `@RequestMapping` annotation on the interface.
 Please, enable class based proxying, or otherwise the interface must also have an
 `@Controller` annotation.
-
-
-
-

@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,6 +23,7 @@ import org.hibernate.SessionFactory;
 import org.junit.jupiter.api.Test;
 
 import org.springframework.aop.framework.ProxyFactory;
+import org.springframework.aop.support.AopUtils;
 import org.springframework.aop.target.SingletonTargetSource;
 import org.springframework.orm.jpa.AbstractContainerEntityManagerFactoryIntegrationTests;
 import org.springframework.orm.jpa.EntityManagerFactoryInfo;
@@ -46,18 +47,23 @@ class HibernateEntityManagerFactoryIntegrationTests extends AbstractContainerEnt
 
 
 	@Test
-	void testCanCastNativeEntityManagerFactoryToHibernateEntityManagerFactoryImpl() {
+	void advisedEntityManagerProxyFromSmartFactoryBean() {
+		assertThat(AopUtils.isAopProxy(sharedEntityManager)).isTrue();
+	}
+
+	@Test
+	void canCastNativeEntityManagerFactoryToHibernateEntityManagerFactoryImpl() {
 		EntityManagerFactoryInfo emfi = (EntityManagerFactoryInfo) entityManagerFactory;
 		assertThat(emfi.getNativeEntityManagerFactory()).isInstanceOf(SessionFactory.class);
 	}
 
 	@Test
-	void testCanCastSharedEntityManagerProxyToHibernateEntityManager() {
+	void canCastSharedEntityManagerProxyToHibernateEntityManager() {
 		assertThat(((EntityManagerProxy) sharedEntityManager).getTargetEntityManager()).isInstanceOf(Session.class);
 	}
 
 	@Test
-	void testCanUnwrapAopProxy() {
+	void canUnwrapAopProxy() {
 		EntityManager em = entityManagerFactory.createEntityManager();
 		EntityManager proxy = ProxyFactory.getProxy(EntityManager.class, new SingletonTargetSource(em));
 		assertThat(proxy.unwrap(Session.class)).isSameAs(em);
@@ -65,7 +71,7 @@ class HibernateEntityManagerFactoryIntegrationTests extends AbstractContainerEnt
 	}
 
 	@Test  // SPR-16956
-	public void testReadOnly() {
+	void readOnly() {
 		assertThat(sharedEntityManager.unwrap(Session.class).getHibernateFlushMode()).isSameAs(FlushMode.AUTO);
 		assertThat(sharedEntityManager.unwrap(Session.class).isDefaultReadOnly()).isFalse();
 		endTransaction();

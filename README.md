@@ -6,7 +6,7 @@ Spring provides everything required beyond the Java programming language for cre
 
 ## Code of Conduct
 
-This project is governed by the [Spring Code of Conduct](CODE_OF_CONDUCT.adoc). By participating, you are expected to uphold this code of conduct. Please report unacceptable behavior to spring-code-of-conduct@pivotal.io.
+This project is governed by the [Spring Code of Conduct](https://github.com/spring-projects/spring-framework/?tab=coc-ov-file#contributor-code-of-conduct). By participating, you are expected to uphold this code of conduct. Please report unacceptable behavior to spring-code-of-conduct@spring.io.
 
 ## Access to Binaries
 
@@ -23,11 +23,11 @@ See the [Micro-Benchmarks](https://github.com/spring-projects/spring-framework/w
 
 ## Build from Source
 
-See the [Build from Source](https://github.com/spring-projects/spring-framework/wiki/Build-from-Source) wiki page and the [CONTRIBUTING.md](CONTRIBUTING.md) file.
+See the [Build from Source](CONTRIBUTING.md#build-from-source) section of the [CONTRIBUTING.md](CONTRIBUTING.md) file.
 
 ## Continuous Integration Builds
 
-Information regarding CI builds can be found in the [Spring Framework Concourse pipeline](ci/README.adoc) documentation.
+CI builds are defined with [GitHub Actions workflows](.github/workflows).
 
 ## Stay in Touch
 

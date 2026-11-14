@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -40,6 +40,7 @@ import org.springframework.context.ApplicationContextInitializer;
 import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.context.annotation.Bean;
 import org.springframework.core.env.ConfigurableEnvironment;
+import org.springframework.core.env.Environment;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.server.RequestPath;
 import org.springframework.web.HttpRequestHandler;
@@ -72,6 +73,7 @@ import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
@@ -121,15 +123,15 @@ class DispatcherServletTests {
 
 	@Test
 	void configuredDispatcherServlets() {
-		assertThat((simpleDispatcherServlet.getNamespace())).as("Correct namespace")
+		assertThat(simpleDispatcherServlet.getNamespace()).as("Correct namespace")
 				.isEqualTo("simple" + FrameworkServlet.DEFAULT_NAMESPACE_SUFFIX);
-		assertThat((FrameworkServlet.SERVLET_CONTEXT_PREFIX + "simple")).as("Correct attribute")
+		assertThat(FrameworkServlet.SERVLET_CONTEXT_PREFIX + "simple").as("Correct attribute")
 				.isEqualTo(simpleDispatcherServlet.getServletContextAttributeName());
 		assertThat(simpleDispatcherServlet.getWebApplicationContext()).as("Context published")
 				.isSameAs(getServletContext().getAttribute(FrameworkServlet.SERVLET_CONTEXT_PREFIX + "simple"));
 
 		assertThat(complexDispatcherServlet.getNamespace()).as("Correct namespace").isEqualTo("test");
-		assertThat((FrameworkServlet.SERVLET_CONTEXT_PREFIX + "complex")).as("Correct attribute")
+		assertThat(FrameworkServlet.SERVLET_CONTEXT_PREFIX + "complex").as("Correct attribute")
 				.isEqualTo(complexDispatcherServlet.getServletContextAttributeName());
 		assertThat(getServletContext().getAttribute(FrameworkServlet.SERVLET_CONTEXT_PREFIX + "complex")).as("Context not published")
 				.isNull();
@@ -196,7 +198,6 @@ class DispatcherServletTests {
 		MockHttpServletResponse response = new MockHttpServletResponse();
 		simpleDispatcherServlet.service(request, response);
 		assertThat(response.getForwardedUrl()).as("Not forwarded").isNull();
-		assertThat(response.getHeader("Last-Modified")).isEqualTo("Wed, 01 Apr 2015 00:00:00 GMT");
 	}
 
 	@Test
@@ -205,7 +206,7 @@ class DispatcherServletTests {
 		MockHttpServletResponse response = new MockHttpServletResponse();
 		complexDispatcherServlet.service(request, response);
 		assertThat(response.getForwardedUrl()).as("forwarded URL").isEqualTo("failed0.jsp");
-		assertThat(request.getAttribute("exception").getClass().equals(ServletException.class)).as("Exception exposed").isTrue();
+		assertThat(request.getAttribute("exception").getClass()).as("Exception exposed").isEqualTo(ServletException.class);
 	}
 
 	@Test
@@ -226,7 +227,6 @@ class DispatcherServletTests {
 		assertThat(request.getAttribute("test3")).isNotNull();
 		assertThat(request.getAttribute("test3x")).isNotNull();
 		assertThat(request.getAttribute("test3y")).isNotNull();
-		assertThat(response.getHeader("Last-Modified")).isEqualTo("Wed, 01 Apr 2015 00:00:01 GMT");
 	}
 
 	@Test
@@ -368,7 +368,7 @@ class DispatcherServletTests {
 		complexDispatcherServlet.service(request, response);
 		assertThat(response.getStatus()).isEqualTo(200);
 		assertThat(response.getForwardedUrl()).as("forwarded URL").isEqualTo("failed0.jsp");
-		assertThat(request.getAttribute("exception").getClass().equals(RuntimeException.class)).as("Exception exposed").isTrue();
+		assertThat(request.getAttribute("exception").getClass()).as("Exception exposed").isEqualTo(RuntimeException.class);
 	}
 
 	@Test
@@ -381,7 +381,7 @@ class DispatcherServletTests {
 		complexDispatcherServlet.service(request, response);
 		assertThat(response.getStatus()).isEqualTo(200);
 		assertThat(response.getForwardedUrl()).as("forwarded URL").isEqualTo("failed0.jsp");
-		assertThat(request.getAttribute("exception").getClass().equals(ServletException.class)).as("Exception exposed").isTrue();
+		assertThat(request.getAttribute("exception").getClass()).as("Exception exposed").isEqualTo(ServletException.class);
 	}
 
 	@Test
@@ -391,31 +391,6 @@ class DispatcherServletTests {
 		request.addUserRole("role2");
 		request.addParameter("locale", "en");
 		request.addParameter("locale2", "en_CA");
-		MockHttpServletResponse response = new MockHttpServletResponse();
-		complexDispatcherServlet.service(request, response);
-		assertThat(response.getForwardedUrl()).as("Not forwarded").isNull();
-	}
-
-	@Test
-	void themeChangeInterceptor1() throws Exception {
-		MockHttpServletRequest request = new MockHttpServletRequest(getServletContext(), "GET", "/locale.do");
-		request.addPreferredLocale(Locale.CANADA);
-		request.addUserRole("role1");
-		request.addParameter("theme", "mytheme");
-		MockHttpServletResponse response = new MockHttpServletResponse();
-		complexDispatcherServlet.service(request, response);
-		assertThat(response.getStatus()).isEqualTo(200);
-		assertThat(response.getForwardedUrl()).as("forwarded URL").isEqualTo("failed0.jsp");
-		assertThat(request.getAttribute("exception").getClass().equals(ServletException.class)).as("Exception exposed").isTrue();
-	}
-
-	@Test
-	void themeChangeInterceptor2() throws Exception {
-		MockHttpServletRequest request = new MockHttpServletRequest(getServletContext(), "GET", "/locale.do");
-		request.addPreferredLocale(Locale.CANADA);
-		request.addUserRole("role1");
-		request.addParameter("theme", "mytheme");
-		request.addParameter("theme2", "theme");
 		MockHttpServletResponse response = new MockHttpServletResponse();
 		complexDispatcherServlet.service(request, response);
 		assertThat(response.getForwardedUrl()).as("Not forwarded").isNull();
@@ -814,9 +789,9 @@ class DispatcherServletTests {
 		ConfigurableEnvironment env1 = new StandardServletEnvironment();
 		servlet.setEnvironment(env1); // should succeed
 		assertThat(servlet.getEnvironment()).isSameAs(env1);
-		assertThatIllegalArgumentException().as("non-configurable Environment").isThrownBy(() ->
-				servlet.setEnvironment(new DummyEnvironment()));
+		assertThatIllegalArgumentException().isThrownBy(() -> servlet.setEnvironment(mock(Environment.class)));
 		class CustomServletEnvironment extends StandardServletEnvironment { }
+		@SuppressWarnings("serial")
 		DispatcherServlet custom = new DispatcherServlet() {
 			@Override
 			protected ConfigurableWebEnvironment createEnvironment() {
@@ -826,7 +801,7 @@ class DispatcherServletTests {
 		assertThat(custom.getEnvironment()).isInstanceOf(CustomServletEnvironment.class);
 	}
 
-	@Test
+	@Test  // gh-36247
 	void allowedOptionsIncludesPatchMethod() throws Exception {
 		MockHttpServletRequest request = new MockHttpServletRequest(getServletContext(), "OPTIONS", "/foo");
 		MockHttpServletResponse response = spy(new MockHttpServletResponse());
@@ -834,7 +809,7 @@ class DispatcherServletTests {
 		servlet.setDispatchOptionsRequest(false);
 		servlet.service(request, response);
 		verify(response, never()).getHeader(anyString()); // SPR-10341
-		assertThat(response.getHeader("Allow")).isEqualTo("GET, HEAD, POST, PUT, DELETE, TRACE, OPTIONS, PATCH");
+		assertThat(response.getHeader("Allow")).isEqualTo("GET, HEAD, PATCH, POST, PUT, DELETE, TRACE, OPTIONS");
 	}
 
 	@Test
@@ -924,6 +899,27 @@ class DispatcherServletTests {
 		assertThat(response.getHeader("Test-Header")).isEqualTo("spring");
 	}
 
+	@Test // gh-34366, gh-35116
+	void shouldResetContentHeadersIfNotCommitted() throws Exception {
+		StaticWebApplicationContext context = new StaticWebApplicationContext();
+		context.setServletContext(getServletContext());
+		context.registerSingleton("/error", ErrorController.class);
+		DispatcherServlet servlet = new DispatcherServlet(context);
+		servlet.init(servletConfig);
+
+		MockHttpServletRequest request = new MockHttpServletRequest(getServletContext(), "GET", "/error");
+		MockHttpServletResponse response = new MockHttpServletResponse();
+
+		assertThatThrownBy(() -> servlet.service(request, response))
+				.isInstanceOf(ServletException.class)
+				.hasCauseInstanceOf(IllegalArgumentException.class);
+
+		assertThat(response.getContentAsByteArray()).isEmpty();
+		assertThat(response.getStatus()).isEqualTo(400);
+		assertThat(response.getHeaderNames()).doesNotContain(HttpHeaders.CONTENT_TYPE);
+		assertThat(response.getHeaderNames()).doesNotContain(HttpHeaders.CONTENT_DISPOSITION);
+	}
+
 
 	public static class ControllerFromParent implements Controller {
 
@@ -976,6 +972,8 @@ class DispatcherServletTests {
 		public ModelAndView handleRequest(HttpServletRequest request, HttpServletResponse response) throws Exception {
 			response.setStatus(400);
 			response.setHeader("Test-Header", "spring");
+			response.addHeader("Content-Type", "application/json");
+			response.addHeader("Content-Disposition", "attachment; filename=\"report.txt\"");
 			if (request.getAttribute("commit") != null) {
 				response.flushBuffer();
 			}

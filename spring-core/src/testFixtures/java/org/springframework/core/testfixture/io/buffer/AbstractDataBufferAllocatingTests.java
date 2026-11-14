@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -34,8 +34,6 @@ import io.netty.buffer.PoolArenaMetric;
 import io.netty.buffer.PooledByteBufAllocator;
 import io.netty.buffer.PooledByteBufAllocatorMetric;
 import io.netty.buffer.UnpooledByteBufAllocator;
-import io.netty5.buffer.BufferAllocator;
-import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.extension.AfterEachCallback;
 import org.junit.jupiter.api.extension.RegisterExtension;
@@ -48,13 +46,11 @@ import org.springframework.core.io.buffer.DataBuffer;
 import org.springframework.core.io.buffer.DataBufferFactory;
 import org.springframework.core.io.buffer.DataBufferUtils;
 import org.springframework.core.io.buffer.DefaultDataBufferFactory;
-import org.springframework.core.io.buffer.Netty5DataBufferFactory;
 import org.springframework.core.io.buffer.NettyDataBufferFactory;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Named.named;
-import static org.junit.jupiter.params.provider.Arguments.arguments;
+import static org.junit.jupiter.params.provider.Arguments.argumentSet;
 
 /**
  * Base class for tests that read or write data buffers with an extension to check
@@ -65,14 +61,6 @@ import static org.junit.jupiter.params.provider.Arguments.arguments;
  * @author Sam Brannen
  */
 public abstract class AbstractDataBufferAllocatingTests {
-
-	private static BufferAllocator netty5OnHeapUnpooled;
-
-	private static BufferAllocator netty5OffHeapUnpooled;
-
-	private static BufferAllocator netty5OffHeapPooled;
-
-	private static BufferAllocator netty5OnHeapPooled;
 
 	private static UnpooledByteBufAllocator netty4OffHeapUnpooled;
 
@@ -174,59 +162,37 @@ public abstract class AbstractDataBufferAllocatingTests {
 
 	@BeforeAll
 	@SuppressWarnings("deprecation") // PooledByteBufAllocator no longer supports tinyCacheSize.
-	public static void createAllocators() {
+	static void createAllocators() {
 		netty4OnHeapUnpooled = new UnpooledByteBufAllocator(false);
 		netty4OffHeapUnpooled = new UnpooledByteBufAllocator(true);
 		netty4OnHeapPooled = new PooledByteBufAllocator(false, 1, 1, 4096, 4, 0, 0, 0, true);
 		netty4OffHeapPooled = new PooledByteBufAllocator(true, 1, 1, 4096, 4, 0, 0, 0, true);
-
-		netty5OnHeapUnpooled = BufferAllocator.onHeapUnpooled();
-		netty5OffHeapUnpooled = BufferAllocator.offHeapUnpooled();
-		netty5OnHeapPooled = BufferAllocator.onHeapPooled();
-		netty5OffHeapPooled = BufferAllocator.offHeapPooled();
-	}
-
-	@AfterAll
-	static void closeAllocators() {
-		netty5OnHeapUnpooled.close();
-		netty5OffHeapUnpooled.close();
-		netty5OnHeapPooled.close();
-		netty5OffHeapPooled.close();
 	}
 
 
 	@Retention(RetentionPolicy.RUNTIME)
 	@Target(ElementType.METHOD)
-	@ParameterizedTest(name = "[{index}] {0}")
+	@ParameterizedTest
 	@MethodSource("org.springframework.core.testfixture.io.buffer.AbstractDataBufferAllocatingTests#dataBufferFactories()")
 	public @interface ParameterizedDataBufferAllocatingTest {
 	}
 
-	public static Stream<Arguments> dataBufferFactories() {
+	static Stream<Arguments> dataBufferFactories() {
 		return Stream.of(
 			// Netty 4
-			arguments(named("NettyDataBufferFactory - UnpooledByteBufAllocator - preferDirect = true",
-					new NettyDataBufferFactory(netty4OffHeapUnpooled))),
-			arguments(named("NettyDataBufferFactory - UnpooledByteBufAllocator - preferDirect = false",
-					new NettyDataBufferFactory(netty4OnHeapUnpooled))),
-			arguments(named("NettyDataBufferFactory - PooledByteBufAllocator - preferDirect = true",
-					new NettyDataBufferFactory(netty4OffHeapPooled))),
-			arguments(named("NettyDataBufferFactory - PooledByteBufAllocator - preferDirect = false",
-					new NettyDataBufferFactory(netty4OnHeapPooled))),
-			// Netty 5
-			arguments(named("Netty5DataBufferFactory - BufferAllocator.onHeapUnpooled()",
-					new Netty5DataBufferFactory(netty5OnHeapUnpooled))),
-			arguments(named("Netty5DataBufferFactory - BufferAllocator.offHeapUnpooled()",
-					new Netty5DataBufferFactory(netty5OffHeapUnpooled))),
-			arguments(named("Netty5DataBufferFactory - BufferAllocator.onHeapPooled()",
-					new Netty5DataBufferFactory(netty5OnHeapPooled))),
-			arguments(named("Netty5DataBufferFactory - BufferAllocator.offHeapPooled()",
-					new Netty5DataBufferFactory(netty5OffHeapPooled))),
+			argumentSet("NettyDataBufferFactory - UnpooledByteBufAllocator - preferDirect = true",
+					new NettyDataBufferFactory(netty4OffHeapUnpooled)),
+			argumentSet("NettyDataBufferFactory - UnpooledByteBufAllocator - preferDirect = false",
+					new NettyDataBufferFactory(netty4OnHeapUnpooled)),
+			argumentSet("NettyDataBufferFactory - PooledByteBufAllocator - preferDirect = true",
+					new NettyDataBufferFactory(netty4OffHeapPooled)),
+			argumentSet("NettyDataBufferFactory - PooledByteBufAllocator - preferDirect = false",
+					new NettyDataBufferFactory(netty4OnHeapPooled)),
 			// Default
-			arguments(named("DefaultDataBufferFactory - preferDirect = true",
-					new DefaultDataBufferFactory(true))),
-			arguments(named("DefaultDataBufferFactory - preferDirect = false",
-					new DefaultDataBufferFactory(false)))
+			argumentSet("DefaultDataBufferFactory - preferDirect = true",
+					new DefaultDataBufferFactory(true)),
+			argumentSet("DefaultDataBufferFactory - preferDirect = false",
+					new DefaultDataBufferFactory(false))
 		);
 	}
 

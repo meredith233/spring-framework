@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2013 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,11 +19,11 @@ package org.springframework.beans;
 import java.beans.BeanInfo;
 import java.beans.IntrospectionException;
 
-import org.springframework.lang.Nullable;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Strategy interface for creating {@link BeanInfo} instances for Spring beans.
- * Can be used to plug in custom bean property resolution strategies (e.g. for other
+ * Can be used to plug in custom bean property resolution strategies (for example, for other
  * languages on the JVM) or more efficient {@link BeanInfo} retrieval algorithms.
  *
  * <p>BeanInfoFactories are instantiated by the {@link CachedIntrospectionResults},
@@ -54,7 +54,6 @@ public interface BeanInfoFactory {
 	 * @return the BeanInfo, or {@code null} if the given class is not supported
 	 * @throws IntrospectionException in case of exceptions
 	 */
-	@Nullable
-	BeanInfo getBeanInfo(Class<?> beanClass) throws IntrospectionException;
+	@Nullable BeanInfo getBeanInfo(Class<?> beanClass) throws IntrospectionException;
 
 }

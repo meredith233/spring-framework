@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -41,7 +41,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * @author Rossen Stoyanchev
  */
 @ExtendWith(GzipSupport.class)
-public class EncodedResourceResolverTests {
+class EncodedResourceResolverTests {
 
 	private ResourceResolverChain resolver;
 
@@ -78,8 +78,7 @@ public class EncodedResourceResolverTests {
 		assertThat(actual.getDescription()).isEqualTo(getResource(file + ".gz").getDescription());
 		assertThat(actual.getFilename()).isEqualTo(getResource(file).getFilename());
 
-		boolean condition = actual instanceof HttpResource;
-		assertThat(condition).isTrue();
+		assertThat(actual).isInstanceOf(HttpResource.class);
 		HttpHeaders headers = ((HttpResource) actual).getResponseHeaders();
 		assertThat(headers.getFirst(HttpHeaders.CONTENT_ENCODING)).isEqualTo("gzip");
 		assertThat(headers.getFirst(HttpHeaders.VARY)).isEqualTo("Accept-Encoding");
@@ -95,8 +94,7 @@ public class EncodedResourceResolverTests {
 
 		assertThat(resolved.getDescription()).isEqualTo(getResource("foo.css.gz").getDescription());
 		assertThat(resolved.getFilename()).isEqualTo(getResource("foo.css").getFilename());
-		boolean condition = resolved instanceof HttpResource;
-		assertThat(condition).isTrue();
+		assertThat(resolved).isInstanceOf(HttpResource.class);
 	}
 
 	@Test
@@ -110,8 +108,7 @@ public class EncodedResourceResolverTests {
 
 		assertThat(resolved.getDescription()).isEqualTo(getResource(file + ".gz").getDescription());
 		assertThat(resolved.getFilename()).isEqualTo(getResource(file).getFilename());
-		boolean condition = resolved instanceof HttpResource;
-		assertThat(condition).isTrue();
+		assertThat(resolved).isInstanceOf(HttpResource.class);
 
 		// 2. Resolve unencoded resource
 		request = new MockHttpServletRequest("GET", "/js/foo.js");
@@ -119,12 +116,11 @@ public class EncodedResourceResolverTests {
 
 		assertThat(resolved.getDescription()).isEqualTo(getResource(file).getDescription());
 		assertThat(resolved.getFilename()).isEqualTo(getResource(file).getFilename());
-		boolean condition1 = resolved instanceof HttpResource;
-		assertThat(condition1).isFalse();
+		assertThat(resolved).isNotInstanceOf(HttpResource.class);
 	}
 
 	@Test  // SPR-13149
-	public void resolveWithNullRequest() {
+	void resolveWithNullRequest() {
 		String file = "js/foo.js";
 		Resource resolved = this.resolver.resolveResource(null, file, this.locations);
 

@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,6 +20,7 @@ import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
 
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 
 import org.springframework.beans.MutablePropertyValues;
@@ -34,7 +35,6 @@ import org.springframework.core.ResolvableType;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.support.EncodedResource;
-import org.springframework.lang.Nullable;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -81,13 +81,13 @@ class StaticApplicationContextMulticasterTests extends AbstractApplicationContex
 
 	@Test
 	@Override
-	public void count() {
+	protected void count() {
 		assertCount(15);
 	}
 
 	@Test
 	@Override
-	public void events() throws Exception {
+	protected void events() throws Exception {
 		TestApplicationEventMulticaster.counter = 0;
 		super.events();
 		assertThat(TestApplicationEventMulticaster.counter).isEqualTo(1);

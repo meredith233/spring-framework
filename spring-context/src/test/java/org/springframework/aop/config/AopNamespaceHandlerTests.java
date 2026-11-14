@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -53,7 +53,7 @@ class AopNamespaceHandlerTests {
 
 
 	@Test
-	void testIsProxy() {
+	void isProxy() {
 		ITestBean bean = getTestBean();
 
 		assertThat(AopUtils.isAopProxy(bean)).as("Bean is not a proxy").isTrue();
@@ -66,7 +66,7 @@ class AopNamespaceHandlerTests {
 	}
 
 	@Test
-	void testAdviceInvokedCorrectly() {
+	void adviceInvokedCorrectly() {
 		CountingBeforeAdvice getAgeCounter = (CountingBeforeAdvice) this.context.getBean("getAgeCounter");
 		CountingBeforeAdvice getNameCounter = (CountingBeforeAdvice) this.context.getBean("getNameCounter");
 
@@ -87,7 +87,7 @@ class AopNamespaceHandlerTests {
 	}
 
 	@Test
-	void testAspectApplied() {
+	void aspectApplied() {
 		ITestBean bean = getTestBean();
 
 		CountingAspectJAdvice advice = (CountingAspectJAdvice) this.context.getBean("countingAdvice");
@@ -107,7 +107,7 @@ class AopNamespaceHandlerTests {
 	}
 
 	@Test
-	void testAspectAppliedForInitializeBeanWithEmptyName() {
+	void aspectAppliedForInitializeBeanWithEmptyName() {
 		ITestBean bean = (ITestBean) this.context.getAutowireCapableBeanFactory().initializeBean(new TestBean(), "");
 
 		CountingAspectJAdvice advice = (CountingAspectJAdvice) this.context.getBean("countingAdvice");
@@ -127,7 +127,7 @@ class AopNamespaceHandlerTests {
 	}
 
 	@Test
-	void testAspectAppliedForInitializeBeanWithNullName() {
+	void aspectAppliedForInitializeBeanWithNullName() {
 		ITestBean bean = (ITestBean) this.context.getAutowireCapableBeanFactory().initializeBean(new TestBean(), null);
 
 		CountingAspectJAdvice advice = (CountingAspectJAdvice) this.context.getBean("countingAdvice");

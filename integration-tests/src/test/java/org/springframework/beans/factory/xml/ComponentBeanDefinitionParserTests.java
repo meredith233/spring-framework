@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -50,13 +50,13 @@ class ComponentBeanDefinitionParserTests {
 	}
 
 	@Test
-	void testBionicBasic() {
+	void bionicBasic() {
 		Component cp = getBionicFamily();
 		assertThat(cp.getName()).isEqualTo("Bionic-1");
 	}
 
 	@Test
-	void testBionicFirstLevelChildren() {
+	void bionicFirstLevelChildren() {
 		Component cp = getBionicFamily();
 		List<Component> components = cp.getComponents();
 		assertThat(components).hasSize(2);
@@ -65,7 +65,7 @@ class ComponentBeanDefinitionParserTests {
 	}
 
 	@Test
-	void testBionicSecondLevelChildren() {
+	void bionicSecondLevelChildren() {
 		Component cp = getBionicFamily();
 		List<Component> components = cp.getComponents().get(0).getComponents();
 		assertThat(components).hasSize(2);

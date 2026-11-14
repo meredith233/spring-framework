@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -54,7 +54,7 @@ class HeaderMethodArgumentResolverTests {
 
 
 	@BeforeEach
-	public void setup() {
+	void setup() {
 		GenericApplicationContext context = new GenericApplicationContext();
 		context.refresh();
 		this.resolver = new HeaderMethodArgumentResolver(new DefaultConversionService(), context.getBeanFactory());
@@ -75,7 +75,7 @@ class HeaderMethodArgumentResolverTests {
 	}
 
 	@Test  // SPR-11326
-	public void resolveArgumentNativeHeader() throws Exception {
+	void resolveArgumentNativeHeader() throws Exception {
 		TestMessageHeaderAccessor headers = new TestMessageHeaderAccessor();
 		headers.setNativeHeader("param1", "foo");
 		Message<byte[]> message = MessageBuilder.withPayload(new byte[0]).setHeaders(headers).build();

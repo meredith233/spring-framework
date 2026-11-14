@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -104,8 +104,7 @@ class SessionAttributesHandlerTests {
 
 		assertThat(sessionAttributeStore.retrieveAttribute(request, "attr1")).isEqualTo("value1");
 		assertThat(sessionAttributeStore.retrieveAttribute(request, "attr2")).isEqualTo("value2");
-		boolean condition = sessionAttributeStore.retrieveAttribute(request, "attr3") instanceof TestBean;
-		assertThat(condition).isTrue();
+		assertThat(sessionAttributeStore.retrieveAttribute(request, "attr3")).isInstanceOf(TestBean.class);
 	}
 
 

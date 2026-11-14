@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -157,6 +157,41 @@ class TransactionalApplicationListenerMethodAdapterTests {
 		assertThatNoException().isThrownBy(() -> factory.createApplicationListener("test", SampleEvents.class, m));
 	}
 
+	@Test
+	void withTransactionalAnnotationBeforeCommit() {
+		RestrictedTransactionalEventListenerFactory factory = new RestrictedTransactionalEventListenerFactory();
+		Method m = ReflectionUtils.findMethod(SampleEvents.class, "withTransactionalAnnotationBeforeCommit", String.class);
+		assertThatNoException().isThrownBy(() -> factory.createApplicationListener("test", SampleEvents.class, m));
+	}
+
+	@Test
+	void withTransactionalAnnotationOnEnclosingClass() {
+		RestrictedTransactionalEventListenerFactory factory = new RestrictedTransactionalEventListenerFactory();
+		Method m = ReflectionUtils.findMethod(SampleEvents.SampleEventsWithTransactionalAnnotation.class, "defaultPhase", String.class);
+		assertThatIllegalStateException().isThrownBy(() -> factory.createApplicationListener("test", SampleEvents.SampleEventsWithTransactionalAnnotation.class, m));
+	}
+
+	@Test
+	void withTransactionalRequiresNewAnnotationAndTransactionalAnnotationOnEnclosingClass() {
+		RestrictedTransactionalEventListenerFactory factory = new RestrictedTransactionalEventListenerFactory();
+		Method m = ReflectionUtils.findMethod(SampleEvents.SampleEventsWithTransactionalAnnotation.class, "withTransactionalRequiresNewAnnotation", String.class);
+		assertThatNoException().isThrownBy(() -> factory.createApplicationListener("test", SampleEvents.SampleEventsWithTransactionalAnnotation.class, m));
+	}
+
+	@Test
+	void withTransactionalNotSupportedAnnotationAndTransactionalAnnotationOnEnclosingClass() {
+		RestrictedTransactionalEventListenerFactory factory = new RestrictedTransactionalEventListenerFactory();
+		Method m = ReflectionUtils.findMethod(SampleEvents.SampleEventsWithTransactionalAnnotation.class, "withTransactionalNotSupportedAnnotation", String.class);
+		assertThatNoException().isThrownBy(() -> factory.createApplicationListener("test", SampleEvents.SampleEventsWithTransactionalAnnotation.class, m));
+	}
+
+	@Test
+	void withAsyncTransactionalAnnotationAndTransactionalAnnotationOnEnclosingClass() {
+		RestrictedTransactionalEventListenerFactory factory = new RestrictedTransactionalEventListenerFactory();
+		Method m = ReflectionUtils.findMethod(SampleEvents.SampleEventsWithTransactionalAnnotation.class, "withAsyncTransactionalAnnotation", String.class);
+		assertThatNoException().isThrownBy(() -> factory.createApplicationListener("test", SampleEvents.SampleEventsWithTransactionalAnnotation.class, m));
+	}
+
 
 	private static void assertPhase(Method method, TransactionPhase expected) {
 		assertThat(method).as("Method must not be null").isNotNull();
@@ -247,6 +282,34 @@ class TransactionalApplicationListenerMethodAdapterTests {
 		@TransactionalEventListener
 		@Async @Transactional(propagation = Propagation.REQUIRES_NEW)
 		public void withAsyncTransactionalAnnotation(String data) {
+		}
+
+		@TransactionalEventListener(phase = TransactionPhase.BEFORE_COMMIT)
+		@Transactional
+		public void withTransactionalAnnotationBeforeCommit(String data) {
+		}
+
+		@Transactional
+		static class SampleEventsWithTransactionalAnnotation {
+
+			@TransactionalEventListener
+			public void defaultPhase(String data) {
+			}
+
+			@TransactionalEventListener
+			@Transactional(propagation = Propagation.REQUIRES_NEW)
+			public void withTransactionalRequiresNewAnnotation(String data) {
+			}
+
+			@TransactionalEventListener
+			@Transactional(propagation = Propagation.NOT_SUPPORTED)
+			public void withTransactionalNotSupportedAnnotation(String data) {
+			}
+
+			@TransactionalEventListener
+			@Async @Transactional(propagation = Propagation.REQUIRES_NEW)
+			public void withAsyncTransactionalAnnotation(String data) {
+			}
 		}
 	}
 

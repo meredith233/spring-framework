@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2023 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,7 +16,8 @@
 
 package org.springframework.validation;
 
-import org.springframework.lang.Nullable;
+import org.jspecify.annotations.Nullable;
+
 import org.springframework.util.Assert;
 import org.springframework.util.ObjectUtils;
 
@@ -37,8 +38,7 @@ public class FieldError extends ObjectError {
 
 	private final String field;
 
-	@Nullable
-	private final Object rejectedValue;
+	private final @Nullable Object rejectedValue;
 
 	private final boolean bindingFailure;
 
@@ -47,7 +47,8 @@ public class FieldError extends ObjectError {
 	 * Create a new FieldError instance.
 	 * @param objectName the name of the affected object
 	 * @param field the affected field of the object
-	 * @param defaultMessage the default message to be used to resolve this message
+	 * @param defaultMessage the default message to use as a fallback, since no
+	 * message code is specified (it is not looked up as a message key)
 	 */
 	public FieldError(String objectName, String field, String defaultMessage) {
 		this(objectName, field, null, false, null, null, defaultMessage);
@@ -60,12 +61,15 @@ public class FieldError extends ObjectError {
 	 * @param rejectedValue the rejected field value
 	 * @param bindingFailure whether this error represents a binding failure
 	 * (like a type mismatch); else, it is a validation failure
-	 * @param codes the codes to be used to resolve this message
+	 * @param codes the message codes to try, in order, when resolving this
+	 * message against a {@code MessageSource}
 	 * @param arguments the array of arguments to be used to resolve this message
-	 * @param defaultMessage the default message to be used to resolve this message
+	 * @param defaultMessage the default message to use if none of the codes
+	 * can be resolved (it is not looked up as a message key itself, but may
+	 * contain argument placeholders)
 	 */
 	public FieldError(String objectName, String field, @Nullable Object rejectedValue, boolean bindingFailure,
-			@Nullable String[] codes, @Nullable Object[] arguments, @Nullable String defaultMessage) {
+			String @Nullable [] codes, Object @Nullable [] arguments, @Nullable String defaultMessage) {
 
 		super(objectName, codes, arguments, defaultMessage);
 		Assert.notNull(field, "Field must not be null");
@@ -85,8 +89,7 @@ public class FieldError extends ObjectError {
 	/**
 	 * Return the rejected field value.
 	 */
-	@Nullable
-	public Object getRejectedValue() {
+	public @Nullable Object getRejectedValue() {
 		return this.rejectedValue;
 	}
 

@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -29,11 +29,11 @@ import java.util.regex.Pattern;
 
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import org.jspecify.annotations.Nullable;
 
 import org.springframework.beans.BeanUtils;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
-import org.springframework.lang.Nullable;
 import org.springframework.util.Assert;
 import org.springframework.util.CollectionUtils;
 import org.springframework.util.ObjectUtils;
@@ -70,9 +70,6 @@ import org.springframework.web.util.WebUtils;
  * actually is, they are much better off setting this flag to true, and submitting
  * paths which are to be considered relative to the web application root.
  *
- * <p><b>NOTE when using this redirect view in a Portlet environment:</b> Make sure
- * that your controller respects the Portlet {@code sendRedirect} constraints.
- *
  * @author Rod Johnson
  * @author Juergen Hoeller
  * @author Colin Sampaleanu
@@ -95,18 +92,15 @@ public class RedirectView extends AbstractUrlBasedView implements SmartView {
 
 	private boolean exposeModelAttributes = true;
 
-	@Nullable
-	private String encodingScheme;
+	private @Nullable String encodingScheme;
 
-	@Nullable
-	private HttpStatusCode statusCode;
+	private @Nullable HttpStatusCode statusCode;
 
 	private boolean expandUriTemplateVariables = true;
 
 	private boolean propagateQueryParams = false;
 
-	@Nullable
-	private String[] hosts;
+	private String @Nullable [] hosts;
 
 
 	/**
@@ -266,7 +260,7 @@ public class RedirectView extends AbstractUrlBasedView implements SmartView {
 	 * @param hosts one or more application hosts
 	 * @since 4.3
 	 */
-	public void setHosts(@Nullable String... hosts) {
+	public void setHosts(String @Nullable ... hosts) {
 		this.hosts = hosts;
 	}
 
@@ -274,8 +268,7 @@ public class RedirectView extends AbstractUrlBasedView implements SmartView {
 	 * Return the configured application hosts.
 	 * @since 4.3
 	 */
-	@Nullable
-	public String[] getHosts() {
+	public String @Nullable [] getHosts() {
 		return this.hosts;
 	}
 

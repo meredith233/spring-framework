@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2023 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,10 +19,12 @@ package org.springframework.jdbc.core.namedparam;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.Locale;
 import java.util.Map;
 
+import org.jspecify.annotations.Nullable;
+
 import org.springframework.jdbc.core.SqlParameterValue;
-import org.springframework.lang.Nullable;
 
 /**
  * Class that provides helper methods for the use of {@link SqlParameterSource},
@@ -36,7 +38,8 @@ public abstract class SqlParameterSourceUtils {
 
 	/**
 	 * Create an array of {@link SqlParameterSource} objects populated with data
-	 * from the values passed in (either a {@link Map} or a bean object).
+	 * from the values passed in (a {@link Map}, a bean object, or an existing
+	 * {@link SqlParameterSource} which is used as-is).
 	 * This will define what is included in a batch operation.
 	 * @param candidates object array of objects containing the values to be used
 	 * @return an array of {@link SqlParameterSource}
@@ -50,7 +53,8 @@ public abstract class SqlParameterSourceUtils {
 
 	/**
 	 * Create an array of {@link SqlParameterSource} objects populated with data
-	 * from the values passed in (either a {@link Map} or a bean object).
+	 * from the values passed in (a {@link Map}, a bean object, or an existing
+	 * {@link SqlParameterSource} which is used as-is).
 	 * This will define what is included in a batch operation.
 	 * @param candidates collection of objects containing the values to be used
 	 * @return an array of {@link SqlParameterSource}
@@ -64,7 +68,8 @@ public abstract class SqlParameterSourceUtils {
 		SqlParameterSource[] batch = new SqlParameterSource[candidates.size()];
 		int i = 0;
 		for (Object candidate : candidates) {
-			batch[i] = (candidate instanceof Map map ? new MapSqlParameterSource(map) :
+			batch[i] = (candidate instanceof SqlParameterSource sqlParameterSource ? sqlParameterSource :
+					candidate instanceof Map map ? new MapSqlParameterSource(map) :
 					new BeanPropertySqlParameterSource(candidate));
 			i++;
 		}
@@ -94,8 +99,7 @@ public abstract class SqlParameterSourceUtils {
 	 * @return the value object
 	 * @see SqlParameterValue
 	 */
-	@Nullable
-	public static Object getTypedValue(SqlParameterSource source, String parameterName) {
+	public static @Nullable Object getTypedValue(SqlParameterSource source, String parameterName) {
 		int sqlType = source.getSqlType(parameterName);
 		if (sqlType != SqlParameterSource.TYPE_UNKNOWN) {
 			return new SqlParameterValue(sqlType, source.getTypeName(parameterName), source.getValue(parameterName));
@@ -115,7 +119,7 @@ public abstract class SqlParameterSourceUtils {
 		String[] paramNames = parameterSource.getParameterNames();
 		if (paramNames != null) {
 			for (String name : paramNames) {
-				caseInsensitiveParameterNames.put(name.toLowerCase(), name);
+				caseInsensitiveParameterNames.put(name.toLowerCase(Locale.ROOT), name);
 			}
 		}
 		return caseInsensitiveParameterNames;

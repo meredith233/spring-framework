@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,13 +22,13 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.jspecify.annotations.Nullable;
+
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpInputMessage;
 import org.springframework.http.HttpOutputMessage;
 import org.springframework.http.MediaType;
-import org.springframework.lang.Nullable;
 import org.springframework.util.Assert;
-import org.springframework.util.StreamUtils;
 
 /**
  * Implementation of {@link HttpMessageConverter} that can read and write strings.
@@ -51,8 +51,7 @@ public class StringHttpMessageConverter extends AbstractHttpMessageConverter<Str
 	public static final Charset DEFAULT_CHARSET = StandardCharsets.ISO_8859_1;
 
 
-	@Nullable
-	private volatile List<Charset> availableCharsets;
+	private volatile @Nullable List<Charset> availableCharsets;
 
 	private boolean writeAcceptCharset = false;
 
@@ -100,11 +99,14 @@ public class StringHttpMessageConverter extends AbstractHttpMessageConverter<Str
 	}
 
 	@Override
-	protected Long getContentLength(String str, @Nullable MediaType contentType) {
-		Charset charset = getContentTypeCharset(contentType);
-		return (long) str.getBytes(charset).length;
+	protected void writeInternal(String str, HttpOutputMessage outputMessage) throws IOException {
+		HttpHeaders headers = outputMessage.getHeaders();
+		if (this.writeAcceptCharset && headers.get(HttpHeaders.ACCEPT_CHARSET) == null) {
+			headers.setAcceptCharset(getAcceptedCharsets());
+		}
+		Charset charset = getContentTypeCharset(headers.getContentType());
+		outputMessage.getBody().write(str.getBytes(charset));
 	}
-
 
 	@Override
 	protected void addDefaultHeaders(HttpHeaders headers, String s, @Nullable MediaType type) throws IOException {
@@ -119,15 +121,10 @@ public class StringHttpMessageConverter extends AbstractHttpMessageConverter<Str
 	}
 
 	@Override
-	protected void writeInternal(String str, HttpOutputMessage outputMessage) throws IOException {
-		HttpHeaders headers = outputMessage.getHeaders();
-		if (this.writeAcceptCharset && headers.get(HttpHeaders.ACCEPT_CHARSET) == null) {
-			headers.setAcceptCharset(getAcceptedCharsets());
-		}
-		Charset charset = getContentTypeCharset(headers.getContentType());
-		StreamUtils.copy(str, charset, outputMessage.getBody());
+	protected Long getContentLength(String str, @Nullable MediaType contentType) {
+		Charset charset = getContentTypeCharset(contentType);
+		return (long) str.getBytes(charset).length;
 	}
-
 
 	/**
 	 * Return the list of supported {@link Charset Charsets}.
@@ -162,6 +159,12 @@ public class StringHttpMessageConverter extends AbstractHttpMessageConverter<Str
 	}
 
 	@Override
+	public boolean canWriteRepeatedly(String s, @Nullable MediaType contentType) {
+		return true;
+	}
+
+	@Override
+	@SuppressWarnings("removal")
 	protected boolean supportsRepeatableWrites(String s) {
 		return true;
 	}

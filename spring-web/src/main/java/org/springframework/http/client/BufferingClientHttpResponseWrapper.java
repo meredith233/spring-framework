@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2023 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,9 +20,10 @@ import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 
+import org.jspecify.annotations.Nullable;
+
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatusCode;
-import org.springframework.lang.Nullable;
 import org.springframework.util.StreamUtils;
 
 /**
@@ -30,14 +31,14 @@ import org.springframework.util.StreamUtils;
  * into memory, thus allowing for multiple invocations of {@link #getBody()}.
  *
  * @author Arjen Poutsma
+ * @author Juergen Hoeller
  * @since 3.1
  */
 final class BufferingClientHttpResponseWrapper implements ClientHttpResponse {
 
 	private final ClientHttpResponse response;
 
-	@Nullable
-	private byte[] body;
+	private volatile byte @Nullable [] body;
 
 
 	BufferingClientHttpResponseWrapper(ClientHttpResponse response) {
@@ -62,10 +63,17 @@ final class BufferingClientHttpResponseWrapper implements ClientHttpResponse {
 
 	@Override
 	public InputStream getBody() throws IOException {
-		if (this.body == null) {
-			this.body = StreamUtils.copyToByteArray(this.response.getBody());
+		byte[] body = this.body;
+		if (body == null) {
+			synchronized (this) {
+				body = this.body;
+				if (body == null) {
+					body = StreamUtils.copyToByteArray(this.response.getBody());
+					this.body = body;
+				}
+			}
 		}
-		return new ByteArrayInputStream(this.body);
+		return new ByteArrayInputStream(body);
 	}
 
 	@Override

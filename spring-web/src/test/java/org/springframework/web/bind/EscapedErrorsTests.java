@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -33,7 +33,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class EscapedErrorsTests {
 
 	@Test
-	void testEscapedErrors() {
+	void escapedErrors() {
 		TestBean tb = new TestBean();
 		tb.setName("empty &");
 
@@ -85,13 +85,34 @@ class EscapedErrorsTests {
 		FieldError ageError = errors.getFieldError("age");
 		assertThat(ageError.getDefaultMessage()).as("Age error message escaped").isEqualTo("message: &lt;tag&gt;");
 		assertThat(ageError.getCode()).as("Age error code not escaped").isEqualTo("AGE_NOT_SET <tag>");
-		assertThat((Integer.valueOf(0))).as("Age value not escaped").isEqualTo(errors.getFieldValue("age"));
+		assertThat(Integer.valueOf(0)).as("Age value not escaped").isEqualTo(errors.getFieldValue("age"));
 		FieldError ageErrorInList = errors.getFieldErrors("age").get(0);
 		assertThat(ageError.getDefaultMessage()).as("Same name error in list")
 				.isEqualTo(ageErrorInList.getDefaultMessage());
 		FieldError ageError2 = errors.getFieldErrors("age").get(1);
 		assertThat(ageError2.getDefaultMessage()).as("Age error 2 message escaped").isEqualTo("message: &lt;tag&gt;");
 		assertThat(ageError2.getCode()).as("Age error 2 code not escaped").isEqualTo("AGE_NOT_32 <tag>");
+	}
+
+	@Test
+	void noArgFieldErrorAccessorsEscapeRejectedValueAndMessage() {
+		TestBean tb = new TestBean();
+		tb.setName("<script>alert(1)</script>");
+
+		Errors errors = new EscapedErrors(new BindException(tb, "tb"));
+		errors.rejectValue("name", "NAME_INVALID", null, "message: <tag>");
+
+		FieldError fieldError = errors.getFieldError();
+		assertThat(fieldError.getDefaultMessage()).as("No-arg getFieldError() message escaped")
+				.isEqualTo("message: &lt;tag&gt;");
+		assertThat(fieldError.getRejectedValue()).as("No-arg getFieldError() rejected value escaped")
+				.isEqualTo("&lt;script&gt;alert(1)&lt;/script&gt;");
+
+		FieldError fieldErrorInList = errors.getFieldErrors().get(0);
+		assertThat(fieldErrorInList.getDefaultMessage()).as("No-arg getFieldErrors() message escaped")
+				.isEqualTo("message: &lt;tag&gt;");
+		assertThat(fieldErrorInList.getRejectedValue()).as("No-arg getFieldErrors() rejected value escaped")
+				.isEqualTo("&lt;script&gt;alert(1)&lt;/script&gt;");
 	}
 
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2023 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -32,18 +32,18 @@ import org.apache.hc.client5.http.classic.methods.HttpPatch;
 import org.apache.hc.client5.http.classic.methods.HttpPost;
 import org.apache.hc.client5.http.classic.methods.HttpPut;
 import org.apache.hc.client5.http.classic.methods.HttpTrace;
+import org.apache.hc.client5.http.classic.methods.HttpUriRequestBase;
 import org.apache.hc.client5.http.config.Configurable;
 import org.apache.hc.client5.http.config.RequestConfig;
 import org.apache.hc.client5.http.impl.classic.HttpClients;
 import org.apache.hc.client5.http.io.HttpClientConnectionManager;
 import org.apache.hc.client5.http.protocol.HttpClientContext;
 import org.apache.hc.core5.http.ClassicHttpRequest;
-import org.apache.hc.core5.http.io.SocketConfig;
 import org.apache.hc.core5.http.protocol.HttpContext;
+import org.jspecify.annotations.Nullable;
 
 import org.springframework.beans.factory.DisposableBean;
 import org.springframework.http.HttpMethod;
-import org.springframework.lang.Nullable;
 import org.springframework.util.Assert;
 
 /**
@@ -54,7 +54,7 @@ import org.springframework.util.Assert;
  * <p>Allows to use a pre-configured {@link HttpClient} instance -
  * potentially with authentication, HTTP connection pooling, etc.
  *
- * <p><b>NOTE:</b> Requires Apache HttpComponents 5.1 or higher, as of Spring 6.0.
+ * <p><b>NOTE:</b> Requires Apache HttpComponents 5.1 or higher.
  *
  * @author Oleg Kalnichevski
  * @author Arjen Poutsma
@@ -64,14 +64,17 @@ import org.springframework.util.Assert;
  */
 public class HttpComponentsClientHttpRequestFactory implements ClientHttpRequestFactory, DisposableBean {
 
+	private static final Duration ONE_MILLISECOND = Duration.ofMillis(1);
+
+
 	private HttpClient httpClient;
 
-	@Nullable
-	private BiFunction<HttpMethod, URI, HttpContext> httpContextFactory;
-
-	private long connectTimeout = -1;
+	private @Nullable BiFunction<HttpMethod, URI, HttpContext> httpContextFactory;
 
 	private long connectionRequestTimeout = -1;
+
+	private long readTimeout = -1;
+
 
 	/**
 	 * Create a new instance of the {@code HttpComponentsClientHttpRequestFactory}
@@ -109,50 +112,13 @@ public class HttpComponentsClientHttpRequestFactory implements ClientHttpRequest
 	}
 
 	/**
-	 * Set the connection timeout for the underlying {@link RequestConfig}.
-	 * A timeout value of 0 specifies an infinite timeout.
-	 * <p>Additional properties can be configured by specifying a
-	 * {@link RequestConfig} instance on a custom {@link HttpClient}.
-	 * <p>This options does not affect connection timeouts for SSL
-	 * handshakes or CONNECT requests; for that, it is required to
-	 * use the {@link SocketConfig} on the
-	 * {@link HttpClient} itself.
-	 * @param connectTimeout the timeout value in milliseconds
-	 * @see RequestConfig#getConnectTimeout()
-	 * @see SocketConfig#getSoTimeout
-	 */
-	public void setConnectTimeout(int connectTimeout) {
-		Assert.isTrue(connectTimeout >= 0, "Timeout must be a non-negative value");
-		this.connectTimeout = connectTimeout;
-	}
-
-	/**
-	 * Set the connection timeout for the underlying {@link RequestConfig}.
-	 * A timeout value of 0 specifies an infinite timeout.
-	 * <p>Additional properties can be configured by specifying a
-	 * {@link RequestConfig} instance on a custom {@link HttpClient}.
-	 * <p>This options does not affect connection timeouts for SSL
-	 * handshakes or CONNECT requests; for that, it is required to
-	 * use the {@link SocketConfig} on the
-	 * {@link HttpClient} itself.
-	 * @param connectTimeout the timeout value in milliseconds
-	 * @since 6.1
-	 * @see RequestConfig#getConnectTimeout()
-	 * @see SocketConfig#getSoTimeout
-	 */
-	public void setConnectTimeout(Duration connectTimeout) {
-		Assert.notNull(connectTimeout, "ConnectTimeout must not be null");
-		Assert.isTrue(!connectTimeout.isNegative(), "Timeout must be a non-negative value");
-		this.connectTimeout = connectTimeout.toMillis();
-	}
-
-	/**
 	 * Set the timeout in milliseconds used when requesting a connection
 	 * from the connection manager using the underlying {@link RequestConfig}.
-	 * A timeout value of 0 specifies an infinite timeout.
+	 * <p>A timeout value of 0 specifies an infinite timeout.
 	 * <p>Additional properties can be configured by specifying a
 	 * {@link RequestConfig} instance on a custom {@link HttpClient}.
-	 * @param connectionRequestTimeout the timeout value to request a connection in milliseconds
+	 * @param connectionRequestTimeout the timeout value to request a connection
+	 * in milliseconds
 	 * @see RequestConfig#getConnectionRequestTimeout()
 	 */
 	public void setConnectionRequestTimeout(int connectionRequestTimeout) {
@@ -161,31 +127,55 @@ public class HttpComponentsClientHttpRequestFactory implements ClientHttpRequest
 	}
 
 	/**
-	 * Set the timeout in milliseconds used when requesting a connection
-	 * from the connection manager using the underlying {@link RequestConfig}.
-	 * A timeout value of 0 specifies an infinite timeout.
+	 * Set the timeout used when requesting a connection from the connection
+	 * manager using the underlying {@link RequestConfig}.
+	 * <p>A timeout value of 0 specifies an infinite timeout.
 	 * <p>Additional properties can be configured by specifying a
 	 * {@link RequestConfig} instance on a custom {@link HttpClient}.
-	 * @param connectionRequestTimeout the timeout value to request a connection in milliseconds
+	 * @param connectionRequestTimeout the timeout value to request a connection
+	 * as a {@code Duration}; must be 0 or at least one millisecond
 	 * @since 6.1
 	 * @see RequestConfig#getConnectionRequestTimeout()
 	 */
 	public void setConnectionRequestTimeout(Duration connectionRequestTimeout) {
 		Assert.notNull(connectionRequestTimeout, "ConnectionRequestTimeout must not be null");
 		Assert.isTrue(!connectionRequestTimeout.isNegative(), "Timeout must be a non-negative value");
+		Assert.isTrue(connectionRequestTimeout.isZero() ||
+				connectionRequestTimeout.compareTo(ONE_MILLISECOND) >= 0,
+				"Timeout must be zero or at least one millisecond");
 		this.connectionRequestTimeout = connectionRequestTimeout.toMillis();
 	}
 
 	/**
-	 * Indicates whether this request factory should buffer the request body internally.
-	 * <p>Default is {@code true}. When sending large amounts of data via POST or PUT, it is
-	 * recommended to change this property to {@code false}, so as not to run out of memory.
-	 * @since 4.0
-	 * @deprecated since 6.1 requests are never buffered, as if this property is {@code false}
+	 * Set the response timeout for the underlying {@link RequestConfig}.
+	 * <p>A timeout value of 0 specifies an infinite timeout.
+	 * <p>Additional properties can be configured by specifying a
+	 * {@link RequestConfig} instance on a custom {@link HttpClient}.
+	 * @param readTimeout the timeout value in milliseconds
+	 * @since 6.2
+	 * @see RequestConfig#getResponseTimeout()
 	 */
-	@Deprecated(since = "6.1", forRemoval = true)
-	public void setBufferRequestBody(boolean bufferRequestBody) {
-		// no-op
+	public void setReadTimeout(int readTimeout) {
+		Assert.isTrue(readTimeout >= 0, "Timeout must be a non-negative value");
+		this.readTimeout = readTimeout;
+	}
+
+	/**
+	 * Set the response timeout for the underlying {@link RequestConfig}.
+	 * <p>A timeout value of 0 specifies an infinite timeout.
+	 * <p>Additional properties can be configured by specifying a
+	 * {@link RequestConfig} instance on a custom {@link HttpClient}.
+	 * @param readTimeout the timeout as a {@code Duration}; must be 0 or at
+	 * least one millisecond
+	 * @since 6.2
+	 * @see RequestConfig#getResponseTimeout()
+	 */
+	public void setReadTimeout(Duration readTimeout) {
+		Assert.notNull(readTimeout, "ReadTimeout must not be null");
+		Assert.isTrue(!readTimeout.isNegative(), "Timeout must be a non-negative value");
+		Assert.isTrue(readTimeout.isZero() || readTimeout.compareTo(ONE_MILLISECOND) >= 0,
+				"Timeout must be zero or at least one millisecond");
+		this.readTimeout = readTimeout.toMillis();
 	}
 
 	/**
@@ -202,7 +192,9 @@ public class HttpComponentsClientHttpRequestFactory implements ClientHttpRequest
 		this.httpContextFactory = httpContextFactory;
 	}
 
+
 	@Override
+	@SuppressWarnings("deprecation")  // HttpClientContext.REQUEST_CONFIG
 	public ClientHttpRequest createRequest(URI uri, HttpMethod httpMethod) throws IOException {
 		HttpClient client = getHttpClient();
 
@@ -213,10 +205,10 @@ public class HttpComponentsClientHttpRequestFactory implements ClientHttpRequest
 			context = HttpClientContext.create();
 		}
 
-		// Request configuration not set in the context
-		if (context.getAttribute(HttpClientContext.REQUEST_CONFIG) == null) {
-			// Use request configuration given by the user, when available
+		// No custom request configuration was set
+		if (!hasCustomRequestConfig(context)) {
 			RequestConfig config = null;
+			// Use request configuration given by the user, when available
 			if (httpRequest instanceof Configurable configurable) {
 				config = configurable.getConfig();
 			}
@@ -224,10 +216,25 @@ public class HttpComponentsClientHttpRequestFactory implements ClientHttpRequest
 				config = createRequestConfig(client);
 			}
 			if (config != null) {
+				if (context instanceof HttpClientContext clientContext) {
+					clientContext.setRequestConfig(config);
+				}
 				context.setAttribute(HttpClientContext.REQUEST_CONFIG, config);
 			}
 		}
 		return new HttpComponentsClientHttpRequest(client, httpRequest, context);
+	}
+
+	@SuppressWarnings("deprecation")  // HttpClientContext.REQUEST_CONFIG
+	private static boolean hasCustomRequestConfig(HttpContext context) {
+		if (context instanceof HttpClientContext clientContext) {
+			// Prior to 5.4, the default config was set to RequestConfig.DEFAULT
+			// As of 5.4, it is set to null
+			RequestConfig requestConfig = clientContext.getRequestConfig();
+			return requestConfig != null && !requestConfig.equals(RequestConfig.DEFAULT);
+		}
+		// Prior to 5.4, the config was stored as an attribute
+		return context.getAttribute(HttpClientContext.REQUEST_CONFIG) != null;
 	}
 
 
@@ -242,8 +249,7 @@ public class HttpComponentsClientHttpRequestFactory implements ClientHttpRequest
 	 * @since 4.2
 	 * @see #mergeRequestConfig(RequestConfig)
 	 */
-	@Nullable
-	protected RequestConfig createRequestConfig(Object client) {
+	protected @Nullable RequestConfig createRequestConfig(Object client) {
 		if (client instanceof Configurable configurableClient) {
 			RequestConfig clientRequestConfig = configurableClient.getConfig();
 			return mergeRequestConfig(clientRequestConfig);
@@ -258,18 +264,17 @@ public class HttpComponentsClientHttpRequestFactory implements ClientHttpRequest
 	 * @return the merged request config
 	 * @since 4.2
 	 */
-	@SuppressWarnings("deprecation")  // setConnectTimeout
 	protected RequestConfig mergeRequestConfig(RequestConfig clientConfig) {
-		if (this.connectTimeout == -1 && this.connectionRequestTimeout == -1) {  // nothing to merge
+		if (this.connectionRequestTimeout == -1 && this.readTimeout == -1) {  // nothing to merge
 			return clientConfig;
 		}
 
 		RequestConfig.Builder builder = RequestConfig.copy(clientConfig);
-		if (this.connectTimeout >= 0) {
-			builder.setConnectTimeout(this.connectTimeout, TimeUnit.MILLISECONDS);
-		}
 		if (this.connectionRequestTimeout >= 0) {
 			builder.setConnectionRequestTimeout(this.connectionRequestTimeout, TimeUnit.MILLISECONDS);
+		}
+		if (this.readTimeout >= 0) {
+			builder.setResponseTimeout(this.readTimeout, TimeUnit.MILLISECONDS);
 		}
 		return builder.build();
 	}
@@ -305,12 +310,15 @@ public class HttpComponentsClientHttpRequestFactory implements ClientHttpRequest
 		else if (HttpMethod.TRACE.equals(httpMethod)) {
 			return new HttpTrace(uri);
 		}
+		else if (HttpMethod.QUERY.equals(httpMethod)) {
+			return new HttpUriRequestBase(HttpMethod.QUERY.name(), uri);
+		}
 		throw new IllegalArgumentException("Invalid HTTP method: " + httpMethod);
 	}
 
 	/**
-	 * Template method that allows for manipulating the {@link ClassicHttpRequest} before it is
-	 * returned as part of a {@link HttpComponentsClientHttpRequest}.
+	 * Template method that allows for manipulating the {@link ClassicHttpRequest}
+	 * before it is returned as part of a {@link HttpComponentsClientHttpRequest}.
 	 * <p>The default implementation is empty.
 	 * @param request the request to process
 	 */
@@ -318,21 +326,19 @@ public class HttpComponentsClientHttpRequestFactory implements ClientHttpRequest
 	}
 
 	/**
-	 * Template methods that creates a {@link HttpContext} for the given HTTP method and URI.
+	 * Template method that creates a {@link HttpContext} for the given HTTP method and URI.
 	 * <p>The default implementation returns {@code null}.
 	 * @param httpMethod the HTTP method
 	 * @param uri the URI
 	 * @return the http context
 	 */
-	@Nullable
-	protected HttpContext createHttpContext(HttpMethod httpMethod, URI uri) {
+	protected @Nullable HttpContext createHttpContext(HttpMethod httpMethod, URI uri) {
 		return (this.httpContextFactory != null ? this.httpContextFactory.apply(httpMethod, uri) : null);
 	}
 
 
 	/**
-	 * Shutdown hook that closes the underlying
-	 * {@link HttpClientConnectionManager ClientConnectionManager}'s
+	 * Shutdown hook that closes the underlying {@link HttpClientConnectionManager}'s
 	 * connection pool, if any.
 	 */
 	@Override

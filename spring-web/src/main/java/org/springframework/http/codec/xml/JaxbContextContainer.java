@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2019 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,8 +16,8 @@
 
 package org.springframework.http.codec.xml;
 
+import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
 
 import jakarta.xml.bind.JAXBContext;
 import jakarta.xml.bind.JAXBException;
@@ -35,7 +35,7 @@ import org.springframework.core.codec.CodecException;
  */
 final class JaxbContextContainer {
 
-	private final ConcurrentMap<Class<?>, JAXBContext> jaxbContexts = new ConcurrentHashMap<>(64);
+	private final Map<Class<?>, JAXBContext> jaxbContexts = new ConcurrentHashMap<>(64);
 
 
 	public Marshaller createMarshaller(Class<?> clazz) throws CodecException, JAXBException {
@@ -51,13 +51,29 @@ final class JaxbContextContainer {
 	private JAXBContext getJaxbContext(Class<?> clazz) throws CodecException {
 		return this.jaxbContexts.computeIfAbsent(clazz, key -> {
 			try {
-				return JAXBContext.newInstance(clazz);
+				return createJaxbContext(clazz);
 			}
 			catch (JAXBException ex) {
 				throw new CodecException(
 						"Could not create JAXBContext for class [" + clazz + "]: " + ex.getMessage(), ex);
 			}
 		});
+	}
+
+	/**
+	 * Create a {@link JAXBContext} for the given type, exposing the class
+	 * ClassLoader as current thread context ClassLoader for the time of
+	 * creating the context.
+	 */
+	private JAXBContext createJaxbContext(Class<?> clazz) throws JAXBException {
+		ClassLoader currentClassLoader = Thread.currentThread().getContextClassLoader();
+		try {
+			Thread.currentThread().setContextClassLoader(clazz.getClassLoader());
+			return JAXBContext.newInstance(clazz);
+		}
+		finally {
+			Thread.currentThread().setContextClassLoader(currentClassLoader);
+		}
 	}
 
 }

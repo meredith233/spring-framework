@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2023 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,7 +17,7 @@
 package org.springframework.expression;
 
 /**
- * Implementers of this interface are expected to be able to locate types.
+ * Implementors of this interface are expected to be able to locate types.
  *
  * <p>They may use a custom {@link ClassLoader} and/or deal with common package
  * prefixes (for example, {@code java.lang}) however they wish.

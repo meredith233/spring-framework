@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -33,10 +33,10 @@ import org.springframework.web.bind.annotation.ResponseBody;
  *
  * @author Rossen Stoyanchev
  */
-public class RequestParameterTests {
+class RequestParameterTests {
 
 	@Test
-	public void queryParameter() {
+	void queryParameter() {
 
 		WebTestClient client = MockMvcWebTestClient.bindToController(new PersonController()).build();
 

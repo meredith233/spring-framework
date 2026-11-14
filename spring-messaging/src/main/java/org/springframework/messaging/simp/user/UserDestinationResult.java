@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2023 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,7 +19,8 @@ package org.springframework.messaging.simp.user;
 import java.util.Collections;
 import java.util.Set;
 
-import org.springframework.lang.Nullable;
+import org.jspecify.annotations.Nullable;
+
 import org.springframework.util.Assert;
 
 /**
@@ -38,13 +39,16 @@ public class UserDestinationResult {
 
 	private final String subscribeDestination;
 
-	@Nullable
-	private final String user;
+	private final @Nullable String user;
 
 	private final Set<String> sessionIds;
 
 
-	public UserDestinationResult(String sourceDestination, Set<String> targetDestinations,
+	/**
+	 * Main constructor.
+	 */
+	public UserDestinationResult(
+			String sourceDestination, Set<String> targetDestinations,
 			String subscribeDestination, @Nullable String user) {
 
 		this(sourceDestination, targetDestinations, subscribeDestination, user, null);
@@ -82,7 +86,7 @@ public class UserDestinationResult {
 
 	/**
 	 * The target destinations that the source destination was translated to,
-	 * one per active user session, e.g. "/queue/position-updates-useri9oqdfzo".
+	 * one per active user session, for example, "/queue/position-updates-useri9oqdfzo".
 	 * @return the target destinations, never {@code null} but possibly an empty
 	 * set if there are no active sessions for the user.
 	 */
@@ -91,7 +95,7 @@ public class UserDestinationResult {
 	}
 
 	/**
-	 * The user destination in the form expected when a client subscribes, e.g.
+	 * The user destination in the form expected when a client subscribes, for example,
 	 * "/user/queue/position-updates".
 	 * @return the subscribe form of the "user" destination, never {@code null}.
 	 */
@@ -106,15 +110,13 @@ public class UserDestinationResult {
 	 * sessionId in place of a user name thus removing the need for a user-to-session
 	 * lookup via {@link SimpUserRegistry}.
 	 */
-	@Nullable
-	public String getUser() {
+	public @Nullable String getUser() {
 		return this.user;
 	}
 
 	/**
 	 * Return the session id for the targetDestination.
 	 */
-	@Nullable
 	public Set<String> getSessionIds() {
 		return this.sessionIds;
 	}

@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -28,13 +28,13 @@ import java.util.Set;
 
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
+import org.jspecify.annotations.Nullable;
 
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.InvalidMediaTypeException;
 import org.springframework.http.MediaType;
 import org.springframework.http.server.PathContainer;
-import org.springframework.lang.Nullable;
 import org.springframework.util.Assert;
 import org.springframework.util.CollectionUtils;
 import org.springframework.util.MultiValueMap;
@@ -69,9 +69,12 @@ public abstract class RequestMappingInfoHandlerMapping extends AbstractHandlerMe
 
 	private static final Method HTTP_OPTIONS_HANDLE_METHOD;
 
+	private static final Method HTTP_HEAD_QUERY_HANDLE_METHOD;
+
 	static {
 		try {
 			HTTP_OPTIONS_HANDLE_METHOD = HttpOptionsHandler.class.getMethod("handle");
+			HTTP_HEAD_QUERY_HANDLE_METHOD = HttpHeadQueryHandler.class.getMethod("handle");
 		}
 		catch (NoSuchMethodException ex) {
 			// Should never happen
@@ -85,15 +88,6 @@ public abstract class RequestMappingInfoHandlerMapping extends AbstractHandlerMe
 	}
 
 
-	/**
-	 * Get the URL path patterns associated with the supplied {@link RequestMappingInfo}.
-	 */
-	@Override
-	@SuppressWarnings("deprecation")
-	protected Set<String> getMappingPathPatterns(RequestMappingInfo info) {
-		return info.getPatternValues();
-	}
-
 	@Override
 	protected Set<String> getDirectPaths(RequestMappingInfo info) {
 		return info.getDirectPaths();
@@ -106,8 +100,7 @@ public abstract class RequestMappingInfoHandlerMapping extends AbstractHandlerMe
 	 * @return an info in case of a match; or {@code null} otherwise.
 	 */
 	@Override
-	@Nullable
-	protected RequestMappingInfo getMatchingMapping(RequestMappingInfo info, HttpServletRequest request) {
+	protected @Nullable RequestMappingInfo getMatchingMapping(RequestMappingInfo info, HttpServletRequest request) {
 		return info.getMatchingCondition(request);
 	}
 
@@ -120,8 +113,7 @@ public abstract class RequestMappingInfoHandlerMapping extends AbstractHandlerMe
 	}
 
 	@Override
-	@Nullable
-	protected HandlerMethod getHandlerInternal(HttpServletRequest request) throws Exception {
+	protected @Nullable HandlerMethod getHandlerInternal(HttpServletRequest request) throws Exception {
 		request.removeAttribute(PRODUCIBLE_MEDIA_TYPES_ATTRIBUTE);
 		try {
 			return super.getHandlerInternal(request);
@@ -137,9 +129,12 @@ public abstract class RequestMappingInfoHandlerMapping extends AbstractHandlerMe
 	 * @see HandlerMapping#MATRIX_VARIABLES_ATTRIBUTE
 	 * @see HandlerMapping#PRODUCIBLE_MEDIA_TYPES_ATTRIBUTE
 	 */
+	@SuppressWarnings("removal")
 	@Override
 	protected void handleMatch(RequestMappingInfo info, String lookupPath, HttpServletRequest request) {
 		super.handleMatch(info, lookupPath, request);
+
+		info.getVersionCondition().handleMatch(request);
 
 		RequestCondition<?> condition = info.getActivePatternsCondition();
 		if (condition instanceof PathPatternsRequestCondition pprc) {
@@ -176,12 +171,14 @@ public abstract class RequestMappingInfoHandlerMapping extends AbstractHandlerMe
 			uriVariables = result.getUriVariables();
 			request.setAttribute(MATRIX_VARIABLES_ATTRIBUTE, result.getMatrixVariables());
 		}
+		request.setAttribute(BEST_MATCHING_PATH_PATTERN_ATTRIBUTE, bestPattern);
 		request.setAttribute(BEST_MATCHING_PATTERN_ATTRIBUTE, bestPattern.getPatternString());
 		ServerHttpObservationFilter.findObservationContext(request)
 				.ifPresent(context -> context.setPathPattern(bestPattern.getPatternString()));
 		request.setAttribute(URI_TEMPLATE_VARIABLES_ATTRIBUTE, uriVariables);
 	}
 
+	@SuppressWarnings("removal")
 	private void extractMatchDetails(
 			PatternsRequestCondition condition, String lookupPath, HttpServletRequest request) {
 
@@ -205,6 +202,7 @@ public abstract class RequestMappingInfoHandlerMapping extends AbstractHandlerMe
 		request.setAttribute(URI_TEMPLATE_VARIABLES_ATTRIBUTE, uriVariables);
 	}
 
+	@SuppressWarnings("removal")
 	private Map<String, MultiValueMap<String, String>> extractMatrixVariables(
 			HttpServletRequest request, Map<String, String> uriVariables) {
 
@@ -244,8 +242,7 @@ public abstract class RequestMappingInfoHandlerMapping extends AbstractHandlerMe
 	 * but not by consumable/producible media types
 	 */
 	@Override
-	@Nullable
-	protected HandlerMethod handleNoMatch(
+	protected @Nullable HandlerMethod handleNoMatch(
 			Set<RequestMappingInfo> infos, String lookupPath, HttpServletRequest request) throws ServletException {
 
 		if (CollectionUtils.isEmpty(infos)) {
@@ -260,9 +257,15 @@ public abstract class RequestMappingInfoHandlerMapping extends AbstractHandlerMe
 		if (helper.hasMethodsMismatch()) {
 			Set<String> methods = helper.getAllowedMethods();
 			if (HttpMethod.OPTIONS.matches(request.getMethod())) {
-				Set<MediaType> mediaTypes = helper.getConsumablePatchMediaTypes();
-				HttpOptionsHandler handler = new HttpOptionsHandler(methods, mediaTypes);
+				Set<MediaType> patchMediaTypes = helper.getConsumablePatchMediaTypes();
+				Set<MediaType> queryMediaTypes = helper.getConsumableQueryMediaTypes();
+				HttpOptionsHandler handler = new HttpOptionsHandler(methods, patchMediaTypes, queryMediaTypes);
 				return new HandlerMethod(handler, HTTP_OPTIONS_HANDLE_METHOD);
+			}
+			if (HttpMethod.HEAD.matches(request.getMethod()) && methods.contains(HttpMethod.QUERY.name())) {
+				Set<MediaType> queryMediaTypes = helper.getConsumableQueryMediaTypes();
+				HttpHeadQueryHandler handler = new HttpHeadQueryHandler(methods, queryMediaTypes);
+				return new HandlerMethod(handler, HTTP_HEAD_QUERY_HANDLE_METHOD);
 			}
 			throw new HttpRequestMethodNotSupportedException(request.getMethod(), methods);
 		}
@@ -444,6 +447,21 @@ public abstract class RequestMappingInfoHandlerMapping extends AbstractHandlerMe
 			return result;
 		}
 
+		/**
+		 * Return declared "consumable" types but only among those that have
+		 * QUERY specified, or that have no methods at all.
+		 */
+		public Set<MediaType> getConsumableQueryMediaTypes() {
+			Set<MediaType> result = new LinkedHashSet<>();
+			for (PartialMatch match : this.partialMatches) {
+				Set<RequestMethod> methods = match.getInfo().getMethodsCondition().getMethods();
+				if (methods.isEmpty() || methods.contains(RequestMethod.QUERY)) {
+					result.addAll(match.getInfo().getConsumesCondition().getConsumableMediaTypes());
+				}
+			}
+			return result;
+		}
+
 
 		/**
 		 * Container for a RequestMappingInfo that matches the URL path at least.
@@ -508,9 +526,10 @@ public abstract class RequestMappingInfoHandlerMapping extends AbstractHandlerMe
 
 		private final HttpHeaders headers = new HttpHeaders();
 
-		public HttpOptionsHandler(Set<String> declaredMethods, Set<MediaType> acceptPatch) {
+		public HttpOptionsHandler(Set<String> declaredMethods, Set<MediaType> acceptPatch, Set<MediaType> acceptQuery) {
 			this.headers.setAllow(initAllowedHttpMethods(declaredMethods));
 			this.headers.setAcceptPatch(new ArrayList<>(acceptPatch));
+			this.headers.setAcceptQuery(new ArrayList<>(acceptQuery));
 		}
 
 		private static Set<HttpMethod> initAllowedHttpMethods(Set<String> declaredMethods) {
@@ -526,13 +545,31 @@ public abstract class RequestMappingInfoHandlerMapping extends AbstractHandlerMe
 				for (String method : declaredMethods) {
 					HttpMethod httpMethod = HttpMethod.valueOf(method);
 					result.add(httpMethod);
-					if (httpMethod == HttpMethod.GET) {
+					if (httpMethod == HttpMethod.GET || httpMethod == HttpMethod.QUERY) {
 						result.add(HttpMethod.HEAD);
 					}
 				}
 				result.add(HttpMethod.OPTIONS);
 			}
 			return result;
+		}
+
+		@SuppressWarnings("unused")
+		public HttpHeaders handle() {
+			return this.headers;
+		}
+	}
+
+	/**
+	 * Default handler for HTTP HEAD targeting a QUERY endpoint.
+	 */
+	private static class HttpHeadQueryHandler {
+
+		private final HttpHeaders headers = new HttpHeaders();
+
+		public HttpHeadQueryHandler(Set<String> declaredMethods, Set<MediaType> acceptQuery) {
+			this.headers.setAllow(HttpOptionsHandler.initAllowedHttpMethods(declaredMethods));
+			this.headers.setAcceptQuery(new ArrayList<>(acceptQuery));
 		}
 
 		@SuppressWarnings("unused")

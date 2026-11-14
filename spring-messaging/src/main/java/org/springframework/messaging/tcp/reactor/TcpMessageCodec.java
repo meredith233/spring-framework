@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2022 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,7 +23,7 @@ import org.springframework.messaging.Message;
 
 /**
  * Contract to encode and decode a {@link Message} to and from a {@link ByteBuffer}
- * allowing a higher-level protocol (e.g. STOMP over TCP) to plug in.
+ * allowing a higher-level protocol (for example, STOMP over TCP) to plug in.
  *
  * @author Rossen Stoyanchev
  * @since 6.0

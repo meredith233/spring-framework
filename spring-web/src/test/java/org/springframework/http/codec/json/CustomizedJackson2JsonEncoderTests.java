@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -35,6 +35,7 @@ import static org.springframework.http.MediaType.APPLICATION_NDJSON;
  *
  * @author Jason Laber
  */
+@SuppressWarnings("removal")
 class CustomizedJackson2JsonEncoderTests extends AbstractEncoderTests<Jackson2JsonEncoder> {
 
 	CustomizedJackson2JsonEncoderTests() {
@@ -49,7 +50,7 @@ class CustomizedJackson2JsonEncoderTests extends AbstractEncoderTests<Jackson2Js
 
 	@Test
 	@Override
-	public void encode() throws Exception {
+	protected void encode() throws Exception {
 		Flux<MyCustomizedEncoderBean> input = Flux.just(
 				new MyCustomizedEncoderBean(MyCustomEncoderEnum.VAL1),
 				new MyCustomizedEncoderBean(MyCustomEncoderEnum.VAL2)

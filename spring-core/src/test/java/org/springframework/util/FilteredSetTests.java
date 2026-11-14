@@ -1,0 +1,56 @@
+/*
+ * Copyright 2002-present the original author or authors.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.springframework.util;
+
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.Set;
+
+import org.jspecify.annotations.Nullable;
+import org.junit.jupiter.api.Test;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+/**
+ * @author Arjen Poutsma
+ * @author Yanming Zhou
+ */
+class FilteredSetTests {
+
+	@Test
+	void equals() {
+		Set<String> set = Set.of("foo", "bar", "baz");
+		FilteredSet<String> filtered = new FilteredSet<>(set, s -> !s.equals("bar"));
+
+		Set<String> expected = Set.of("foo", "baz");
+
+		assertThat(filtered).isEqualTo(expected);
+		assertThat(filtered).isNotEqualTo(set);
+		assertThat(filtered).isNotEqualTo(Collections.emptySet());
+	}
+
+	@Test
+	void nullable() {
+		Set<@Nullable String> set = new HashSet<>();
+		set.add("foo");
+		set.add("bar");
+		set.add(null);
+		FilteredSet<@Nullable String> filtered = new FilteredSet<>(set, s -> !"bar".equals(s));
+
+		assertThat(filtered).containsExactlyInAnyOrder("foo", null);
+	}
+}

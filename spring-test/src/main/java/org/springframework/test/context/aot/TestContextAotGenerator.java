@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2023 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -29,11 +29,11 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
 import org.springframework.aot.AotDetector;
-import org.springframework.aot.generate.ClassNameGenerator;
 import org.springframework.aot.generate.DefaultGenerationContext;
 import org.springframework.aot.generate.GeneratedClasses;
 import org.springframework.aot.generate.GeneratedFiles;
 import org.springframework.aot.generate.GenerationContext;
+import org.springframework.aot.generate.NameGenerator;
 import org.springframework.aot.hint.RuntimeHints;
 import org.springframework.aot.hint.RuntimeHintsRegistrar;
 import org.springframework.aot.hint.TypeReference;
@@ -314,8 +314,7 @@ public class TestContextAotGenerator {
 	ClassName processAheadOfTime(MergedContextConfiguration mergedConfig,
 			GenerationContext generationContext) throws TestContextAotException {
 
-		GenericApplicationContext gac = loadContextForAotProcessing(mergedConfig);
-		try {
+		try (GenericApplicationContext gac = loadContextForAotProcessing(mergedConfig)) {
 			return this.aotGenerator.processAheadOfTime(gac, generationContext);
 		}
 		catch (Throwable ex) {
@@ -331,9 +330,9 @@ public class TestContextAotGenerator {
 	 * create {@link GenericApplicationContext GenericApplicationContexts}.
 	 * @throws TestContextAotException if an error occurs while loading the application
 	 * context or if one of the prerequisites is not met
-	 * @see AotContextLoader#loadContextForAotProcessing(MergedContextConfiguration)
+	 * @see AotContextLoader#loadContextForAotProcessing(MergedContextConfiguration, RuntimeHints)
 	 */
-	private GenericApplicationContext loadContextForAotProcessing(
+	GenericApplicationContext loadContextForAotProcessing(
 			MergedContextConfiguration mergedConfig) throws TestContextAotException {
 
 		Class<?> testClass = mergedConfig.getTestClass();
@@ -345,7 +344,7 @@ public class TestContextAotGenerator {
 
 		if (contextLoader instanceof AotContextLoader aotContextLoader) {
 			try {
-				ApplicationContext context = aotContextLoader.loadContextForAotProcessing(mergedConfig);
+				ApplicationContext context = aotContextLoader.loadContextForAotProcessing(mergedConfig, this.runtimeHints);
 				if (context instanceof GenericApplicationContext gac) {
 					return gac;
 				}
@@ -371,7 +370,7 @@ public class TestContextAotGenerator {
 		registerDeclaredConstructors(testContextBootstrapper.getClass()); // @BootstrapWith
 		testContextBootstrapper.getTestExecutionListeners().forEach(listener -> {
 			registerDeclaredConstructors(listener.getClass()); // @TestExecutionListeners
-			if (listener instanceof AotTestExecutionListener aotListener) {
+			if (!isDisabledInAotMode.test(testClass) && listener instanceof AotTestExecutionListener aotListener) {
 				aotListener.processAheadOfTime(this.runtimeHints, testClass, getClass().getClassLoader());
 			}
 		});
@@ -379,9 +378,9 @@ public class TestContextAotGenerator {
 	}
 
 	DefaultGenerationContext createGenerationContext(Class<?> testClass) {
-		ClassNameGenerator classNameGenerator = new ClassNameGenerator(ClassName.get(testClass));
+		NameGenerator nameGenerator = new NameGenerator(ClassName.get(testClass));
 		TestContextGenerationContext generationContext =
-				new TestContextGenerationContext(classNameGenerator, this.generatedFiles, this.runtimeHints);
+				new TestContextGenerationContext(nameGenerator, this.generatedFiles, this.runtimeHints);
 		return generationContext.withName(nextTestContextId());
 	}
 
@@ -390,9 +389,9 @@ public class TestContextAotGenerator {
 	}
 
 	private void generateAotTestContextInitializerMappings(MultiValueMap<ClassName, Class<?>> initializerClassMappings) {
-		ClassNameGenerator classNameGenerator = new ClassNameGenerator(ClassName.get(AotTestContextInitializers.class));
+		NameGenerator nameGenerator = new NameGenerator(ClassName.get(AotTestContextInitializers.class));
 		DefaultGenerationContext generationContext =
-				new DefaultGenerationContext(classNameGenerator, this.generatedFiles, this.runtimeHints);
+				new DefaultGenerationContext(nameGenerator, this.generatedFiles, this.runtimeHints);
 		GeneratedClasses generatedClasses = generationContext.getGeneratedClasses();
 
 		AotTestContextInitializersCodeGenerator codeGenerator =
@@ -403,9 +402,9 @@ public class TestContextAotGenerator {
 	}
 
 	private void generateAotTestAttributeMappings() {
-		ClassNameGenerator classNameGenerator = new ClassNameGenerator(ClassName.get(AotTestAttributes.class));
+		NameGenerator nameGenerator = new NameGenerator(ClassName.get(AotTestAttributes.class));
 		DefaultGenerationContext generationContext =
-				new DefaultGenerationContext(classNameGenerator, this.generatedFiles, this.runtimeHints);
+				new DefaultGenerationContext(nameGenerator, this.generatedFiles, this.runtimeHints);
 		GeneratedClasses generatedClasses = generationContext.getGeneratedClasses();
 
 		Map<String, String> attributes = AotTestAttributesFactory.getAttributes();

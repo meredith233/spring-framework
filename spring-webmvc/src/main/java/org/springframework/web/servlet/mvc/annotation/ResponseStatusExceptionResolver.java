@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2023 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,14 +20,16 @@ import java.io.IOException;
 
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import org.jspecify.annotations.Nullable;
 
 import org.springframework.context.MessageSource;
 import org.springframework.context.MessageSourceAware;
 import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.core.annotation.AnnotatedElementUtils;
-import org.springframework.lang.Nullable;
+import org.springframework.http.HttpStatusCode;
 import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.ResponseStatus;
+import org.springframework.web.filter.ServerHttpObservationFilter;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.servlet.ModelAndView;
 import org.springframework.web.servlet.handler.AbstractHandlerExceptionResolver;
@@ -47,6 +49,9 @@ import org.springframework.web.servlet.handler.AbstractHandlerExceptionResolver;
  *
  * <p>As of 5.0 this resolver also supports {@link ResponseStatusException}.
  *
+ * <p>As of 7.1, exceptions resolved to a 5xx server error status are recorded
+ * as the error of the current HTTP server observation, if any.
+ *
  * @author Arjen Poutsma
  * @author Rossen Stoyanchev
  * @author Sam Brannen
@@ -56,8 +61,7 @@ import org.springframework.web.servlet.handler.AbstractHandlerExceptionResolver;
  */
 public class ResponseStatusExceptionResolver extends AbstractHandlerExceptionResolver implements MessageSourceAware {
 
-	@Nullable
-	private MessageSource messageSource;
+	private @Nullable MessageSource messageSource;
 
 
 	@Override
@@ -67,18 +71,21 @@ public class ResponseStatusExceptionResolver extends AbstractHandlerExceptionRes
 
 
 	@Override
-	@Nullable
-	protected ModelAndView doResolveException(
+	protected @Nullable ModelAndView doResolveException(
 			HttpServletRequest request, HttpServletResponse response, @Nullable Object handler, Exception ex) {
 
 		try {
 			if (ex instanceof ResponseStatusException rse) {
-				return resolveResponseStatusException(rse, request, response, handler);
+				ModelAndView mav = resolveResponseStatusException(rse, request, response, handler);
+				recordServerError(rse.getStatusCode(), ex, request);
+				return mav;
 			}
 
 			ResponseStatus status = AnnotatedElementUtils.findMergedAnnotation(ex.getClass(), ResponseStatus.class);
 			if (status != null) {
-				return resolveResponseStatus(status, request, response, handler, ex);
+				ModelAndView mav = resolveResponseStatus(status, request, response, handler, ex);
+				recordServerError(status.code(), ex, request);
+				return mav;
 			}
 
 			if (ex.getCause() instanceof Exception cause) {
@@ -93,6 +100,12 @@ public class ResponseStatusExceptionResolver extends AbstractHandlerExceptionRes
 		return null;
 	}
 
+	private void recordServerError(HttpStatusCode statusCode, Exception ex, HttpServletRequest request) {
+		if (statusCode.is5xxServerError()) {
+			ServerHttpObservationFilter.recordHandledException(request, ex);
+		}
+	}
+
 	/**
 	 * Template method that handles the {@link ResponseStatus @ResponseStatus} annotation.
 	 * <p>The default implementation delegates to {@link #applyStatusAndReason}
@@ -101,7 +114,7 @@ public class ResponseStatusExceptionResolver extends AbstractHandlerExceptionRes
 	 * @param request current HTTP request
 	 * @param response current HTTP response
 	 * @param handler the executed handler, or {@code null} if none chosen at the
-	 * time of the exception, e.g. if multipart resolution failed
+	 * time of the exception, for example, if multipart resolution failed
 	 * @param ex the exception
 	 * @return an empty ModelAndView, i.e. exception resolved
 	 */
@@ -123,7 +136,7 @@ public class ResponseStatusExceptionResolver extends AbstractHandlerExceptionRes
 	 * @param request current HTTP request
 	 * @param response current HTTP response
 	 * @param handler the executed handler, or {@code null} if none chosen at the
-	 * time of the exception, e.g. if multipart resolution failed
+	 * time of the exception, for example, if multipart resolution failed
 	 * @return an empty ModelAndView, i.e. exception resolved
 	 * @since 5.0
 	 */

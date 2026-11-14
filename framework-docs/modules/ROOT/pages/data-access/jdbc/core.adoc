@@ -4,14 +4,14 @@
 This section covers how to use the JDBC core classes to control basic JDBC processing,
 including error handling. It includes the following topics:
 
-* xref:data-access/jdbc/core.adoc#jdbc-JdbcTemplate[Using `JdbcTemplate`]
-* xref:data-access/jdbc/core.adoc#jdbc-NamedParameterJdbcTemplate[Using `NamedParameterJdbcTemplate`]
-* xref:data-access/jdbc/core.adoc#jdbc-JdbcClient[Unified JDBC Query/Update Operations: `JdbcClient`]
-* xref:data-access/jdbc/core.adoc#jdbc-SQLExceptionTranslator[Using `SQLExceptionTranslator`]
-* xref:data-access/jdbc/core.adoc#jdbc-statements-executing[Running Statements]
-* xref:data-access/jdbc/core.adoc#jdbc-statements-querying[Running Queries]
-* xref:data-access/jdbc/core.adoc#jdbc-updates[Updating the Database]
-* xref:data-access/jdbc/core.adoc#jdbc-auto-generated-keys[Retrieving Auto-generated Keys]
+* <<jdbc-JdbcTemplate,Using `JdbcTemplate`>>
+* <<jdbc-NamedParameterJdbcTemplate,Using `NamedParameterJdbcTemplate`>>
+* <<jdbc-JdbcClient,Unified JDBC Query/Update Operations: `JdbcClient`>>
+* <<jdbc-SQLExceptionTranslator,Using `SQLExceptionTranslator`>>
+* <<jdbc-statements-executing,Running Statements>>
+* <<jdbc-statements-querying,Running Queries>>
+* <<jdbc-updates,Updating the Database>>
+* <<jdbc-auto-generated-keys,Retrieving Auto-generated Keys>>
 
 
 [[jdbc-JdbcTemplate]]
@@ -62,14 +62,14 @@ The following query gets the number of rows in a relation:
 ======
 Java::
 +
-[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+[source,java,indent=0,subs="verbatim,quotes"]
 ----
 	int rowCount = this.jdbcTemplate.queryForObject("select count(*) from t_actor", Integer.class);
 ----
 
 Kotlin::
 +
-[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+[source,kotlin,indent=0,subs="verbatim,quotes"]
 ----
 	val rowCount = jdbcTemplate.queryForObject<Int>("select count(*) from t_actor")!!
 ----
@@ -81,7 +81,7 @@ The following query uses a bind variable:
 ======
 Java::
 +
-[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+[source,java,indent=0,subs="verbatim,quotes"]
 ----
 	int countOfActorsNamedJoe = this.jdbcTemplate.queryForObject(
 			"select count(*) from t_actor where first_name = ?", Integer.class, "Joe");
@@ -89,7 +89,7 @@ Java::
 
 Kotlin::
 +
-[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+[source,kotlin,indent=0,subs="verbatim,quotes"]
 ----
 	val countOfActorsNamedJoe = jdbcTemplate.queryForObject<Int>(
 			"select count(*) from t_actor where first_name = ?", arrayOf("Joe"))!!
@@ -103,7 +103,7 @@ The following query looks for a `String`:
 ======
 Java::
 +
-[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+[source,java,indent=0,subs="verbatim,quotes"]
 ----
 	String lastName = this.jdbcTemplate.queryForObject(
 			"select last_name from t_actor where id = ?",
@@ -112,7 +112,7 @@ Java::
 
 Kotlin::
 +
-[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+[source,kotlin,indent=0,subs="verbatim,quotes"]
 ----
 	val lastName = this.jdbcTemplate.queryForObject<String>(
 			"select last_name from t_actor where id = ?",
@@ -126,7 +126,7 @@ The following query finds and populates a single domain object:
 ======
 Java::
 +
-[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+[source,java,indent=0,subs="verbatim,quotes"]
 ----
 	Actor actor = jdbcTemplate.queryForObject(
 			"select first_name, last_name from t_actor where id = ?",
@@ -141,7 +141,7 @@ Java::
 
 Kotlin::
 +
-[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+[source,kotlin,indent=0,subs="verbatim,quotes"]
 ----
 	val actor = jdbcTemplate.queryForObject(
 				"select first_name, last_name from t_actor where id = ?",
@@ -157,7 +157,7 @@ The following query finds and populates a list of domain objects:
 ======
 Java::
 +
-[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+[source,java,indent=0,subs="verbatim,quotes"]
 ----
 	List<Actor> actors = this.jdbcTemplate.query(
 			"select first_name, last_name from t_actor",
@@ -171,10 +171,10 @@ Java::
 
 Kotlin::
 +
-[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+[source,kotlin,indent=0,subs="verbatim,quotes"]
 ----
 	val actors = jdbcTemplate.query("select first_name, last_name from t_actor") { rs, _ ->
-			Actor(rs.getString("first_name"), rs.getString("last_name"))
+			Actor(rs.getString("first_name"), rs.getString("last_name")) }
 ----
 ======
 
@@ -187,7 +187,7 @@ For example, it may be better to write the preceding code snippet as follows:
 ======
 Java::
 +
-[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+[source,java,indent=0,subs="verbatim,quotes"]
 ----
 	private final RowMapper<Actor> actorRowMapper = (resultSet, rowNum) -> {
 		Actor actor = new Actor();
@@ -203,7 +203,7 @@ Java::
 
 Kotlin::
 +
-[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+[source,kotlin,indent=0,subs="verbatim,quotes"]
 ----
 	val actorMapper = RowMapper<Actor> { rs: ResultSet, rowNum: Int ->
 		Actor(rs.getString("first_name"), rs.getString("last_name"))
@@ -227,7 +227,7 @@ The following example inserts a new entry:
 ======
 Java::
 +
-[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+[source,java,indent=0,subs="verbatim,quotes"]
 ----
 	this.jdbcTemplate.update(
 			"insert into t_actor (first_name, last_name) values (?, ?)",
@@ -236,7 +236,7 @@ Java::
 
 Kotlin::
 +
-[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+[source,kotlin,indent=0,subs="verbatim,quotes"]
 ----
 	jdbcTemplate.update(
 			"insert into t_actor (first_name, last_name) values (?, ?)",
@@ -250,7 +250,7 @@ The following example updates an existing entry:
 ======
 Java::
 +
-[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+[source,java,indent=0,subs="verbatim,quotes"]
 ----
 	this.jdbcTemplate.update(
 			"update t_actor set last_name = ? where id = ?",
@@ -259,7 +259,7 @@ Java::
 
 Kotlin::
 +
-[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+[source,kotlin,indent=0,subs="verbatim,quotes"]
 ----
 	jdbcTemplate.update(
 			"update t_actor set last_name = ? where id = ?",
@@ -273,7 +273,7 @@ The following example deletes an entry:
 ======
 Java::
 +
-[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+[source,java,indent=0,subs="verbatim,quotes"]
 ----
 	this.jdbcTemplate.update(
 			"delete from t_actor where id = ?",
@@ -282,7 +282,7 @@ Java::
 
 Kotlin::
 +
-[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+[source,kotlin,indent=0,subs="verbatim,quotes"]
 ----
 	jdbcTemplate.update("delete from t_actor where id = ?", actorId.toLong())
 ----
@@ -300,14 +300,14 @@ table:
 ======
 Java::
 +
-[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+[source,java,indent=0,subs="verbatim,quotes"]
 ----
 	this.jdbcTemplate.execute("create table mytable (id integer, name varchar(100))");
 ----
 
 Kotlin::
 +
-[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+[source,kotlin,indent=0,subs="verbatim,quotes"]
 ----
 	jdbcTemplate.execute("create table mytable (id integer, name varchar(100))")
 ----
@@ -319,7 +319,7 @@ The following example invokes a stored procedure:
 ======
 Java::
 +
-[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+[source,java,indent=0,subs="verbatim,quotes"]
 ----
 	this.jdbcTemplate.update(
 			"call SUPPORT.REFRESH_ACTORS_SUMMARY(?)",
@@ -328,7 +328,7 @@ Java::
 
 Kotlin::
 +
-[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+[source,kotlin,indent=0,subs="verbatim,quotes"]
 ----
 	jdbcTemplate.update(
 			"call SUPPORT.REFRESH_ACTORS_SUMMARY(?)",
@@ -339,7 +339,7 @@ Kotlin::
 
 More sophisticated stored procedure support is xref:data-access/jdbc/object.adoc#jdbc-StoredProcedure[covered later].
 
-[[jdbc-JdbcTemplate-idioms]]
+[[jdbc-jdbctemplate-idioms]]
 === `JdbcTemplate` Best Practices
 
 Instances of the `JdbcTemplate` class are thread-safe, once configured. This is
@@ -349,43 +349,12 @@ The `JdbcTemplate` is stateful, in that it maintains a reference to a `DataSourc
 this state is not conversational state.
 
 A common practice when using the `JdbcTemplate` class (and the associated
-xref:data-access/jdbc/core.adoc#jdbc-NamedParameterJdbcTemplate[`NamedParameterJdbcTemplate`] class) is to
+<<jdbc-NamedParameterJdbcTemplate,`NamedParameterJdbcTemplate`>> class) is to
 configure a `DataSource` in your Spring configuration file and then dependency-inject
 that shared `DataSource` bean into your DAO classes. The `JdbcTemplate` is created in
-the setter for the `DataSource`. This leads to DAOs that resemble the following:
+the setter for the `DataSource` or in the constructor. This leads to DAOs that resemble the following:
 
---
-[tabs]
-======
-Java::
-+
-[source,java,indent=0,subs="verbatim,quotes",role="primary"]
-----
-	public class JdbcCorporateEventDao implements CorporateEventDao {
-
-		private JdbcTemplate jdbcTemplate;
-
-		public void setDataSource(DataSource dataSource) {
-			this.jdbcTemplate = new JdbcTemplate(dataSource);
-		}
-
-		// JDBC-backed implementations of the methods on the CorporateEventDao follow...
-	}
-----
-
-Kotlin::
-+
-[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
-----
-	class JdbcCorporateEventDao(dataSource: DataSource) : CorporateEventDao {
-
-		private val jdbcTemplate = JdbcTemplate(dataSource)
-
-		// JDBC-backed implementations of the methods on the CorporateEventDao follow...
-	}
-----
-======
---
+include-code::./JdbcCorporateEventDao[tag=snippet,indent=0]
 
 The following example shows the corresponding configuration:
 
@@ -429,7 +398,7 @@ parameters. The following example shows how to use `NamedParameterJdbcTemplate`:
 ======
 Java::
 +
-[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+[source,java,indent=0,subs="verbatim,quotes"]
 ----
 	// some JDBC-backed DAO class...
 	private NamedParameterJdbcTemplate namedParameterJdbcTemplate;
@@ -447,7 +416,7 @@ Java::
 
 Kotlin::
 +
-[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+[source,kotlin,indent=0,subs="verbatim,quotes"]
 ----
 	private val namedParameterJdbcTemplate = NamedParameterJdbcTemplate(dataSource)
 
@@ -474,7 +443,7 @@ The following example shows the use of the `Map`-based style:
 ======
 Java::
 +
-[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+[source,java,indent=0,subs="verbatim,quotes"]
 ----
 	// some JDBC-backed DAO class...
 	private NamedParameterJdbcTemplate namedParameterJdbcTemplate;
@@ -492,7 +461,7 @@ Java::
 
 Kotlin::
 +
-[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+[source,kotlin,indent=0,subs="verbatim,quotes"]
 ----
 	// some JDBC-backed DAO class...
 	private val namedParameterJdbcTemplate = NamedParameterJdbcTemplate(dataSource)
@@ -525,7 +494,7 @@ The following example shows a typical JavaBean:
 ======
 Java::
 +
-[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+[source,java,indent=0,subs="verbatim,quotes"]
 ----
 	public class Actor {
 
@@ -551,7 +520,7 @@ Java::
 
 Kotlin::
 +
-[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+[source,kotlin,indent=0,subs="verbatim,quotes"]
 ----
 	data class Actor(val id: Long, val firstName: String, val lastName: String)
 ----
@@ -564,7 +533,7 @@ members of the class shown in the preceding example:
 ======
 Java::
 +
-[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+[source,java,indent=0,subs="verbatim,quotes"]
 ----
 	// some JDBC-backed DAO class...
 	private NamedParameterJdbcTemplate namedParameterJdbcTemplate;
@@ -583,11 +552,9 @@ Java::
 
 Kotlin::
 +
-[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+[source,kotlin,indent=0,subs="verbatim,quotes"]
 ----
 	// some JDBC-backed DAO class...
-	private val namedParameterJdbcTemplate = NamedParameterJdbcTemplate(dataSource)
-
 	private val namedParameterJdbcTemplate = NamedParameterJdbcTemplate(dataSource)
 
 	fun countOfActors(exampleActor: Actor): Int {
@@ -605,7 +572,7 @@ functionality that is present only in the `JdbcTemplate` class, you can use the
 `getJdbcOperations()` method to access the wrapped `JdbcTemplate` through the
 `JdbcOperations` interface.
 
-See also xref:data-access/jdbc/core.adoc#jdbc-JdbcTemplate-idioms[`JdbcTemplate` Best Practices]
+See also <<jdbc-jdbctemplate-idioms,`JdbcTemplate` Best Practices>>
 for guidelines on using the `NamedParameterJdbcTemplate` class in the context of an application.
 
 
@@ -707,7 +674,39 @@ provides `firstName` and `lastName` properties, such as the `Actor` class from a
 [source,java,indent=0,subs="verbatim,quotes"]
 ----
 	this.jdbcClient.sql("insert into t_actor (first_name, last_name) values (:firstName, :lastName)")
-			.paramSource(new Actor("Leonor", "Watling")
+			.paramSource(new Actor("Leonor", "Watling"))
+			.update();
+----
+
+For batch updates, accumulate the batch entries in a fluent fashion through `batch()`,
+defining each entry through `entry(...)` – either with a callback that binds positional
+or named parameters as for a single update, or with a `List` of positional parameters
+or a `Map` of named parameters. The accumulated entries are executed as a single JDBC
+batch by `update()`:
+
+[source,java,indent=0,subs="verbatim,quotes"]
+----
+	this.jdbcClient.sql("insert into t_actor (first_name, last_name) values (:firstName, :lastName)")
+			.batch()
+				.entry(entry -> entry.param("firstName", "Leonor").param("lastName", "Watling"))
+				.entry(entry -> entry.param("firstName", "Christian").param("lastName", "Bale"))
+			.update();
+----
+
+NOTE: When defining an entry with a `List` of positional parameters that contains `null`
+values, use a list which permits `null` elements – for example, `Arrays.asList(...)`
+rather than `List.of(...)` – or bind each parameter individually through the callback.
+
+Alternatively, define several entries at once through `entries(...)`, with each given
+parameter source object – for example, an `Actor` record – representing one entry.
+`entry(...)` and `entries(...)` calls may be freely combined within the same batch:
+
+[source,java,indent=0,subs="verbatim,quotes"]
+----
+	List<Actor> actors = ...;
+	this.jdbcClient.sql("insert into t_actor (first_name, last_name) values (:firstName, :lastName)")
+			.batch()
+				.entries(actors)
 			.update();
 ----
 
@@ -718,9 +717,9 @@ for `BeanPropertySqlParameterSource` and `BeanPropertyRowMapper`/`DataClassRowMa
 also with `JdbcTemplate` and `NamedParameterJdbcTemplate` themselves.
 
 NOTE: `JdbcClient` is a flexible but simplified facade for JDBC query/update statements.
-Advanced capabilities such as batch inserts and stored procedure calls typically require
-extra customization: consider Spring's `SimpleJdbcInsert` and `SimpleJdbcCall` classes or
-plain direct `JdbcTemplate` usage for any such capabilities not available in `JdbcClient`.
+Advanced capabilities such as stored procedure calls typically require extra customization:
+consider Spring's `SimpleJdbcInsert` and `SimpleJdbcCall` classes or plain direct
+`JdbcTemplate` usage for any such capabilities not available in `JdbcClient`.
 
 
 [[jdbc-SQLExceptionTranslator]]
@@ -777,7 +776,7 @@ You can extend `SQLErrorCodeSQLExceptionTranslator`, as the following example sh
 ======
 Java::
 +
-[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+[source,java,indent=0,subs="verbatim,quotes"]
 ----
 	public class CustomSQLErrorCodesTranslator extends SQLErrorCodeSQLExceptionTranslator {
 
@@ -792,7 +791,7 @@ Java::
 
 Kotlin::
 +
-[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+[source,kotlin,indent=0,subs="verbatim,quotes"]
 ----
 	class CustomSQLErrorCodesTranslator : SQLErrorCodeSQLExceptionTranslator() {
 
@@ -817,7 +816,7 @@ how you can use this custom translator:
 ======
 Java::
 +
-[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+[source,java,indent=0,subs="verbatim,quotes"]
 ----
 	private JdbcTemplate jdbcTemplate;
 
@@ -842,7 +841,7 @@ Java::
 
 Kotlin::
 +
-[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+[source,kotlin,indent=0,subs="verbatim,quotes"]
 ----
 	// create a JdbcTemplate and set data source
 	private val jdbcTemplate = JdbcTemplate(dataSource).apply {
@@ -877,7 +876,7 @@ fully functional class that creates a new table:
 ======
 Java::
 +
-[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+[source,java,indent=0,subs="verbatim,quotes"]
 ----
 	import javax.sql.DataSource;
 	import org.springframework.jdbc.core.JdbcTemplate;
@@ -898,7 +897,7 @@ Java::
 
 Kotlin::
 +
-[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+[source,kotlin,indent=0,subs="verbatim,quotes"]
 ----
 	import javax.sql.DataSource
 	import org.springframework.jdbc.core.JdbcTemplate
@@ -928,7 +927,7 @@ query methods, one for an `int` and one that queries for a `String`:
 ======
 Java::
 +
-[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+[source,java,indent=0,subs="verbatim,quotes"]
 ----
 	import javax.sql.DataSource;
 	import org.springframework.jdbc.core.JdbcTemplate;
@@ -953,7 +952,7 @@ Java::
 
 Kotlin::
 +
-[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+[source,kotlin,indent=0,subs="verbatim,quotes"]
 ----
 import javax.sql.DataSource
 import org.springframework.jdbc.core.JdbcTemplate
@@ -981,7 +980,7 @@ list of all the rows, it might be as follows:
 ======
 Java::
 +
-[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+[source,java,indent=0,subs="verbatim,quotes"]
 ----
 	private JdbcTemplate jdbcTemplate;
 
@@ -996,7 +995,7 @@ Java::
 
 Kotlin::
 +
-[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+[source,kotlin,indent=0,subs="verbatim,quotes"]
 ----
 	private val jdbcTemplate = JdbcTemplate(dataSource)
 
@@ -1023,7 +1022,7 @@ The following example updates a column for a certain primary key:
 ======
 Java::
 +
-[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+[source,java,indent=0,subs="verbatim,quotes"]
 ----
 	import javax.sql.DataSource;
 	import org.springframework.jdbc.core.JdbcTemplate;
@@ -1044,7 +1043,7 @@ Java::
 
 Kotlin::
 +
-[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+[source,kotlin,indent=0,subs="verbatim,quotes"]
 ----
 	import javax.sql.DataSource
 	import org.springframework.jdbc.core.JdbcTemplate
@@ -1082,7 +1081,7 @@ on Oracle but may not work on other platforms:
 ======
 Java::
 +
-[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+[source,java,indent=0,subs="verbatim,quotes"]
 ----
 	final String INSERT_SQL = "insert into my_test (name) values(?)";
 	final String name = "Rob";
@@ -1099,7 +1098,7 @@ Java::
 
 Kotlin::
 +
-[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+[source,kotlin,indent=0,subs="verbatim,quotes"]
 ----
 	val INSERT_SQL = "insert into my_test (name) values(?)"
 	val name = "Rob"
@@ -1112,6 +1111,3 @@ Kotlin::
 	// keyHolder.getKey() now contains the generated key
 ----
 ======
-
-
-

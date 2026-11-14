@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2022 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -47,14 +47,14 @@ class RuntimeHintsTests {
 	@Test
 	void resourceHintWithClass() {
 		this.hints.resources().registerType(String.class);
-		assertThat(this.hints.resources().resourcePatternHints()).singleElement().satisfies(resourceHint -> {
-			assertThat(resourceHint.getIncludes()).map(ResourcePatternHint::getPattern)
-					.containsExactlyInAnyOrder("/", "java", "java/lang", "java/lang/String.class");
-			assertThat(resourceHint.getExcludes()).isEmpty();
-		});
+		assertThat(this.hints.resources().resourcePatternHints()).singleElement().satisfies(resourceHint ->
+				assertThat(resourceHint.getIncludes()).map(ResourcePatternHint::getPattern)
+				.containsExactlyInAnyOrder("/", "java", "java/lang", "java/lang/String.class"));
 	}
 
 	@Test
+	@Deprecated
+	@SuppressWarnings("removal")
 	void javaSerializationHintWithClass() {
 		this.hints.serialization().registerType(String.class);
 		assertThat(this.hints.serialization().javaSerializationHints().map(JavaSerializationHint::getType))

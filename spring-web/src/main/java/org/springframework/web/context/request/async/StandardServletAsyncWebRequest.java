@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,6 +21,7 @@ import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Consumer;
 
@@ -32,8 +33,8 @@ import jakarta.servlet.WriteListener;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpServletResponseWrapper;
+import org.jspecify.annotations.Nullable;
 
-import org.springframework.lang.Nullable;
 import org.springframework.util.Assert;
 import org.springframework.web.context.request.ServletWebRequest;
 
@@ -56,11 +57,9 @@ public class StandardServletAsyncWebRequest extends ServletWebRequest implements
 
 	private final List<Runnable> completionHandlers = new ArrayList<>();
 
-	@Nullable
-	private Long timeout;
+	private @Nullable Long timeout;
 
-	@Nullable
-	private AsyncContext asyncContext;
+	private @Nullable AsyncContext asyncContext;
 
 	private State state;
 
@@ -84,7 +83,7 @@ public class StandardServletAsyncWebRequest extends ServletWebRequest implements
 	 * @param previousRequest the existing request from the last dispatch
 	 * @since 5.3.33
 	 */
-	@SuppressWarnings("NullAway")
+	@SuppressWarnings("NullAway") // Dataflow analysis limitation
 	StandardServletAsyncWebRequest(HttpServletRequest request, HttpServletResponse response,
 			@Nullable StandardServletAsyncWebRequest previousRequest) {
 
@@ -213,6 +212,37 @@ public class StandardServletAsyncWebRequest extends ServletWebRequest implements
 
 
 	/**
+	 * Return 0 when there is no need to obtain a lock (no async handling in
+	 * progress), 1 if lock was acquired, and -1 if lock is not acquired because
+	 * request is no longer usable.
+	 */
+	private int tryObtainLock() {
+
+		if (this.state == State.NEW) {
+			return 0;
+		}
+
+		// Do not wait indefinitely, stop if we moved on from ASYNC state (for example, to ERROR),
+		// helps to avoid ABBA deadlock with onError callback
+
+		while (this.state == State.ASYNC) {
+			try {
+				if (this.stateLock.tryLock(500, TimeUnit.MILLISECONDS)) {
+					if (this.state == State.ASYNC) {
+						return 1;
+					}
+					this.stateLock.unlock();
+					break;
+				}
+			}
+			catch (InterruptedException ignored) {
+			}
+		}
+
+		return -1;
+	}
+
+	/**
 	 * Package private access for testing only.
 	 */
 	ReentrantLock stateLock() {
@@ -226,14 +256,11 @@ public class StandardServletAsyncWebRequest extends ServletWebRequest implements
 	 */
 	private static final class LifecycleHttpServletResponse extends HttpServletResponseWrapper {
 
-		@Nullable
-		private StandardServletAsyncWebRequest asyncWebRequest;
+		private @Nullable StandardServletAsyncWebRequest asyncWebRequest;
 
-		@Nullable
-		private ServletOutputStream outputStream;
+		private @Nullable ServletOutputStream outputStream;
 
-		@Nullable
-		private PrintWriter writer;
+		private @Nullable PrintWriter writer;
 
 		public LifecycleHttpServletResponse(HttpServletResponse response) {
 			super(response);
@@ -244,9 +271,9 @@ public class StandardServletAsyncWebRequest extends ServletWebRequest implements
 		}
 
 		@Override
-		@SuppressWarnings("NullAway")
+		@SuppressWarnings("NullAway") // Dataflow analysis limitation
 		public ServletOutputStream getOutputStream() throws IOException {
-			int level = obtainLockAndCheckState();
+			int level = obtainLockOrRaiseException();
 			try {
 				if (this.outputStream == null) {
 					Assert.notNull(this.asyncWebRequest, "Not initialized");
@@ -264,9 +291,9 @@ public class StandardServletAsyncWebRequest extends ServletWebRequest implements
 		}
 
 		@Override
-		@SuppressWarnings("NullAway")
+		@SuppressWarnings("NullAway") // Dataflow analysis limitation
 		public PrintWriter getWriter() throws IOException {
-			int level = obtainLockAndCheckState();
+			int level = obtainLockOrRaiseException();
 			try {
 				if (this.writer == null) {
 					Assert.notNull(this.asyncWebRequest, "Not initialized");
@@ -284,7 +311,7 @@ public class StandardServletAsyncWebRequest extends ServletWebRequest implements
 
 		@Override
 		public void flushBuffer() throws IOException {
-			int level = obtainLockAndCheckState();
+			int level = obtainLockOrRaiseException();
 			try {
 				getResponse().flushBuffer();
 			}
@@ -296,25 +323,15 @@ public class StandardServletAsyncWebRequest extends ServletWebRequest implements
 			}
 		}
 
-		/**
-		 * Return 0 if checks passed and lock is not needed, 1 if checks passed
-		 * and lock is held, or raise AsyncRequestNotUsableException.
-		 */
-		private int obtainLockAndCheckState() throws AsyncRequestNotUsableException {
+		private int obtainLockOrRaiseException() throws AsyncRequestNotUsableException {
 			Assert.notNull(this.asyncWebRequest, "Not initialized");
-			if (this.asyncWebRequest.state == State.NEW) {
-				return 0;
+			int result = this.asyncWebRequest.tryObtainLock();
+			if (result == -1) {
+				throw new AsyncRequestNotUsableException("Response not usable after " +
+						(this.asyncWebRequest.state == State.COMPLETED ?
+								"async request completion" : "response errors") + ".");
 			}
-
-			this.asyncWebRequest.stateLock.lock();
-			if (this.asyncWebRequest.state == State.ASYNC) {
-				return 1;
-			}
-
-			this.asyncWebRequest.stateLock.unlock();
-			throw new AsyncRequestNotUsableException("Response not usable after " +
-					(this.asyncWebRequest.state == State.COMPLETED ?
-							"async request completion" : "response errors") + ".");
+			return result;
 		}
 
 		void handleIOException(IOException ex, String msg) throws AsyncRequestNotUsableException {
@@ -360,7 +377,7 @@ public class StandardServletAsyncWebRequest extends ServletWebRequest implements
 
 		@Override
 		public void write(int b) throws IOException {
-			int level = this.response.obtainLockAndCheckState();
+			int level = this.response.obtainLockOrRaiseException();
 			try {
 				this.delegate.write(b);
 			}
@@ -372,8 +389,9 @@ public class StandardServletAsyncWebRequest extends ServletWebRequest implements
 			}
 		}
 
+		@Override
 		public void write(byte[] buf, int offset, int len) throws IOException {
-			int level = this.response.obtainLockAndCheckState();
+			int level = this.response.obtainLockOrRaiseException();
 			try {
 				this.delegate.write(buf, offset, len);
 			}
@@ -387,7 +405,7 @@ public class StandardServletAsyncWebRequest extends ServletWebRequest implements
 
 		@Override
 		public void flush() throws IOException {
-			int level = this.response.obtainLockAndCheckState();
+			int level = this.response.obtainLockOrRaiseException();
 			try {
 				this.delegate.flush();
 			}
@@ -401,7 +419,7 @@ public class StandardServletAsyncWebRequest extends ServletWebRequest implements
 
 		@Override
 		public void close() throws IOException {
-			int level = this.response.obtainLockAndCheckState();
+			int level = this.response.obtainLockOrRaiseException();
 			try {
 				this.delegate.close();
 			}
@@ -435,237 +453,172 @@ public class StandardServletAsyncWebRequest extends ServletWebRequest implements
 
 		@Override
 		public void flush() {
-			int level = tryObtainLockAndCheckState();
+			invokeWithLock(this.delegate::flush);
+		}
+
+		private void invokeWithLock(Runnable runnable) {
+			int level = this.asyncWebRequest.tryObtainLock();
 			if (level > -1) {
 				try {
-					this.delegate.flush();
+					runnable.run();
 				}
 				finally {
-					releaseLock(level);
+					if (level > 0) {
+						this.asyncWebRequest.stateLock.unlock();
+					}
 				}
 			}
 		}
 
 		@Override
 		public void close() {
-			int level = tryObtainLockAndCheckState();
-			if (level > -1) {
-				try {
-					this.delegate.close();
-				}
-				finally {
-					releaseLock(level);
-				}
-			}
-		}
-
-		@Override
-		public boolean checkError() {
-			return this.delegate.checkError();
+			invokeWithLock(this.delegate::close);
 		}
 
 		@Override
 		public void write(int c) {
-			int level = tryObtainLockAndCheckState();
-			if (level > -1) {
-				try {
-					this.delegate.write(c);
-				}
-				finally {
-					releaseLock(level);
-				}
-			}
+			invokeWithLock(() -> this.delegate.write(c));
 		}
 
 		@Override
 		public void write(char[] buf, int off, int len) {
-			int level = tryObtainLockAndCheckState();
-			if (level > -1) {
-				try {
-					this.delegate.write(buf, off, len);
-				}
-				finally {
-					releaseLock(level);
-				}
-			}
+			invokeWithLock(() -> this.delegate.write(buf, off, len));
 		}
 
 		@Override
 		public void write(char[] buf) {
-			this.delegate.write(buf);
+			write(buf, 0, buf.length);
 		}
 
 		@Override
 		public void write(String s, int off, int len) {
-			int level = tryObtainLockAndCheckState();
-			if (level > -1) {
-				try {
-					this.delegate.write(s, off, len);
-				}
-				finally {
-					releaseLock(level);
-				}
-			}
+			invokeWithLock(() -> this.delegate.write(s, off, len));
 		}
 
 		@Override
 		public void write(String s) {
-			this.delegate.write(s);
-		}
-
-		/**
-		 * Return 0 if checks passed and lock is not needed, 1 if checks passed
-		 * and lock is held, and -1 if checks did not pass.
-		 */
-		private int tryObtainLockAndCheckState() {
-			if (this.asyncWebRequest.state == State.NEW) {
-				return 0;
-			}
-			this.asyncWebRequest.stateLock.lock();
-			if (this.asyncWebRequest.state == State.ASYNC) {
-				return 1;
-			}
-			this.asyncWebRequest.stateLock.unlock();
-			return -1;
-		}
-
-		private void releaseLock(int level) {
-			if (level > 0) {
-				this.asyncWebRequest.stateLock.unlock();
-			}
+			write(s, 0, s.length());
 		}
 
 		// Plain delegates
 
 		@Override
 		public void print(boolean b) {
-			this.delegate.print(b);
+			write(String.valueOf(b));
 		}
 
 		@Override
 		public void print(char c) {
-			this.delegate.print(c);
+			write(c);
 		}
 
 		@Override
 		public void print(int i) {
-			this.delegate.print(i);
+			write(String.valueOf(i));
 		}
 
 		@Override
 		public void print(long l) {
-			this.delegate.print(l);
+			write(String.valueOf(l));
 		}
 
 		@Override
 		public void print(float f) {
-			this.delegate.print(f);
+			write(String.valueOf(f));
 		}
 
 		@Override
 		public void print(double d) {
-			this.delegate.print(d);
+			write(String.valueOf(d));
 		}
 
 		@Override
 		public void print(char[] s) {
-			this.delegate.print(s);
+			write(s);
 		}
 
 		@Override
 		public void print(String s) {
-			this.delegate.print(s);
+			write(String.valueOf(s));
 		}
 
 		@Override
 		public void print(Object obj) {
-			this.delegate.print(obj);
+			write(String.valueOf(obj));
 		}
 
 		@Override
 		public void println() {
-			this.delegate.println();
+			invokeWithLock(this.delegate::println);
 		}
 
 		@Override
 		public void println(boolean x) {
-			this.delegate.println(x);
+			invokeWithLock(() -> this.delegate.println(x));
 		}
 
 		@Override
 		public void println(char x) {
-			this.delegate.println(x);
+			invokeWithLock(() -> this.delegate.println(x));
 		}
 
 		@Override
 		public void println(int x) {
-			this.delegate.println(x);
+			invokeWithLock(() -> this.delegate.println(x));
 		}
 
 		@Override
 		public void println(long x) {
-			this.delegate.println(x);
+			invokeWithLock(() -> this.delegate.println(x));
 		}
 
 		@Override
 		public void println(float x) {
-			this.delegate.println(x);
+			invokeWithLock(() -> this.delegate.println(x));
 		}
 
 		@Override
 		public void println(double x) {
-			this.delegate.println(x);
+			invokeWithLock(() -> this.delegate.println(x));
 		}
 
 		@Override
 		public void println(char[] x) {
-			this.delegate.println(x);
+			invokeWithLock(() -> this.delegate.println(x));
 		}
 
 		@Override
 		public void println(String x) {
-			this.delegate.println(x);
+			invokeWithLock(() -> this.delegate.println(x));
 		}
 
 		@Override
 		public void println(Object x) {
-			this.delegate.println(x);
+			invokeWithLock(() -> this.delegate.println(x));
 		}
 
 		@Override
 		public PrintWriter printf(String format, Object... args) {
-			return this.delegate.printf(format, args);
+			return format(format, args);
 		}
 
 		@Override
 		public PrintWriter printf(Locale l, String format, Object... args) {
-			return this.delegate.printf(l, format, args);
+			return format(format, args);
 		}
 
 		@Override
 		public PrintWriter format(String format, Object... args) {
-			return this.delegate.format(format, args);
+			invokeWithLock(() -> this.delegate.format(format, args));
+			return this;
 		}
 
 		@Override
 		public PrintWriter format(Locale l, String format, Object... args) {
-			return this.delegate.format(l, format, args);
+			invokeWithLock(() -> this.delegate.format(format, args));
+			return this;
 		}
 
-		@Override
-		public PrintWriter append(CharSequence csq) {
-			return this.delegate.append(csq);
-		}
-
-		@Override
-		public PrintWriter append(CharSequence csq, int start, int end) {
-			return this.delegate.append(csq, start, end);
-		}
-
-		@Override
-		public PrintWriter append(char c) {
-			return this.delegate.append(c);
-		}
 	}
 
 

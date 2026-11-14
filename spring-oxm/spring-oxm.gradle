@@ -1,17 +1,14 @@
+import com.github.bjornvester.xjc.XjcTask
+
 plugins {
-	id "org.unbroken-dome.xjc"
+	id "com.github.bjornvester.xjc"
 }
 
 description = "Spring Object/XML Marshalling"
 
 xjc {
-	xjcVersion = '3.0'
-}
-
-sourceSets {
-	test {
-		xjcTargetPackage = 'org.springframework.oxm.jaxb.test'
-	}
+	xsdDir.set(layout.projectDirectory.dir("src/test/schema"))
+	defaultPackage.set('org.springframework.oxm.jaxb.test')
 }
 
 dependencies {
@@ -25,9 +22,17 @@ dependencies {
 	testImplementation("org.codehaus.jettison:jettison") {
 		exclude group: "stax", module: "stax-api"
 	}
-	//testImplementation(files(genJaxb.classesDir).builtBy(genJaxb))
 	testImplementation("org.xmlunit:xmlunit-assertj")
 	testImplementation("org.xmlunit:xmlunit-matchers")
 	testRuntimeOnly("com.sun.xml.bind:jaxb-core")
 	testRuntimeOnly("com.sun.xml.bind:jaxb-impl")
 }
+
+// The XJC plugin adds generated code to the main source set, but we need it only for tests.
+tasks.named("xjc", XjcTask).configure {
+	sourceSets.main.java.setSrcDirs(["src/main/java"])
+	sourceSets.main.resources.setSrcDirs(["src/main/resources"])
+}
+// 2) Attach XJC output only to the test source sets via lazy providers.
+sourceSets.test.java.srcDir(tasks.named("xjc", XjcTask).flatMap { it.outputJavaDir })
+sourceSets.test.resources.srcDir(tasks.named("xjc", XjcTask).flatMap { it.outputResourcesDir })

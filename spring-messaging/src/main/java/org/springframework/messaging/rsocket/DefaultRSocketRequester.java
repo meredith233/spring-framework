@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,11 +18,13 @@ package org.springframework.messaging.rsocket;
 
 import java.util.Collections;
 import java.util.Map;
+import java.util.Objects;
 import java.util.function.Consumer;
 
 import io.rsocket.Payload;
 import io.rsocket.RSocket;
 import io.rsocket.core.RSocketClient;
+import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Publisher;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
@@ -35,7 +37,6 @@ import org.springframework.core.codec.Encoder;
 import org.springframework.core.io.buffer.DataBuffer;
 import org.springframework.core.io.buffer.DataBufferFactory;
 import org.springframework.core.io.buffer.DataBufferUtils;
-import org.springframework.lang.Nullable;
 import org.springframework.util.Assert;
 import org.springframework.util.ClassUtils;
 import org.springframework.util.MimeType;
@@ -52,8 +53,7 @@ final class DefaultRSocketRequester implements RSocketRequester {
 
 	private final RSocketClient rsocketClient;
 
-	@Nullable
-	private final RSocket rsocket;
+	private final @Nullable RSocket rsocket;
 
 	private final MimeType dataMimeType;
 
@@ -87,9 +87,8 @@ final class DefaultRSocketRequester implements RSocketRequester {
 		return this.rsocketClient;
 	}
 
-	@Nullable
 	@Override
-	public RSocket rsocket() {
+	public @Nullable RSocket rsocket() {
 		return this.rsocket;
 	}
 
@@ -132,11 +131,9 @@ final class DefaultRSocketRequester implements RSocketRequester {
 
 		private final MetadataEncoder metadataEncoder = new MetadataEncoder(metadataMimeType(), strategies);
 
-		@Nullable
-		private Mono<Payload> payloadMono;
+		private @Nullable Mono<Payload> payloadMono;
 
-		@Nullable
-		private Flux<Payload> payloadFlux;
+		private @Nullable Flux<Payload> payloadFlux;
 
 
 		public DefaultRequestSpec(String route, Object... vars) {
@@ -178,8 +175,7 @@ final class DefaultRSocketRequester implements RSocketRequester {
 			return this;
 		}
 
-		@Nullable
-		private ReactiveAdapter getAdapter(Class<?> aClass) {
+		private @Nullable ReactiveAdapter getAdapter(Class<?> aClass) {
 			return strategies.reactiveAdapterRegistry().getAdapter(aClass);
 		}
 
@@ -296,7 +292,7 @@ final class DefaultRSocketRequester implements RSocketRequester {
 
 			Decoder<?> decoder = strategies.decoder(elementType, dataMimeType);
 			return (Mono<T>) payloadMono.map(this::retainDataAndReleasePayload)
-					.map(dataBuffer -> decoder.decode(dataBuffer, elementType, dataMimeType, EMPTY_HINTS));
+					.map(dataBuffer -> Objects.requireNonNull(decoder.decode(dataBuffer, elementType, dataMimeType, EMPTY_HINTS)));
 		}
 
 		@Override
@@ -322,7 +318,7 @@ final class DefaultRSocketRequester implements RSocketRequester {
 
 			Decoder<?> decoder = strategies.decoder(elementType, dataMimeType);
 			return payloadFlux.map(this::retainDataAndReleasePayload).map(dataBuffer ->
-					(T) decoder.decode(dataBuffer, elementType, dataMimeType, EMPTY_HINTS));
+					(T) Objects.requireNonNull(decoder.decode(dataBuffer, elementType, dataMimeType, EMPTY_HINTS)));
 		}
 
 		private Mono<Payload> getPayloadMono() {

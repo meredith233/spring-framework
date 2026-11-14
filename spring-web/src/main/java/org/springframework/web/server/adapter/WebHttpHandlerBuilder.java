@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2023 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,6 +23,7 @@ import java.util.function.Consumer;
 import java.util.function.Function;
 
 import io.micrometer.observation.ObservationRegistry;
+import org.jspecify.annotations.Nullable;
 import reactor.blockhound.BlockHound;
 import reactor.blockhound.integration.BlockHoundIntegration;
 
@@ -34,7 +35,6 @@ import org.springframework.http.server.reactive.HttpHandler;
 import org.springframework.http.server.reactive.HttpHandlerDecoratorFactory;
 import org.springframework.http.server.reactive.observation.DefaultServerRequestObservationConvention;
 import org.springframework.http.server.reactive.observation.ServerRequestObservationConvention;
-import org.springframework.lang.Nullable;
 import org.springframework.util.Assert;
 import org.springframework.util.ObjectUtils;
 import org.springframework.web.server.ServerWebExchange;
@@ -85,33 +85,27 @@ public final class WebHttpHandlerBuilder {
 
 	private final WebHandler webHandler;
 
-	@Nullable
-	private final ApplicationContext applicationContext;
+	private final @Nullable ApplicationContext applicationContext;
 
 	private final List<WebFilter> filters = new ArrayList<>();
 
 	private final List<WebExceptionHandler> exceptionHandlers = new ArrayList<>();
 
-	@Nullable
-	private Function<HttpHandler, HttpHandler> httpHandlerDecorator;
+	private @Nullable Function<HttpHandler, HttpHandler> httpHandlerDecorator;
 
-	@Nullable
-	private WebSessionManager sessionManager;
+	private @Nullable WebSessionManager sessionManager;
 
-	@Nullable
-	private ServerCodecConfigurer codecConfigurer;
+	private @Nullable ServerCodecConfigurer codecConfigurer;
 
-	@Nullable
-	private LocaleContextResolver localeContextResolver;
+	private @Nullable LocaleContextResolver localeContextResolver;
 
-	@Nullable
-	private ForwardedHeaderTransformer forwardedHeaderTransformer;
+	private @Nullable ForwardedHeaderTransformer forwardedHeaderTransformer;
 
-	@Nullable
-	private ObservationRegistry observationRegistry;
+	private @Nullable ObservationRegistry observationRegistry;
 
-	@Nullable
-	private ServerRequestObservationConvention observationConvention;
+	private @Nullable ServerRequestObservationConvention observationConvention;
+
+	private @Nullable Boolean defaultHtmlEscape;
 
 
 	/**
@@ -131,13 +125,14 @@ public final class WebHttpHandlerBuilder {
 		this.applicationContext = other.applicationContext;
 		this.filters.addAll(other.filters);
 		this.exceptionHandlers.addAll(other.exceptionHandlers);
+		this.httpHandlerDecorator = other.httpHandlerDecorator;
 		this.sessionManager = other.sessionManager;
 		this.codecConfigurer = other.codecConfigurer;
 		this.localeContextResolver = other.localeContextResolver;
 		this.forwardedHeaderTransformer = other.forwardedHeaderTransformer;
 		this.observationRegistry = other.observationRegistry;
 		this.observationConvention = other.observationConvention;
-		this.httpHandlerDecorator = other.httpHandlerDecorator;
+		this.defaultHtmlEscape = other.defaultHtmlEscape;
 	}
 
 
@@ -243,7 +238,6 @@ public final class WebHttpHandlerBuilder {
 	public WebHttpHandlerBuilder filter(WebFilter... filters) {
 		if (!ObjectUtils.isEmpty(filters)) {
 			this.filters.addAll(Arrays.asList(filters));
-			updateFilters();
 		}
 		return this;
 	}
@@ -254,27 +248,7 @@ public final class WebHttpHandlerBuilder {
 	 */
 	public WebHttpHandlerBuilder filters(Consumer<List<WebFilter>> consumer) {
 		consumer.accept(this.filters);
-		updateFilters();
 		return this;
-	}
-
-	private void updateFilters() {
-		if (this.filters.isEmpty()) {
-			return;
-		}
-
-		List<WebFilter> filtersToUse = this.filters.stream()
-				.peek(filter -> {
-					if (filter instanceof ForwardedHeaderTransformer forwardedHeaderTransformerFilter
-							&& this.forwardedHeaderTransformer == null) {
-						this.forwardedHeaderTransformer = forwardedHeaderTransformerFilter;
-					}
-				})
-				.filter(filter -> !(filter instanceof ForwardedHeaderTransformer))
-				.toList();
-
-		this.filters.clear();
-		this.filters.addAll(filtersToUse);
 	}
 
 	/**
@@ -295,6 +269,31 @@ public final class WebHttpHandlerBuilder {
 	public WebHttpHandlerBuilder exceptionHandlers(Consumer<List<WebExceptionHandler>> consumer) {
 		consumer.accept(this.exceptionHandlers);
 		return this;
+	}
+
+	/**
+	 * Configure a {@link Function} to decorate the {@link HttpHandler} returned
+	 * by this builder which effectively wraps the entire
+	 * {@link WebExceptionHandler} - {@link WebFilter} - {@link WebHandler}
+	 * processing chain. This provides access to the request and response before
+	 * the entire chain and likewise the ability to observe the result of
+	 * the entire chain.
+	 * @param handlerDecorator the decorator to apply
+	 * @since 5.3
+	 */
+	public WebHttpHandlerBuilder httpHandlerDecorator(Function<HttpHandler, HttpHandler> handlerDecorator) {
+		this.httpHandlerDecorator = (this.httpHandlerDecorator != null ?
+				handlerDecorator.andThen(this.httpHandlerDecorator) : handlerDecorator);
+		return this;
+	}
+
+	/**
+	 * Whether a decorator for {@link HttpHandler} is configured or not via
+	 * {@link #httpHandlerDecorator(Function)}.
+	 * @since 5.3
+	 */
+	public boolean hasHttpHandlerDecorator() {
+		return (this.httpHandlerDecorator != null);
 	}
 
 	/**
@@ -400,28 +399,26 @@ public final class WebHttpHandlerBuilder {
 	}
 
 	/**
-	 * Configure a {@link Function} to decorate the {@link HttpHandler} returned
-	 * by this builder which effectively wraps the entire
-	 * {@link WebExceptionHandler} - {@link WebFilter} - {@link WebHandler}
-	 * processing chain. This provides access to the request and response before
-	 * the entire chain and likewise the ability to observe the result of
-	 * the entire chain.
-	 * @param handlerDecorator the decorator to apply
-	 * @since 5.3
+	 * Configure whether default HTML escaping is enabled for the web application.
+	 * The setting is then exposed as the exchanger attribute
+	 * {@link ServerWebExchange#HTML_ESCAPE_ATTRIBUTE}.
+	 * <p>This method differentiates between no setting specified at all and
+	 * an actual boolean value specified, allowing to have a context-specific
+	 * default in case of no setting at the global level.
+	 * @param defaultHtmlEscape whether to enable default HTML escaping
+	 * @since 7.0.6
 	 */
-	public WebHttpHandlerBuilder httpHandlerDecorator(Function<HttpHandler, HttpHandler> handlerDecorator) {
-		this.httpHandlerDecorator = (this.httpHandlerDecorator != null ?
-				handlerDecorator.andThen(this.httpHandlerDecorator) : handlerDecorator);
+	public WebHttpHandlerBuilder defaultHtmlEscape(@Nullable Boolean defaultHtmlEscape) {
+		this.defaultHtmlEscape = defaultHtmlEscape;
 		return this;
 	}
 
 	/**
-	 * Whether a decorator for {@link HttpHandler} is configured or not via
-	 * {@link #httpHandlerDecorator(Function)}.
-	 * @since 5.3
+	 * Whether HTML escaping is enabled for the web application.
+	 * @since 7.0.6
 	 */
-	public boolean hasHttpHandlerDecorator() {
-		return (this.httpHandlerDecorator != null);
+	public @Nullable Boolean getDefaultHtmlEscape() {
+		return this.defaultHtmlEscape;
 	}
 
 	/**
@@ -452,6 +449,9 @@ public final class WebHttpHandlerBuilder {
 		}
 		if (this.applicationContext != null) {
 			adapted.setApplicationContext(this.applicationContext);
+		}
+		if (this.defaultHtmlEscape != null) {
+			adapted.setDefaultHtmlEscape(this.defaultHtmlEscape);
 		}
 		adapted.afterPropertiesSet();
 

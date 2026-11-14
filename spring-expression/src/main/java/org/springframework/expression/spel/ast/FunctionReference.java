@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,9 +18,12 @@ package org.springframework.expression.spel.ast;
 
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodType;
+import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.util.StringJoiner;
+
+import org.jspecify.annotations.Nullable;
 
 import org.springframework.asm.MethodVisitor;
 import org.springframework.core.MethodParameter;
@@ -33,7 +36,6 @@ import org.springframework.expression.spel.ExpressionState;
 import org.springframework.expression.spel.SpelEvaluationException;
 import org.springframework.expression.spel.SpelMessage;
 import org.springframework.expression.spel.support.ReflectionHelper;
-import org.springframework.lang.Nullable;
 import org.springframework.util.Assert;
 import org.springframework.util.ClassUtils;
 import org.springframework.util.ReflectionUtils;
@@ -61,8 +63,7 @@ public class FunctionReference extends SpelNodeImpl {
 
 	// Captures the most recently used method for the function invocation *if* the method
 	// can safely be used for compilation (i.e. no argument conversion is going on)
-	@Nullable
-	private volatile Method method;
+	private volatile @Nullable Method method;
 
 
 	public FunctionReference(String functionName, int startPos, int endPos, SpelNodeImpl... arguments) {
@@ -83,6 +84,7 @@ public class FunctionReference extends SpelNodeImpl {
 		// Note: "javaMethod" cannot be named "method" due to a bug in Checkstyle.
 		if (function instanceof Method javaMethod) {
 			try {
+				state.trackOperation();
 				return executeFunctionViaMethod(state, javaMethod);
 			}
 			catch (SpelEvaluationException ex) {
@@ -94,6 +96,7 @@ public class FunctionReference extends SpelNodeImpl {
 		// Function registered via a MethodHandle.
 		if (function instanceof MethodHandle methodHandle) {
 			try {
+				state.trackOperation();
 				return executeFunctionViaMethodHandle(state, methodHandle);
 			}
 			catch (SpelEvaluationException ex) {
@@ -115,7 +118,7 @@ public class FunctionReference extends SpelNodeImpl {
 	 * @throws EvaluationException if there is any problem invoking the method
 	 */
 	private TypedValue executeFunctionViaMethod(ExpressionState state, Method method) throws EvaluationException {
-		Object[] functionArgs = getArguments(state);
+		@Nullable Object[] functionArgs = getArguments(state);
 
 		if (!method.isVarArgs()) {
 			int declaredParamCount = method.getParameterCount();
@@ -145,8 +148,10 @@ public class FunctionReference extends SpelNodeImpl {
 			return new TypedValue(result, new TypeDescriptor(new MethodParameter(method, -1)).narrow(result));
 		}
 		catch (Exception ex) {
-			throw new SpelEvaluationException(getStartPosition(), ex, SpelMessage.EXCEPTION_DURING_FUNCTION_CALL,
-					this.name, ex.getMessage());
+			Throwable cause = ((ex instanceof InvocationTargetException ite && ite.getCause() != null) ?
+					ite.getCause() : ex);
+			throw new SpelEvaluationException(getStartPosition(), cause, SpelMessage.EXCEPTION_DURING_FUNCTION_CALL,
+					this.name, cause.getMessage());
 		}
 		finally {
 			if (compilable) {
@@ -172,18 +177,33 @@ public class FunctionReference extends SpelNodeImpl {
 	 * @since 6.1
 	 */
 	private TypedValue executeFunctionViaMethodHandle(ExpressionState state, MethodHandle methodHandle) throws EvaluationException {
-		Object[] functionArgs = getArguments(state);
+		@Nullable Object[] functionArgs = getArguments(state);
 		MethodType declaredParams = methodHandle.type();
 		int spelParamCount = functionArgs.length;
 		int declaredParamCount = declaredParams.parameterCount();
 
+		// We don't use methodHandle.isVarargsCollector(), because a MethodHandle created via
+		// MethodHandle#bindTo() is "never a variable-arity method handle, even if the original
+		// target method handle was." Thus, we merely assume/suspect that varargs are supported
+		// if the last parameter type is an array.
 		boolean isSuspectedVarargs = declaredParams.lastParameterType().isArray();
 
-		if (spelParamCount < declaredParamCount || (spelParamCount > declaredParamCount && !isSuspectedVarargs)) {
-			// incorrect number, including more arguments and not a vararg
-			// perhaps a subset of arguments was provided but the MethodHandle wasn't bound?
+		if (isSuspectedVarargs) {
+			if (spelParamCount < declaredParamCount - 1) {
+				// Varargs, but the number of provided arguments (potentially 0) is insufficient
+				// for a varargs invocation for the number of declared parameters.
+				//
+				// As stated in the Javadoc for MethodHandle#asVarargsCollector(), "the caller
+				// must supply, at a minimum, N-1 arguments, where N is the arity of the target."
+				throw new SpelEvaluationException(SpelMessage.INCORRECT_NUMBER_OF_ARGUMENTS_TO_FUNCTION,
+						this.name, spelParamCount, (declaredParamCount - 1) + " or more");
+			}
+		}
+		else if (spelParamCount != declaredParamCount) {
+			// Incorrect number and not varargs. Perhaps a subset of arguments was provided,
+			// but the MethodHandle wasn't bound?
 			throw new SpelEvaluationException(SpelMessage.INCORRECT_NUMBER_OF_ARGUMENTS_TO_FUNCTION,
-					this.name, functionArgs.length, declaredParamCount);
+					this.name, spelParamCount, declaredParamCount);
 		}
 
 		// simplest case: the MethodHandle is fully bound or represents a static method with no params:
@@ -202,7 +222,7 @@ public class FunctionReference extends SpelNodeImpl {
 			}
 		}
 
-		// more complex case, we need to look at conversion and vararg repacking
+		// more complex case, we need to look at conversion and varargs repackaging
 		Integer varArgPosition = null;
 		if (isSuspectedVarargs) {
 			varArgPosition = declaredParamCount - 1;
@@ -210,10 +230,29 @@ public class FunctionReference extends SpelNodeImpl {
 		TypeConverter converter = state.getEvaluationContext().getTypeConverter();
 		ReflectionHelper.convertAllMethodHandleArguments(converter, functionArgs, methodHandle, varArgPosition);
 
-		if (isSuspectedVarargs && declaredParamCount == 1) {
-			// we only repack the varargs if it is the ONLY argument
-			functionArgs = ReflectionHelper.setupArgumentsForVarargsInvocation(
-					methodHandle.type().parameterArray(), functionArgs);
+		if (isSuspectedVarargs) {
+			if (declaredParamCount == 1 && !methodHandle.isVarargsCollector()) {
+				// We only repackage the arguments if the MethodHandle accepts a single
+				// argument AND the MethodHandle is not a "varargs collector" -- for example,
+				// when we are dealing with a bound MethodHandle.
+				functionArgs = ReflectionHelper.setupArgumentsForVarargsInvocation(
+						methodHandle.type().parameterArray(), functionArgs);
+			}
+			else if (spelParamCount == declaredParamCount) {
+				// If the varargs were supplied already packaged in an array, we have to create
+				// a new array, add the non-varargs arguments to the beginning of that array,
+				// and add the unpackaged varargs arguments to the end of that array. The reason
+				// is that MethodHandle.invokeWithArguments(Object...) does not expect varargs
+				// to be packaged in an array, in contrast to how method invocation works with
+				// reflection.
+				int actualVarargsIndex = functionArgs.length - 1;
+				if (actualVarargsIndex >= 0 && functionArgs[actualVarargsIndex] instanceof Object[] argsToUnpack) {
+					Object[] newArgs = new Object[actualVarargsIndex + argsToUnpack.length];
+					System.arraycopy(functionArgs, 0, newArgs, 0, actualVarargsIndex);
+					System.arraycopy(argsToUnpack, 0, newArgs, actualVarargsIndex, argsToUnpack.length);
+					functionArgs = newArgs;
+				}
+			}
 		}
 
 		try {
@@ -243,9 +282,9 @@ public class FunctionReference extends SpelNodeImpl {
 	 * Compute the arguments to the function, they are the children of this expression node.
 	 * @return an array of argument values for the function call
 	 */
-	private Object[] getArguments(ExpressionState state) throws EvaluationException {
+	private @Nullable Object[] getArguments(ExpressionState state) throws EvaluationException {
 		// Compute arguments to the function
-		Object[] arguments = new Object[getChildCount()];
+		@Nullable Object[] arguments = new Object[getChildCount()];
 		for (int i = 0; i < arguments.length; i++) {
 			arguments[i] = this.children[i].getValueInternal(state).getValue();
 		}

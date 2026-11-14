@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -26,8 +26,8 @@ import org.assertj.core.api.AbstractMapAssert;
 import org.assertj.core.api.Assertions;
 
 /**
- * AssertJ {@link org.assertj.core.api.Assert assertions} that can be applied to
- * {@link Cookie cookies}.
+ * AssertJ {@linkplain org.assertj.core.api.Assert assertions} that can be applied
+ * to {@link Cookie cookies}.
  *
  * @author Brian Clozel
  * @author Stephane Nicoll
@@ -35,18 +35,20 @@ import org.assertj.core.api.Assertions;
  */
 public class CookieMapAssert extends AbstractMapAssert<CookieMapAssert, Map<String, Cookie>, String, Cookie> {
 
+
 	public CookieMapAssert(Cookie[] actual) {
-		super(mapCookies(actual), CookieMapAssert.class);
+		super(toMap(actual), CookieMapAssert.class);
 		as("Cookies");
 	}
 
-	private static Map<String, Cookie> mapCookies(Cookie[] cookies) {
+	private static Map<String, Cookie> toMap(Cookie[] cookies) {
 		Map<String, Cookie> map = new LinkedHashMap<>();
 		for (Cookie cookie : cookies) {
 			map.putIfAbsent(cookie.getName(), cookie);
 		}
 		return map;
 	}
+
 
 	/**
 	 * Verify that the actual cookies contain a cookie with the given {@code name}.

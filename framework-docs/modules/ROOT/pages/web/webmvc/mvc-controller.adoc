@@ -13,7 +13,7 @@ The following example shows a controller defined by annotations:
 ======
 Java::
 +
-[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+[source,java,indent=0,subs="verbatim,quotes"]
 ----
 	@Controller
 	public class HelloController {
@@ -28,7 +28,7 @@ Java::
 
 Kotlin::
 +
-[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+[source,kotlin,indent=0,subs="verbatim,quotes"]
 ----
 	import org.springframework.ui.set
 
@@ -49,6 +49,3 @@ but many other options exist and are explained later in this chapter.
 
 TIP: Guides and tutorials on {spring-site-guides}[spring.io] use the annotation-based
 programming model described in this section.
-
-
-

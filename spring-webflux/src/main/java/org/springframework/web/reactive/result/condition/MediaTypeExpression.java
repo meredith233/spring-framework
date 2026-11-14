@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2016 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,7 +19,7 @@ package org.springframework.web.reactive.result.condition;
 import org.springframework.http.MediaType;
 
 /**
- * A contract for media type expressions (e.g. "text/plain", "!text/plain") as
+ * A contract for media type expressions (for example, "text/plain", "!text/plain") as
  * defined in the {@code @RequestMapping} annotation for "consumes" and
  * "produces" conditions.
  *

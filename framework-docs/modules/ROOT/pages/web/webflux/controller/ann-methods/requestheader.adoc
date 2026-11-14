@@ -25,7 +25,7 @@ The following example gets the value of the `Accept-Encoding` and `Keep-Alive` h
 ======
 Java::
 +
-[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+[source,java,indent=0,subs="verbatim,quotes"]
 ----
 	@GetMapping("/demo")
 	public void handle(
@@ -39,7 +39,7 @@ Java::
 
 Kotlin::
 +
-[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+[source,kotlin,indent=0,subs="verbatim,quotes"]
 ----
 	@GetMapping("/demo")
 	fun handle(
@@ -63,5 +63,3 @@ TIP: Built-in support is available for converting a comma-separated string into 
 array or collection of strings or other types known to the type conversion system. For
 example, a method parameter annotated with `@RequestHeader("Accept")` may be of type
 `String` but also of `String[]` or `List<String>`.
-
-

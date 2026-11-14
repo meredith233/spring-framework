@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,12 +17,14 @@
 package org.springframework.web.server;
 
 import java.util.Locale;
+import java.util.Objects;
+
+import org.jspecify.annotations.Nullable;
 
 import org.springframework.context.MessageSource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ProblemDetail;
-import org.springframework.lang.Nullable;
 import org.springframework.web.ErrorResponseException;
 
 /**
@@ -37,8 +39,7 @@ import org.springframework.web.ErrorResponseException;
 @SuppressWarnings("serial")
 public class ResponseStatusException extends ErrorResponseException {
 
-	@Nullable
-	private final String reason;
+	private final @Nullable String reason;
 
 
 	/**
@@ -92,7 +93,7 @@ public class ResponseStatusException extends ErrorResponseException {
 	 */
 	protected ResponseStatusException(
 			HttpStatusCode status, @Nullable String reason, @Nullable Throwable cause,
-			@Nullable String messageDetailCode, @Nullable Object[] messageDetailArguments) {
+			@Nullable String messageDetailCode, Object @Nullable [] messageDetailArguments) {
 
 		super(status, ProblemDetail.forStatus(status), cause, messageDetailCode, messageDetailArguments);
 		this.reason = reason;
@@ -103,48 +104,37 @@ public class ResponseStatusException extends ErrorResponseException {
 	/**
 	 * The reason explaining the exception (potentially {@code null} or empty).
 	 */
-	@Nullable
-	public String getReason() {
+	public @Nullable String getReason() {
 		return this.reason;
 	}
 
 	/**
-	 * Return headers to add to the error response, e.g. "Allow", "Accept", etc.
-	 * <p>By default, delegates to {@link #getResponseHeaders()} for backwards
-	 * compatibility.
+	 * Return headers to add to the error response, for example, "Allow", "Accept", etc.
 	 */
 	@Override
 	public HttpHeaders getHeaders() {
-		return getResponseHeaders();
-	}
-
-	/**
-	 * Return headers associated with the exception that should be added to the
-	 * error response, e.g. "Allow", "Accept", etc.
-	 * <p>The default implementation in this class returns empty headers.
-	 * @since 5.1.13
-	 * @deprecated as of 6.0 in favor of {@link #getHeaders()}
-	 */
-	@Deprecated(since = "6.0")
-	public HttpHeaders getResponseHeaders() {
 		return HttpHeaders.EMPTY;
 	}
 
 	@Override
 	public ProblemDetail updateAndGetBody(@Nullable MessageSource messageSource, Locale locale) {
-		super.updateAndGetBody(messageSource, locale);
-
-		// The reason may be a code (consistent with ResponseStatusExceptionResolver)
-
-		if (messageSource != null && getReason() != null && getReason().equals(getBody().getDetail())) {
-			Object[] arguments = getDetailMessageArguments(messageSource, locale);
-			String resolved = messageSource.getMessage(getReason(), arguments, null, locale);
-			if (resolved != null) {
-				getBody().setDetail(resolved);
+		String reason = getReason();
+		if (reason != null) {
+			boolean detailNotCustomized = reason.equals(getBody().getDetail());
+			super.updateAndGetBody(messageSource, locale);
+			if (!detailNotCustomized) {
+				return getBody();
 			}
+			// The reason may itself be a code (consistent with ResponseStatusExceptionResolver)
+			String resolved = null;
+			if (messageSource != null) {
+				resolved = messageSource.getMessage(reason, getDetailMessageArguments(messageSource, locale), null, locale);
+			}
+			// set to the custom reason if no message was resolved
+			getBody().setDetail(Objects.requireNonNullElse(resolved, reason));
+			return getBody();
 		}
-
-		return getBody();
+		return super.updateAndGetBody(messageSource, locale);
 	}
 
 	@Override

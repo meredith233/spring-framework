@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,29 +17,42 @@
 package org.springframework.web.client;
 
 import java.lang.reflect.Field;
+import java.net.URI;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 
+import org.assertj.core.api.InstanceOfAssertFactories;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.client.ClientHttpRequestInitializer;
 import org.springframework.http.client.ClientHttpRequestInterceptor;
 import org.springframework.http.client.JettyClientHttpRequestFactory;
 import org.springframework.http.client.support.BasicAuthenticationInterceptor;
+import org.springframework.http.converter.ByteArrayHttpMessageConverter;
 import org.springframework.http.converter.HttpMessageConverter;
 import org.springframework.http.converter.StringHttpMessageConverter;
-import org.springframework.lang.Nullable;
+import org.springframework.http.converter.json.JacksonJsonHttpMessageConverter;
+import org.springframework.http.converter.multipart.MultipartHttpMessageConverter;
 import org.springframework.web.util.DefaultUriBuilderFactory;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
 import static org.assertj.core.api.Assertions.fail;
 
 
 /**
+ * Tests for {@link DefaultRestClientBuilder}.
  * @author Arjen Poutsma
+ * @author Sebastien Deleuze
+ * @author Nicklas Wiegandt
  */
-public class RestClientBuilderTests {
+class RestClientBuilderTests {
 
-	@SuppressWarnings("unchecked")
+	@SuppressWarnings({"unchecked", "removal"})
 	@Test
 	void createFromRestTemplate() {
 		JettyClientHttpRequestFactory requestFactory = new JettyClientHttpRequestFactory();
@@ -80,6 +93,7 @@ public class RestClientBuilderTests {
 	}
 
 	@Test
+	@SuppressWarnings("removal")
 	void defaultUriBuilderFactory() {
 		RestTemplate restTemplate = new RestTemplate();
 
@@ -90,10 +104,254 @@ public class RestClientBuilderTests {
 		assertThat(fieldValue("uriBuilderFactory", defaultBuilder)).isNull();
 	}
 
-	@Nullable
-	private static Object fieldValue(String name, DefaultRestClientBuilder instance) {
+	@Test
+	void defaultUri() {
+		URI baseUrl = URI.create("https://example.org");
+		RestClient.Builder builder = RestClient.builder();
+		builder.baseUrl(baseUrl);
+
+		assertThat(builder).isInstanceOf(DefaultRestClientBuilder.class);
+		DefaultRestClientBuilder defaultBuilder = (DefaultRestClientBuilder) builder;
+
+		assertThat(fieldValue("baseUrl", defaultBuilder)).isEqualTo(baseUrl.toString());
+	}
+
+	@SuppressWarnings("removal")
+	@Test
+	void messageConvertersList() {
+		StringHttpMessageConverter stringConverter = new StringHttpMessageConverter();
+		RestClient.Builder builder = RestClient.builder();
+		builder.messageConverters(List.of(stringConverter));
+
+		assertThat(builder).isInstanceOf(DefaultRestClientBuilder.class);
+		DefaultRestClientBuilder defaultBuilder = (DefaultRestClientBuilder) builder;
+
+		assertThat(fieldValue("messageConverters", defaultBuilder))
+				.asInstanceOf(InstanceOfAssertFactories.LIST)
+				.containsExactly(stringConverter);
+	}
+
+	@SuppressWarnings("removal")
+	@Test
+	void messageConvertersListEmpty() {
+		RestClient.Builder builder = RestClient.builder();
+		List<HttpMessageConverter<?>> converters = Collections.emptyList();
+		assertThatIllegalArgumentException().isThrownBy(() -> builder.messageConverters(converters));
+	}
+
+	@SuppressWarnings("removal")
+	@Test
+	void messageConvertersListWithNullElement() {
+		RestClient.Builder builder = RestClient.builder();
+		List<HttpMessageConverter<?>> converters = new ArrayList<>();
+		converters.add(null);
+		assertThatIllegalArgumentException().isThrownBy(() -> builder.messageConverters(converters));
+	}
+
+	@Test
+	void configureMessageConverters() {
+		StringHttpMessageConverter stringConverter = new StringHttpMessageConverter();
+		RestClient.Builder builder = RestClient.builder();
+		builder.configureMessageConverters(clientBuilder -> clientBuilder.addCustomConverter(stringConverter));
+		assertThat(builder).isInstanceOf(DefaultRestClientBuilder.class);
+		DefaultRestClient restClient = (DefaultRestClient) builder.build();
+
+		assertThat(fieldValue("messageConverters", restClient))
+				.asInstanceOf(InstanceOfAssertFactories.LIST)
+				.startsWith(stringConverter)
+				.hasAtLeastOneElementOfType(ByteArrayHttpMessageConverter.class)
+				.hasAtLeastOneElementOfType(JacksonJsonHttpMessageConverter.class)
+				.hasAtLeastOneElementOfType(MultipartHttpMessageConverter.class);
+	}
+
+	@Test
+	void configureMessageConvertersWithDisabledDefaults() {
+		StringHttpMessageConverter stringConverter = new StringHttpMessageConverter();
+		RestClient.Builder builder = RestClient.builder();
+		builder.configureMessageConverters(clientBuilder -> clientBuilder.disableDefaults()
+				.addCustomConverter(stringConverter));
+		DefaultRestClient restClient = (DefaultRestClient) builder.build();
+
+		assertThat(fieldValue("messageConverters", restClient))
+				.asInstanceOf(InstanceOfAssertFactories.LIST)
+				.hasExactlyElementsOfTypes(StringHttpMessageConverter.class, MultipartHttpMessageConverter.class);
+	}
+
+	@Test
+	void configureMessageConvertersOverridesDefaultConverter() {
+		JacksonJsonHttpMessageConverter jsonConverter = new JacksonJsonHttpMessageConverter();
+		RestClient.Builder builder = RestClient.builder();
+		builder.configureMessageConverters(clientBuilder -> clientBuilder.withJsonConverter(jsonConverter));
+		DefaultRestClient restClient = (DefaultRestClient) builder.build();
+
+		assertThat(fieldValue("messageConverters", restClient))
+				.asInstanceOf(InstanceOfAssertFactories.LIST)
+				.hasAtLeastOneElementOfType(ByteArrayHttpMessageConverter.class)
+				.filteredOn(JacksonJsonHttpMessageConverter.class::isInstance)
+				.containsExactly(jsonConverter);
+	}
+
+	@Test
+	void configureMessageConvertersAfterMutateCustomizesDefaultConverters() {
+		RestClient restClient = RestClient.builder().build();
+		List<HttpMessageConverter<?>> converters = new ArrayList<>();
+		restClient.mutate()
+				.configureMessageConverters(clientBuilder ->
+						clientBuilder.configureMessageConvertersList(converters::addAll))
+				.build();
+
+		assertThat(converters).isNotEmpty()
+				.hasAtLeastOneElementOfType(JacksonJsonHttpMessageConverter.class);
+	}
+
+	@Test
+	void defaultCookieAddsCookieToDefaultCookiesMap() {
+		RestClient.Builder builder = RestClient.builder();
+
+		builder.defaultCookie("myCookie", "testValue");
+
+		assertThat(fieldValue("defaultCookies", (DefaultRestClientBuilder) builder))
+				.asInstanceOf(InstanceOfAssertFactories.MAP)
+				.containsExactly(Map.entry("myCookie", List.of("testValue")));
+	}
+
+	@Test
+	void defaultCookieWithMultipleValuesAddsCookieToDefaultCookiesMap() {
+		RestClient.Builder builder = RestClient.builder();
+
+		builder.defaultCookie("myCookie", "testValue1", "testValue2");
+
+		assertThat(fieldValue("defaultCookies", (DefaultRestClientBuilder) builder))
+				.asInstanceOf(InstanceOfAssertFactories.MAP)
+				.containsExactly(Map.entry("myCookie", List.of("testValue1", "testValue2")));
+	}
+
+	@Test
+	void defaultCookiesAllowsToAddCookie() {
+		RestClient.Builder builder = RestClient.builder();
+		builder.defaultCookie("firstCookie", "firstValue");
+
+		builder.defaultCookies(cookies -> cookies.add("secondCookie", "secondValue"));
+
+		assertThat(fieldValue("defaultCookies", (DefaultRestClientBuilder) builder))
+				.asInstanceOf(InstanceOfAssertFactories.MAP)
+				.containsExactly(
+						Map.entry("firstCookie", List.of("firstValue")),
+						Map.entry("secondCookie", List.of("secondValue"))
+				);
+	}
+
+	@Test
+	void defaultCookiesAllowsToRemoveCookie() {
+		RestClient.Builder builder = RestClient.builder();
+		builder.defaultCookie("firstCookie", "firstValue");
+		builder.defaultCookie("secondCookie", "secondValue");
+
+		builder.defaultCookies(cookies -> cookies.remove("firstCookie"));
+
+		assertThat(fieldValue("defaultCookies", (DefaultRestClientBuilder) builder))
+				.asInstanceOf(InstanceOfAssertFactories.MAP)
+				.containsExactly(Map.entry("secondCookie", List.of("secondValue")));
+	}
+
+	@Test
+	void copyConstructorCopiesDefaultCookies() {
+		DefaultRestClientBuilder sourceBuilder = new DefaultRestClientBuilder();
+		sourceBuilder.defaultCookie("firstCookie", "firstValue");
+		sourceBuilder.defaultCookie("secondCookie", "secondValue");
+
+		DefaultRestClientBuilder copiedBuilder = new DefaultRestClientBuilder(sourceBuilder);
+
+		assertThat(fieldValue("defaultCookies", copiedBuilder))
+				.asInstanceOf(InstanceOfAssertFactories.MAP)
+				.containsExactly(
+						Map.entry("firstCookie", List.of("firstValue")),
+						Map.entry("secondCookie", List.of("secondValue"))
+				);
+	}
+
+	@Test
+	void copyConstructorCopiesDefaultCookiesImmutable() {
+		DefaultRestClientBuilder sourceBuilder = new DefaultRestClientBuilder();
+		sourceBuilder.defaultCookie("firstCookie", "firstValue");
+		sourceBuilder.defaultCookie("secondCookie", "secondValue");
+		DefaultRestClientBuilder copiedBuilder = new DefaultRestClientBuilder(sourceBuilder);
+
+		sourceBuilder.defaultCookie("thirdCookie", "thirdValue");
+		sourceBuilder.defaultCookie("firstCookie", "fourthValue");
+
+		assertThat(fieldValue("defaultCookies", copiedBuilder))
+				.asInstanceOf(InstanceOfAssertFactories.MAP)
+				.containsExactly(
+						Map.entry("firstCookie", List.of("firstValue")),
+						Map.entry("secondCookie", List.of("secondValue"))
+				);
+	}
+
+	@Test
+	void copyConstructorCopiesDefaultHeadersImmutable() {
+		DefaultRestClientBuilder sourceBuilder = new DefaultRestClientBuilder();
+		sourceBuilder.defaultHeaders(headers -> headers.add("firstHeader", "firstValue"));
+		DefaultRestClientBuilder copiedBuilder = new DefaultRestClientBuilder(sourceBuilder);
+
+		sourceBuilder.defaultHeaders(headers -> headers.add("firstHeader", "secondValue"));
+
+		assertThat(fieldValue("defaultHeaders", copiedBuilder))
+				.asInstanceOf(InstanceOfAssertFactories.type(HttpHeaders.class))
+				.extracting(headers -> headers.get("firstHeader"), InstanceOfAssertFactories.LIST)
+				.containsExactly("firstValue");
+	}
+
+	@Test
+	void buildCopiesDefaultCookies() {
+		RestClient.Builder builder = RestClient.builder();
+		builder.defaultCookie("firstCookie", "firstValue");
+		builder.defaultCookie("secondCookie", "secondValue");
+
+		RestClient restClient = builder.build();
+
+		assertThat(fieldValue("defaultCookies", restClient))
+				.asInstanceOf(InstanceOfAssertFactories.MAP)
+				.containsExactly(
+						Map.entry("firstCookie", List.of("firstValue")),
+						Map.entry("secondCookie", List.of("secondValue"))
+				);
+	}
+
+	@Test
+	void buildCopiesDefaultCookiesImmutable() {
+		RestClient.Builder builder = RestClient.builder();
+		builder.defaultCookie("firstCookie", "firstValue");
+		builder.defaultCookie("secondCookie", "secondValue");
+		RestClient restClient = builder.build();
+
+		builder.defaultCookie("thirdCookie", "thirdValue");
+		builder.defaultCookie("firstCookie", "fourthValue");
+
+		assertThat(fieldValue("defaultCookies", restClient))
+				.asInstanceOf(InstanceOfAssertFactories.MAP)
+				.containsExactly(
+						Map.entry("firstCookie", List.of("firstValue")),
+						Map.entry("secondCookie", List.of("secondValue"))
+				);
+	}
+
+	private static @Nullable Object fieldValue(String name, DefaultRestClientBuilder instance) {
 		try {
 			Field field = DefaultRestClientBuilder.class.getDeclaredField(name);
+			field.setAccessible(true);
+
+			return field.get(instance);
+		}
+		catch (NoSuchFieldException | IllegalAccessException ex) {
+			fail(ex.getMessage(), ex);
+			return null;
+		}
+	}
+
+	private static @Nullable Object fieldValue(String name, RestClient instance) {
+		try {
+			Field field = DefaultRestClient.class.getDeclaredField(name);
 			field.setAccessible(true);
 
 			return field.get(instance);

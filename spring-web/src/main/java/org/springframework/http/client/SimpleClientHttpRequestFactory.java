@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2023 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -24,8 +24,9 @@ import java.net.URL;
 import java.net.URLConnection;
 import java.time.Duration;
 
+import org.jspecify.annotations.Nullable;
+
 import org.springframework.http.HttpMethod;
-import org.springframework.lang.Nullable;
 import org.springframework.util.Assert;
 
 /**
@@ -41,9 +42,12 @@ public class SimpleClientHttpRequestFactory implements ClientHttpRequestFactory 
 
 	private static final int DEFAULT_CHUNK_SIZE = 4096;
 
+	private static final Duration ONE_MILLISECOND = Duration.ofMillis(1);
 
-	@Nullable
-	private Proxy proxy;
+	private static final Duration MAX_TIMEOUT = Duration.ofMillis(Integer.MAX_VALUE);
+
+
+	private @Nullable Proxy proxy;
 
 	private int chunkSize = DEFAULT_CHUNK_SIZE;
 
@@ -60,31 +64,8 @@ public class SimpleClientHttpRequestFactory implements ClientHttpRequestFactory 
 	}
 
 	/**
-	 * Indicate whether this request factory should buffer the
-	 * {@linkplain ClientHttpRequest#getBody() request body} internally.
-	 * <p>Default is {@code true}. When sending large amounts of data via POST or PUT,
-	 * it is recommended to change this property to {@code false}, so as not to run
-	 * out of memory. This will result in a {@link ClientHttpRequest} that either
-	 * streams directly to the underlying {@link HttpURLConnection} (if the
-	 * {@link org.springframework.http.HttpHeaders#getContentLength() Content-Length}
-	 * is known in advance), or that will use "Chunked transfer encoding"
-	 * (if the {@code Content-Length} is not known in advance).
-	 * @see #setChunkSize(int)
-	 * @see HttpURLConnection#setFixedLengthStreamingMode(int)
-	 * @deprecated since 6.1 requests are never buffered, as if this property is {@code false}
-	 */
-	@Deprecated(since = "6.1", forRemoval = true)
-	public void setBufferRequestBody(boolean bufferRequestBody) {
-	}
-
-	/**
 	 * Set the number of bytes to write in each chunk when not buffering request
 	 * bodies locally.
-	 * <p>Note that this parameter is only used when
-	 * {@link #setBufferRequestBody(boolean) bufferRequestBody} is set to {@code false},
-	 * and the {@link org.springframework.http.HttpHeaders#getContentLength() Content-Length}
-	 * is not known in advance.
-	 * @see #setBufferRequestBody(boolean)
 	 */
 	public void setChunkSize(int chunkSize) {
 		this.chunkSize = chunkSize;
@@ -92,60 +73,56 @@ public class SimpleClientHttpRequestFactory implements ClientHttpRequestFactory 
 
 	/**
 	 * Set the underlying URLConnection's connect timeout (in milliseconds).
-	 * A timeout value of 0 specifies an infinite timeout.
+	 * <p>A timeout value of 0 specifies an infinite timeout.
+	 * <p>Negative values are not permitted.
 	 * <p>Default is the system's default timeout.
 	 * @see URLConnection#setConnectTimeout(int)
 	 */
 	public void setConnectTimeout(int connectTimeout) {
+		Assert.isTrue(connectTimeout >= 0, "Timeout must be a non-negative value");
 		this.connectTimeout = connectTimeout;
 	}
 
 	/**
-	 * Set the underlying URLConnection's connect timeout as {@code Duration}.
-	 * A timeout value of 0 specifies an infinite timeout.
+	 * Set the underlying URLConnection's connect timeout as a {@code Duration}.
+	 * <p>A timeout value of 0 specifies an infinite timeout.
+	 * <p>Negative values and values less than one millisecond (other than 0) are
+	 * not permitted, and values exceeding {@link Integer#MAX_VALUE} milliseconds
+	 * are limited to {@code Integer.MAX_VALUE} milliseconds.
 	 * <p>Default is the system's default timeout.
 	 * @since 6.1
 	 * @see URLConnection#setConnectTimeout(int)
 	 */
 	public void setConnectTimeout(Duration connectTimeout) {
 		Assert.notNull(connectTimeout, "ConnectTimeout must not be null");
-		this.connectTimeout = (int) connectTimeout.toMillis();
+		this.connectTimeout = toMillis(connectTimeout);
 	}
 
 	/**
 	 * Set the underlying URLConnection's read timeout (in milliseconds).
-	 * A timeout value of 0 specifies an infinite timeout.
+	 * <p>A timeout value of 0 specifies an infinite timeout.
+	 * <p>Negative values are not permitted.
 	 * <p>Default is the system's default timeout.
 	 * @see URLConnection#setReadTimeout(int)
 	 */
 	public void setReadTimeout(int readTimeout) {
+		Assert.isTrue(readTimeout >= 0, "Timeout must be a non-negative value");
 		this.readTimeout = readTimeout;
 	}
 
 	/**
-	 * Set the underlying URLConnection's read timeout (in milliseconds).
-	 * A timeout value of 0 specifies an infinite timeout.
+	 * Set the underlying URLConnection's read timeout as a {@code Duration}.
+	 * <p>A timeout value of 0 specifies an infinite timeout.
+	 * <p>Negative values and values less than one millisecond (other than 0) are
+	 * not permitted, and values exceeding {@link Integer#MAX_VALUE} milliseconds
+	 * are limited to {@code Integer.MAX_VALUE} milliseconds.
 	 * <p>Default is the system's default timeout.
 	 * @since 6.1
 	 * @see URLConnection#setReadTimeout(int)
 	 */
 	public void setReadTimeout(Duration readTimeout) {
 		Assert.notNull(readTimeout, "ReadTimeout must not be null");
-		this.readTimeout = (int) readTimeout.toMillis();
-	}
-
-	/**
-	 * Set if the underlying URLConnection can be set to 'output streaming' mode.
-	 * Default is {@code true}.
-	 * <p>When output streaming is enabled, authentication and redirection cannot be handled automatically.
-	 * If output streaming is disabled, the {@link HttpURLConnection#setFixedLengthStreamingMode} and
-	 * {@link HttpURLConnection#setChunkedStreamingMode} methods of the underlying connection will never
-	 * be called.
-	 * @param outputStreaming if output streaming is enabled
-	 * @deprecated as of 6.1 requests are always streamed, as if this property is {@code true}
-	 */
-	@Deprecated(since = "6.1", forRemoval = true)
-	public void setOutputStreaming(boolean outputStreaming) {
+		this.readTimeout = toMillis(readTimeout);
 	}
 
 
@@ -198,6 +175,14 @@ public class SimpleClientHttpRequestFactory implements ClientHttpRequestFactory 
 		connection.setInstanceFollowRedirects("GET".equals(httpMethod));
 		connection.setDoOutput(mayWrite);
 		connection.setRequestMethod(httpMethod);
+	}
+
+
+	private static int toMillis(Duration timeout) {
+		Assert.isTrue(!timeout.isNegative(), "Timeout must be a non-negative value");
+		Assert.isTrue(timeout.isZero() || timeout.compareTo(ONE_MILLISECOND) >= 0,
+				"Timeout must be zero or at least one millisecond");
+		return (timeout.compareTo(MAX_TIMEOUT) > 0 ? Integer.MAX_VALUE : (int) timeout.toMillis());
 	}
 
 }

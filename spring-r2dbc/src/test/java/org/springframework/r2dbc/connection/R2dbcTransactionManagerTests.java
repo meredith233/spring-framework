@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,6 +23,7 @@ import io.r2dbc.spi.Connection;
 import io.r2dbc.spi.ConnectionFactory;
 import io.r2dbc.spi.IsolationLevel;
 import io.r2dbc.spi.R2dbcBadGrammarException;
+import io.r2dbc.spi.R2dbcTransientResourceException;
 import io.r2dbc.spi.Statement;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -32,6 +33,7 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.test.StepVerifier;
 
+import org.springframework.dao.TransientDataAccessResourceException;
 import org.springframework.r2dbc.BadSqlGrammarException;
 import org.springframework.transaction.CannotCreateTransactionException;
 import org.springframework.transaction.IllegalTransactionStateException;
@@ -46,13 +48,13 @@ import static org.assertj.core.api.Assertions.fail;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.BDDMockito.inOrder;
-import static org.mockito.BDDMockito.mock;
-import static org.mockito.BDDMockito.never;
-import static org.mockito.BDDMockito.reset;
-import static org.mockito.BDDMockito.verify;
-import static org.mockito.BDDMockito.verifyNoMoreInteractions;
-import static org.mockito.BDDMockito.when;
+import static org.mockito.Mockito.inOrder;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.reset;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
+import static org.mockito.Mockito.when;
 
 /**
  * Tests for {@link R2dbcTransactionManager}.
@@ -80,7 +82,7 @@ class R2dbcTransactionManagerTests {
 
 
 	@Test
-	void testSimpleTransaction() {
+	void simpleTransaction() {
 		when(connectionMock.isAutoCommit()).thenReturn(false);
 		AtomicInteger commits = new AtomicInteger();
 		when(connectionMock.commitTransaction()).thenReturn(
@@ -112,7 +114,7 @@ class R2dbcTransactionManagerTests {
 	}
 
 	@Test
-	void testBeginFails() {
+	void beginFails() {
 		reset(connectionFactoryMock);
 		when(connectionFactoryMock.create()).thenReturn(
 				Mono.error(new R2dbcBadGrammarException("fail")));
@@ -220,7 +222,7 @@ class R2dbcTransactionManagerTests {
 	}
 
 	@Test
-	void testCommitFails() {
+	void commitFails() {
 		when(connectionMock.isAutoCommit()).thenReturn(false);
 		when(connectionMock.commitTransaction()).thenReturn(Mono.defer(() ->
 				Mono.error(new R2dbcBadGrammarException("Commit should fail"))));
@@ -244,7 +246,7 @@ class R2dbcTransactionManagerTests {
 	}
 
 	@Test
-	void testRollback() {
+	void rollback() {
 		when(connectionMock.isAutoCommit()).thenReturn(false);
 		AtomicInteger commits = new AtomicInteger();
 		when(connectionMock.commitTransaction()).thenReturn(
@@ -272,7 +274,7 @@ class R2dbcTransactionManagerTests {
 
 	@Test
 	@SuppressWarnings("unchecked")
-	void testRollbackFails() {
+	void rollbackFails() {
 		when(connectionMock.rollbackTransaction()).thenReturn(Mono.defer(() ->
 				Mono.error(new R2dbcBadGrammarException("Commit should fail"))), Mono.empty());
 
@@ -294,7 +296,7 @@ class R2dbcTransactionManagerTests {
 
 	@Test
 	@SuppressWarnings("unchecked")
-	void testConnectionReleasedWhenRollbackFails() {
+	void connectionReleasedWhenRollbackFails() {
 		when(connectionMock.rollbackTransaction()).thenReturn(Mono.defer(() ->
 				Mono.error(new R2dbcBadGrammarException("Rollback should fail"))), Mono.empty());
 		when(connectionMock.setTransactionIsolationLevel(any())).thenReturn(Mono.empty());
@@ -316,7 +318,32 @@ class R2dbcTransactionManagerTests {
 	}
 
 	@Test
-	void testTransactionSetRollbackOnly() {
+	void commitAndRollbackFails() {
+		when(connectionMock.isAutoCommit()).thenReturn(false);
+		when(connectionMock.commitTransaction()).thenReturn(Mono.defer(() ->
+				Mono.error(new R2dbcBadGrammarException("Commit should fail"))));
+		when(connectionMock.rollbackTransaction()).thenReturn(Mono.defer(() ->
+				Mono.error(new R2dbcTransientResourceException("Rollback should also fail"))));
+
+		TransactionalOperator operator = TransactionalOperator.create(tm);
+
+		ConnectionFactoryUtils.getConnection(connectionFactoryMock)
+				.doOnNext(connection -> connection.createStatement("foo")).then()
+				.as(operator::transactional)
+				.as(StepVerifier::create)
+				.verifyError(TransientDataAccessResourceException.class);
+
+		verify(connectionMock).isAutoCommit();
+		verify(connectionMock).beginTransaction(any(io.r2dbc.spi.TransactionDefinition.class));
+		verify(connectionMock).createStatement("foo");
+		verify(connectionMock).commitTransaction();
+		verify(connectionMock).rollbackTransaction();
+		verify(connectionMock).close();
+		verifyNoMoreInteractions(connectionMock);
+	}
+
+	@Test
+	void transactionSetRollbackOnly() {
 		when(connectionMock.isAutoCommit()).thenReturn(false);
 		when(connectionMock.rollbackTransaction()).thenReturn(Mono.empty());
 		TestTransactionSynchronization sync = new TestTransactionSynchronization(
@@ -353,7 +380,7 @@ class R2dbcTransactionManagerTests {
 	}
 
 	@Test
-	void testPropagationNeverWithExistingTransaction() {
+	void propagationNeverWithExistingTransaction() {
 		when(connectionMock.rollbackTransaction()).thenReturn(Mono.empty());
 
 		DefaultTransactionDefinition definition = new DefaultTransactionDefinition();
@@ -380,7 +407,7 @@ class R2dbcTransactionManagerTests {
 	}
 
 	@Test
-	void testPropagationNestedWithExistingTransaction() {
+	void propagationNestedWithExistingTransaction() {
 		when(connectionMock.createSavepoint(anyString())).thenReturn(Mono.empty());
 		when(connectionMock.rollbackTransactionToSavepoint(anyString())).thenReturn(Mono.empty());
 		when(connectionMock.releaseSavepoint(anyString())).thenReturn(Mono.empty());
@@ -508,7 +535,7 @@ class R2dbcTransactionManagerTests {
 	}
 
 	@Test
-	void testPropagationSupportsAndNested() {
+	void propagationSupportsAndNested() {
 		when(connectionMock.commitTransaction()).thenReturn(Mono.empty());
 
 		DefaultTransactionDefinition definition = new DefaultTransactionDefinition();
@@ -535,7 +562,7 @@ class R2dbcTransactionManagerTests {
 	}
 
 	@Test
-	void testPropagationSupportsAndNestedWithRollback() {
+	void propagationSupportsAndNestedWithRollback() {
 		when(connectionMock.rollbackTransaction()).thenReturn(Mono.empty());
 
 		DefaultTransactionDefinition definition = new DefaultTransactionDefinition();
@@ -565,7 +592,7 @@ class R2dbcTransactionManagerTests {
 	}
 
 	@Test
-	void testPropagationSupportsAndRequiresNew() {
+	void propagationSupportsAndRequiresNew() {
 		when(connectionMock.commitTransaction()).thenReturn(Mono.empty());
 
 		DefaultTransactionDefinition definition = new DefaultTransactionDefinition();
@@ -592,7 +619,7 @@ class R2dbcTransactionManagerTests {
 	}
 
 	@Test
-	void testPropagationSupportsAndRequiresNewWithRollback() {
+	void propagationSupportsAndRequiresNewWithRollback() {
 		when(connectionMock.rollbackTransaction()).thenReturn(Mono.empty());
 
 		DefaultTransactionDefinition definition = new DefaultTransactionDefinition();
@@ -683,8 +710,7 @@ class R2dbcTransactionManagerTests {
 			try {
 				return Mono.fromRunnable(() -> doAfterCompletion(status));
 			}
-			catch (Throwable ex) {
-				// ignore
+			catch (Throwable ignored) {
 			}
 
 			return Mono.empty();

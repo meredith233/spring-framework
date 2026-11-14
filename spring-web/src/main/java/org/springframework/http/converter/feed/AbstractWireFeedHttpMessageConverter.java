@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2023 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -29,6 +29,7 @@ import com.rometools.rome.feed.WireFeed;
 import com.rometools.rome.io.FeedException;
 import com.rometools.rome.io.WireFeedInput;
 import com.rometools.rome.io.WireFeedOutput;
+import org.jspecify.annotations.Nullable;
 
 import org.springframework.http.HttpInputMessage;
 import org.springframework.http.HttpOutputMessage;
@@ -108,7 +109,14 @@ public abstract class AbstractWireFeedHttpMessageConverter<T extends WireFeed>
 	}
 
 	@Override
+	public boolean canWriteRepeatedly(T t, @Nullable MediaType contentType) {
+		return true;
+	}
+
+	@Override
+	@SuppressWarnings("removal")
 	protected boolean supportsRepeatableWrites(T t) {
 		return true;
 	}
+
 }

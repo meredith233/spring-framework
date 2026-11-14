@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -29,19 +29,19 @@ import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException
 class PropertyEntryTests {
 
 	@Test
-	void testCtorBailsOnNullPropertyNameArgument() {
+	void ctorBailsOnNullPropertyNameArgument() {
 		assertThatIllegalArgumentException().isThrownBy(() ->
 				new PropertyEntry(null));
 	}
 
 	@Test
-	void testCtorBailsOnEmptyPropertyNameArgument() {
+	void ctorBailsOnEmptyPropertyNameArgument() {
 		assertThatIllegalArgumentException().isThrownBy(() ->
 				new PropertyEntry(""));
 	}
 
 	@Test
-	void testCtorBailsOnWhitespacedPropertyNameArgument() {
+	void ctorBailsOnWhitespacedPropertyNameArgument() {
 		assertThatIllegalArgumentException().isThrownBy(() ->
 				new PropertyEntry("\t   "));
 	}

@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,6 +20,7 @@ import java.text.ParseException;
 import java.time.Instant;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
+import java.util.Locale;
 import java.util.Random;
 import java.util.stream.Stream;
 
@@ -31,6 +32,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.ArgumentsProvider;
 import org.junit.jupiter.params.provider.ArgumentsSource;
+import org.junit.jupiter.params.support.ParameterDeclarations;
 
 import static java.time.Instant.MAX;
 import static java.time.Instant.MIN;
@@ -50,13 +52,12 @@ class InstantFormatterTests {
 
 	private final InstantFormatter instantFormatter = new InstantFormatter();
 
+
 	@ParameterizedTest
 	@ArgumentsSource(ISOSerializedInstantProvider.class)
 	void should_parse_an_ISO_formatted_string_representation_of_an_Instant(String input) throws ParseException {
 		Instant expected = DateTimeFormatter.ISO_INSTANT.parse(input, Instant::from);
-
-		Instant actual = instantFormatter.parse(input, null);
-
+		Instant actual = instantFormatter.parse(input, Locale.US);
 		assertThat(actual).isEqualTo(expected);
 	}
 
@@ -64,9 +65,7 @@ class InstantFormatterTests {
 	@ArgumentsSource(RFC1123SerializedInstantProvider.class)
 	void should_parse_an_RFC1123_formatted_string_representation_of_an_Instant(String input) throws ParseException {
 		Instant expected = DateTimeFormatter.RFC_1123_DATE_TIME.parse(input, Instant::from);
-
-		Instant actual = instantFormatter.parse(input, null);
-
+		Instant actual = instantFormatter.parse(input, Locale.US);
 		assertThat(actual).isEqualTo(expected);
 	}
 
@@ -74,19 +73,17 @@ class InstantFormatterTests {
 	@ArgumentsSource(RandomInstantProvider.class)
 	void should_serialize_an_Instant_using_ISO_format_and_ignoring_Locale(Instant input) {
 		String expected = DateTimeFormatter.ISO_INSTANT.format(input);
-
-		String actual = instantFormatter.print(input, null);
-
+		String actual = instantFormatter.print(input, Locale.US);
 		assertThat(actual).isEqualTo(expected);
 	}
 
 	@ParameterizedTest
 	@ArgumentsSource(RandomEpochMillisProvider.class)
 	void should_parse_into_an_Instant_from_epoch_milli(Instant input) throws ParseException {
-		Instant actual = instantFormatter.parse(Long.toString(input.toEpochMilli()), null);
-
+		Instant actual = instantFormatter.parse(Long.toString(input.toEpochMilli()), Locale.US);
 		assertThat(actual).isEqualTo(input);
 	}
+
 
 	private static class RandomInstantProvider implements ArgumentsProvider {
 
@@ -95,7 +92,7 @@ class InstantFormatterTests {
 		private static final Random random = new Random();
 
 		@Override
-		public final Stream<Arguments> provideArguments(ExtensionContext context) {
+		public final Stream<Arguments> provideArguments(ParameterDeclarations parameters, ExtensionContext context) {
 			return provideArguments().map(Arguments::of).limit(DATA_SET_SIZE);
 		}
 
@@ -109,6 +106,7 @@ class InstantFormatterTests {
 		}
 	}
 
+
 	private static class ISOSerializedInstantProvider extends RandomInstantProvider {
 
 		@Override
@@ -116,6 +114,7 @@ class InstantFormatterTests {
 			return randomInstantStream(MIN, MAX).map(DateTimeFormatter.ISO_INSTANT::format);
 		}
 	}
+
 
 	private static class RFC1123SerializedInstantProvider extends RandomInstantProvider {
 
@@ -130,6 +129,8 @@ class InstantFormatterTests {
 					.map(DateTimeFormatter.RFC_1123_DATE_TIME.withZone(systemDefault())::format);
 		}
 	}
+
+
 	private static final class RandomEpochMillisProvider implements ArgumentsProvider {
 
 		private static final long DATA_SET_SIZE = 10;
@@ -137,7 +138,7 @@ class InstantFormatterTests {
 		private static final Random random = new Random();
 
 		@Override
-		public Stream<Arguments> provideArguments(ExtensionContext context) {
+		public Stream<Arguments> provideArguments(ParameterDeclarations parameters, ExtensionContext context) {
 			return random.longs(DATA_SET_SIZE, Long.MIN_VALUE, Long.MAX_VALUE)
 					.mapToObj(Instant::ofEpochMilli)
 					.map(instant -> instant.truncatedTo(ChronoUnit.MILLIS))

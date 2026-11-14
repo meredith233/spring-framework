@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2018 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,12 +16,13 @@
 
 package org.springframework.messaging.simp;
 
+import org.jspecify.annotations.Nullable;
+
 import org.springframework.core.NamedThreadLocal;
-import org.springframework.lang.Nullable;
 import org.springframework.messaging.Message;
 
 /**
- * Holder class to expose SiMP attributes associated with a session (e.g. WebSocket)
+ * Holder class to expose SiMP attributes associated with a session (for example, WebSocket)
  * in the form of a thread-bound {@link SimpAttributes} object.
  *
  * @author Rossen Stoyanchev
@@ -66,8 +67,7 @@ public abstract class SimpAttributesContextHolder {
 	 * Return the SimpAttributes currently bound to the thread.
 	 * @return the attributes or {@code null} if not bound
 	 */
-	@Nullable
-	public static SimpAttributes getAttributes() {
+	public static @Nullable SimpAttributes getAttributes() {
 		return attributesHolder.get();
 	}
 

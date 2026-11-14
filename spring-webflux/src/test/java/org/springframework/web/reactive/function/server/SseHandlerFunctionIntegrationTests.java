@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,6 +19,7 @@ package org.springframework.web.reactive.function.server;
 import java.time.Duration;
 import java.util.Objects;
 
+import org.jspecify.annotations.Nullable;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.test.StepVerifier;
@@ -26,7 +27,6 @@ import reactor.test.StepVerifier;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.MediaType;
 import org.springframework.http.codec.ServerSentEvent;
-import org.springframework.lang.Nullable;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.testfixture.http.server.reactive.bootstrap.HttpServer;
 
@@ -125,7 +125,7 @@ class SseHandlerFunctionIntegrationTests extends AbstractRouterFunctionIntegrati
 
 	private static class SseHandler {
 
-		private static final Flux<Long> INTERVAL = testInterval(Duration.ofMillis(100), 2);
+		private static final Flux<Long> INTERVAL = testInterval(Duration.ofMillis(1), 2);
 
 		Mono<ServerResponse> string(ServerRequest request) {
 			return ServerResponse.ok()

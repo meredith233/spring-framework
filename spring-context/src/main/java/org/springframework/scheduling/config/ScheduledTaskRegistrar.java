@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2023 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,6 +18,7 @@ package org.springframework.scheduling.config;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -29,10 +30,10 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 
 import io.micrometer.observation.ObservationRegistry;
+import org.jspecify.annotations.Nullable;
 
 import org.springframework.beans.factory.DisposableBean;
 import org.springframework.beans.factory.InitializingBean;
-import org.springframework.lang.Nullable;
 import org.springframework.scheduling.TaskScheduler;
 import org.springframework.scheduling.Trigger;
 import org.springframework.scheduling.concurrent.ConcurrentTaskScheduler;
@@ -56,6 +57,7 @@ import org.springframework.util.CollectionUtils;
  * @author Sam Brannen
  * @author Arjen Poutsma
  * @author Brian Clozel
+ * @author Vedran Pavic
  * @since 3.0
  * @see org.springframework.scheduling.annotation.EnableAsync
  * @see org.springframework.scheduling.annotation.SchedulingConfigurer
@@ -74,29 +76,21 @@ public class ScheduledTaskRegistrar implements ScheduledTaskHolder, Initializing
 	public static final String CRON_DISABLED = "-";
 
 
-	@Nullable
-	private TaskScheduler taskScheduler;
+	private @Nullable TaskScheduler taskScheduler;
 
-	@Nullable
-	private ScheduledExecutorService localExecutor;
+	private @Nullable ScheduledExecutorService localExecutor;
 
-	@Nullable
-	private ObservationRegistry observationRegistry;
+	private @Nullable ObservationRegistry observationRegistry;
 
-	@Nullable
-	private List<TriggerTask> triggerTasks;
+	private @Nullable List<TriggerTask> triggerTasks;
 
-	@Nullable
-	private List<CronTask> cronTasks;
+	private @Nullable List<CronTask> cronTasks;
 
-	@Nullable
-	private List<IntervalTask> fixedRateTasks;
+	private @Nullable List<IntervalTask> fixedRateTasks;
 
-	@Nullable
-	private List<IntervalTask> fixedDelayTasks;
+	private @Nullable List<IntervalTask> fixedDelayTasks;
 
-	@Nullable
-	private List<DelayedTask> oneTimeTasks;
+	private @Nullable List<DelayedTask> oneTimeTasks;
 
 	private final Map<Task, ScheduledTask> unresolvedTasks = new HashMap<>(16);
 
@@ -134,8 +128,7 @@ public class ScheduledTaskRegistrar implements ScheduledTaskHolder, Initializing
 	/**
 	 * Return the {@link TaskScheduler} instance for this registrar (may be {@code null}).
 	 */
-	@Nullable
-	public TaskScheduler getScheduler() {
+	public @Nullable TaskScheduler getScheduler() {
 		return this.taskScheduler;
 	}
 
@@ -151,8 +144,7 @@ public class ScheduledTaskRegistrar implements ScheduledTaskHolder, Initializing
 	 * Return the {@link ObservationRegistry} for this registrar.
 	 * @since 6.1
 	 */
-	@Nullable
-	public ObservationRegistry getObservationRegistry() {
+	public @Nullable ObservationRegistry getObservationRegistry() {
 		return this.observationRegistry;
 	}
 
@@ -294,13 +286,29 @@ public class ScheduledTaskRegistrar implements ScheduledTaskHolder, Initializing
 	}
 
 	/**
-	 * Add a {@link Runnable} task to be triggered per the given cron {@code expression}.
-	 * <p>As of Spring Framework 5.2, this method will not register the task if the
-	 * {@code expression} is equal to {@link #CRON_DISABLED}.
+	 * Add a {@link Runnable} task to be triggered per the given cron {@code expression}
+	 * in the default time zone.
+	 * <p>This method will not register the task if the {@code expression} is
+	 * equal to {@link #CRON_DISABLED}.
+	 * @see CronTask
 	 */
 	public void addCronTask(Runnable task, String expression) {
 		if (!CRON_DISABLED.equals(expression)) {
 			addCronTask(new CronTask(task, expression));
+		}
+	}
+
+	/**
+	 * Add a {@link Runnable} task to be triggered per the given cron {@code expression}
+	 * and time zone.
+	 * <p>This method will not register the task if the {@code expression} is
+	 * equal to {@link #CRON_DISABLED}.
+	 * @since 7.1
+	 * @see CronTask
+	 */
+	public void addCronTask(Runnable task, String expression, ZoneId zoneId) {
+		if (!CRON_DISABLED.equals(expression)) {
+			addCronTask(new CronTask(task, new CronTrigger(expression, zoneId)));
 		}
 	}
 
@@ -485,8 +493,7 @@ public class ScheduledTaskRegistrar implements ScheduledTaskHolder, Initializing
 	 * @return a handle to the scheduled task, allowing to cancel it
 	 * @since 4.3
 	 */
-	@Nullable
-	public ScheduledTask scheduleTriggerTask(TriggerTask task) {
+	public @Nullable ScheduledTask scheduleTriggerTask(TriggerTask task) {
 		ScheduledTask scheduledTask = this.unresolvedTasks.remove(task);
 		boolean newTask = false;
 		if (scheduledTask == null) {
@@ -510,8 +517,7 @@ public class ScheduledTaskRegistrar implements ScheduledTaskHolder, Initializing
 	 * (or {@code null} if processing a previously registered task)
 	 * @since 4.3
 	 */
-	@Nullable
-	public ScheduledTask scheduleCronTask(CronTask task) {
+	public @Nullable ScheduledTask scheduleCronTask(CronTask task) {
 		ScheduledTask scheduledTask = this.unresolvedTasks.remove(task);
 		boolean newTask = false;
 		if (scheduledTask == null) {
@@ -535,8 +541,7 @@ public class ScheduledTaskRegistrar implements ScheduledTaskHolder, Initializing
 	 * (or {@code null} if processing a previously registered task)
 	 * @since 5.0.2
 	 */
-	@Nullable
-	public ScheduledTask scheduleFixedRateTask(FixedRateTask task) {
+	public @Nullable ScheduledTask scheduleFixedRateTask(FixedRateTask task) {
 		ScheduledTask scheduledTask = this.unresolvedTasks.remove(task);
 		boolean newTask = false;
 		if (scheduledTask == null) {
@@ -569,8 +574,7 @@ public class ScheduledTaskRegistrar implements ScheduledTaskHolder, Initializing
 	 * (or {@code null} if processing a previously registered task)
 	 * @since 5.0.2
 	 */
-	@Nullable
-	public ScheduledTask scheduleFixedDelayTask(FixedDelayTask task) {
+	public @Nullable ScheduledTask scheduleFixedDelayTask(FixedDelayTask task) {
 		ScheduledTask scheduledTask = this.unresolvedTasks.remove(task);
 		boolean newTask = false;
 		if (scheduledTask == null) {
@@ -603,8 +607,7 @@ public class ScheduledTaskRegistrar implements ScheduledTaskHolder, Initializing
 	 * (or {@code null} if processing a previously registered task)
 	 * @since 6.1
 	 */
-	@Nullable
-	public ScheduledTask scheduleOneTimeTask(OneTimeTask task) {
+	public @Nullable ScheduledTask scheduleOneTimeTask(OneTimeTask task) {
 		ScheduledTask scheduledTask = this.unresolvedTasks.remove(task);
 		boolean newTask = false;
 		if (scheduledTask == null) {

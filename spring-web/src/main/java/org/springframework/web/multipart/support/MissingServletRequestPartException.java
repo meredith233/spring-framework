@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2022 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -28,7 +28,7 @@ import org.springframework.web.multipart.MultipartResolver;
  * Signals the part of a "multipart/form-data" request, identified by name
  * could not be found. This may be because the request is not a multipart
  * request, or a part with that name is not present, or because the application
- * is not configured correctly for processing multipart requests, e.g. there
+ * is not configured correctly for processing multipart requests, for example, there
  * is no {@link MultipartResolver}.
  *
  * <p><strong>Note:</strong> This exception does not extend from
@@ -75,7 +75,7 @@ public class MissingServletRequestPartException extends ServletException impleme
 	}
 
 	/**
-	 * Return the body for the response, formatted as an RFC 7807
+	 * Return the body for the response, formatted as an RFC 9457
 	 * {@link ProblemDetail} whose {@link ProblemDetail#getStatus() status}
 	 * should match the response status.
 	 */

@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,7 +20,10 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Executable;
+import java.lang.reflect.Method;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -36,20 +39,31 @@ import javax.lang.model.element.Modifier;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.jspecify.annotations.Nullable;
 
 import org.springframework.aop.framework.autoproxy.AutoProxyUtils;
+import org.springframework.aot.generate.AccessControl;
+import org.springframework.aot.generate.GeneratedClass;
 import org.springframework.aot.generate.GeneratedMethod;
+import org.springframework.aot.generate.GeneratedMethods;
 import org.springframework.aot.generate.GenerationContext;
+import org.springframework.aot.generate.MethodReference;
+import org.springframework.aot.generate.MethodReference.ArgumentCodeGenerator;
 import org.springframework.aot.hint.ExecutableMode;
 import org.springframework.aot.hint.MemberCategory;
+import org.springframework.aot.hint.ReflectionHints;
 import org.springframework.aot.hint.ResourceHints;
 import org.springframework.aot.hint.RuntimeHints;
 import org.springframework.aot.hint.TypeReference;
+import org.springframework.beans.BeanUtils;
 import org.springframework.beans.PropertyValues;
 import org.springframework.beans.factory.BeanClassLoaderAware;
 import org.springframework.beans.factory.BeanDefinitionStoreException;
 import org.springframework.beans.factory.BeanFactory;
+import org.springframework.beans.factory.BeanRegistrar;
+import org.springframework.beans.factory.ListableBeanFactory;
 import org.springframework.beans.factory.annotation.AnnotatedBeanDefinition;
+import org.springframework.beans.factory.aot.AotServices;
 import org.springframework.beans.factory.aot.BeanFactoryInitializationAotContribution;
 import org.springframework.beans.factory.aot.BeanFactoryInitializationAotProcessor;
 import org.springframework.beans.factory.aot.BeanFactoryInitializationCode;
@@ -60,6 +74,7 @@ import org.springframework.beans.factory.aot.BeanRegistrationCodeFragments;
 import org.springframework.beans.factory.aot.BeanRegistrationCodeFragmentsDecorator;
 import org.springframework.beans.factory.aot.InstanceSupplierCodeGenerator;
 import org.springframework.beans.factory.config.BeanDefinition;
+import org.springframework.beans.factory.config.BeanDefinitionCustomizer;
 import org.springframework.beans.factory.config.BeanDefinitionHolder;
 import org.springframework.beans.factory.config.BeanFactoryPostProcessor;
 import org.springframework.beans.factory.config.ConfigurableListableBeanFactory;
@@ -73,8 +88,10 @@ import org.springframework.beans.factory.support.AbstractBeanDefinition;
 import org.springframework.beans.factory.support.BeanDefinitionRegistry;
 import org.springframework.beans.factory.support.BeanDefinitionRegistryPostProcessor;
 import org.springframework.beans.factory.support.BeanNameGenerator;
+import org.springframework.beans.factory.support.BeanRegistryAdapter;
 import org.springframework.beans.factory.support.DefaultListableBeanFactory;
 import org.springframework.beans.factory.support.RegisteredBean;
+import org.springframework.beans.factory.support.RegisteredBean.InstantiationDescriptor;
 import org.springframework.beans.factory.support.RootBeanDefinition;
 import org.springframework.context.ApplicationStartupAware;
 import org.springframework.context.EnvironmentAware;
@@ -98,14 +115,20 @@ import org.springframework.core.type.AnnotationMetadata;
 import org.springframework.core.type.MethodMetadata;
 import org.springframework.core.type.classreading.CachingMetadataReaderFactory;
 import org.springframework.core.type.classreading.MetadataReaderFactory;
+import org.springframework.javapoet.ClassName;
 import org.springframework.javapoet.CodeBlock;
 import org.springframework.javapoet.CodeBlock.Builder;
 import org.springframework.javapoet.MethodSpec;
+import org.springframework.javapoet.NameAllocator;
 import org.springframework.javapoet.ParameterizedTypeName;
-import org.springframework.lang.Nullable;
 import org.springframework.util.Assert;
 import org.springframework.util.ClassUtils;
 import org.springframework.util.CollectionUtils;
+import org.springframework.util.LinkedMultiValueMap;
+import org.springframework.util.MultiValueMap;
+import org.springframework.util.ObjectUtils;
+import org.springframework.util.ReflectionUtils;
+import org.springframework.util.StringUtils;
 
 /**
  * {@link BeanFactoryPostProcessor} used for bootstrapping processing of
@@ -152,13 +175,11 @@ public class ConfigurationClassPostProcessor implements BeanDefinitionRegistryPo
 
 	private ProblemReporter problemReporter = new FailFastProblemReporter();
 
-	@Nullable
-	private Environment environment;
+	private @Nullable Environment environment;
 
 	private ResourceLoader resourceLoader = new DefaultResourceLoader();
 
-	@Nullable
-	private ClassLoader beanClassLoader = ClassUtils.getDefaultClassLoader();
+	private @Nullable ClassLoader beanClassLoader = ClassUtils.getDefaultClassLoader();
 
 	private MetadataReaderFactory metadataReaderFactory = new CachingMetadataReaderFactory();
 
@@ -168,8 +189,7 @@ public class ConfigurationClassPostProcessor implements BeanDefinitionRegistryPo
 
 	private final Set<Integer> factoriesPostProcessed = new HashSet<>();
 
-	@Nullable
-	private ConfigurationClassBeanDefinitionReader reader;
+	private @Nullable ConfigurationClassBeanDefinitionReader reader;
 
 	private boolean localBeanNameGeneratorSet = false;
 
@@ -181,8 +201,9 @@ public class ConfigurationClassPostProcessor implements BeanDefinitionRegistryPo
 
 	private ApplicationStartup applicationStartup = ApplicationStartup.DEFAULT;
 
-	@Nullable
-	private List<PropertySourceDescriptor> propertySourceDescriptors;
+	private List<PropertySourceDescriptor> propertySourceDescriptors = Collections.emptyList();
+
+	private final MultiValueMap<String, BeanRegistrar> beanRegistrars = new LinkedMultiValueMap<>();
 
 
 	@Override
@@ -201,7 +222,7 @@ public class ConfigurationClassPostProcessor implements BeanDefinitionRegistryPo
 	/**
 	 * Set the {@link ProblemReporter} to use.
 	 * <p>Used to register any problems detected with {@link Configuration} or {@link Bean}
-	 * declarations. For instance, an @Bean method marked as {@code final} is illegal
+	 * declarations. For instance, a @Bean method marked as {@code final} is illegal
 	 * and would be reported as a problem. Defaults to {@link FailFastProblemReporter}.
 	 */
 	public void setProblemReporter(@Nullable ProblemReporter problemReporter) {
@@ -221,19 +242,25 @@ public class ConfigurationClassPostProcessor implements BeanDefinitionRegistryPo
 
 	/**
 	 * Set the {@link BeanNameGenerator} to be used when triggering component scanning
-	 * from {@link Configuration} classes and when registering {@link Import}'ed
-	 * configuration classes. The default is a standard {@link AnnotationBeanNameGenerator}
-	 * for scanned components (compatible with the default in {@link ClassPathBeanDefinitionScanner})
+	 * from {@link Configuration @Configuration} classes and when registering
+	 * {@link Import @Import}'ed configuration classes.
+	 * <p>The default is a standard {@link AnnotationBeanNameGenerator} for scanned
+	 * components (compatible with the default in {@link ClassPathBeanDefinitionScanner})
 	 * and a variant thereof for imported configuration classes (using unique fully-qualified
 	 * class names instead of standard component overriding).
-	 * <p>Note that this strategy does <em>not</em> apply to {@link Bean} methods.
+	 * <p>If the supplied bean name generator is a {@link ConfigurationBeanNameGenerator}
+	 * (such as {@link FullyQualifiedConfigurationBeanNameGenerator}), it also affects the
+	 * default names for {@link Bean @Bean} methods in configuration classes.
 	 * <p>This setter is typically only appropriate when configuring the post-processor as a
-	 * standalone bean definition in XML, e.g. not using the dedicated {@code AnnotationConfig*}
+	 * standalone bean definition in XML, for example, not using the dedicated {@code AnnotationConfig*}
 	 * application contexts or the {@code <context:annotation-config>} element. Any bean name
 	 * generator specified against the application context will take precedence over any set here.
 	 * @since 3.1.1
 	 * @see AnnotationConfigApplicationContext#setBeanNameGenerator(BeanNameGenerator)
 	 * @see AnnotationConfigUtils#CONFIGURATION_BEAN_NAME_GENERATOR
+	 * @see AnnotationBeanNameGenerator
+	 * @see FullyQualifiedAnnotationBeanNameGenerator
+	 * @see FullyQualifiedConfigurationBeanNameGenerator
 	 */
 	public void setBeanNameGenerator(BeanNameGenerator beanNameGenerator) {
 		Assert.notNull(beanNameGenerator, "BeanNameGenerator must not be null");
@@ -311,9 +338,8 @@ public class ConfigurationClassPostProcessor implements BeanDefinitionRegistryPo
 		beanFactory.addBeanPostProcessor(new ImportAwareBeanPostProcessor(beanFactory));
 	}
 
-	@Nullable
 	@Override
-	public BeanRegistrationAotContribution processAheadOfTime(RegisteredBean registeredBean) {
+	public @Nullable BeanRegistrationAotContribution processAheadOfTime(RegisteredBean registeredBean) {
 		Object configClassAttr = registeredBean.getMergedBeanDefinition()
 				.getAttribute(ConfigurationClassUtils.CONFIGURATION_CLASS_ATTRIBUTE);
 		if (ConfigurationClassUtils.CONFIGURATION_CLASS_FULL.equals(configClassAttr)) {
@@ -324,12 +350,11 @@ public class ConfigurationClassPostProcessor implements BeanDefinitionRegistryPo
 	}
 
 	@Override
-	@Nullable
-	@SuppressWarnings("NullAway")
-	public BeanFactoryInitializationAotContribution processAheadOfTime(ConfigurableListableBeanFactory beanFactory) {
+	public @Nullable BeanFactoryInitializationAotContribution processAheadOfTime(ConfigurableListableBeanFactory beanFactory) {
 		boolean hasPropertySourceDescriptors = !CollectionUtils.isEmpty(this.propertySourceDescriptors);
 		boolean hasImportRegistry = beanFactory.containsBean(IMPORT_REGISTRY_BEAN_NAME);
-		if (hasPropertySourceDescriptors || hasImportRegistry) {
+		boolean hasBeanRegistrars = !this.beanRegistrars.isEmpty();
+		if (hasPropertySourceDescriptors || hasImportRegistry || hasBeanRegistrars) {
 			return (generationContext, code) -> {
 				if (hasPropertySourceDescriptors) {
 					new PropertySourcesAotContribution(this.propertySourceDescriptors, this::resolvePropertySourceLocation)
@@ -338,13 +363,15 @@ public class ConfigurationClassPostProcessor implements BeanDefinitionRegistryPo
 				if (hasImportRegistry) {
 					new ImportAwareAotContribution(beanFactory).applyTo(generationContext, code);
 				}
+				if (hasBeanRegistrars) {
+					new BeanRegistrarAotContribution(this.beanRegistrars, beanFactory).applyTo(generationContext, code);
+				}
 			};
 		}
 		return null;
 	}
 
-	@Nullable
-	private Resource resolvePropertySourceLocation(String location) {
+	private @Nullable Resource resolvePropertySourceLocation(String location) {
 		try {
 			String resolvedLocation = (this.environment != null ?
 					this.environment.resolveRequiredPlaceholders(location) : location);
@@ -388,15 +415,23 @@ public class ConfigurationClassPostProcessor implements BeanDefinitionRegistryPo
 		});
 
 		// Detect any custom bean name generation strategy supplied through the enclosing application context
-		SingletonBeanRegistry sbr = null;
-		if (registry instanceof SingletonBeanRegistry _sbr) {
-			sbr = _sbr;
-			if (!this.localBeanNameGeneratorSet) {
-				BeanNameGenerator generator = (BeanNameGenerator) sbr.getSingleton(
-						AnnotationConfigUtils.CONFIGURATION_BEAN_NAME_GENERATOR);
-				if (generator != null) {
-					this.componentScanBeanNameGenerator = generator;
-					this.importBeanNameGenerator = generator;
+		SingletonBeanRegistry singletonRegistry = null;
+		if (registry instanceof SingletonBeanRegistry sbr) {
+			singletonRegistry = sbr;
+			BeanNameGenerator configurationGenerator = (BeanNameGenerator) singletonRegistry.getSingleton(
+					AnnotationConfigUtils.CONFIGURATION_BEAN_NAME_GENERATOR);
+			if (configurationGenerator != null) {
+				if (this.localBeanNameGeneratorSet) {
+					if (configurationGenerator instanceof ConfigurationBeanNameGenerator &
+							configurationGenerator != this.importBeanNameGenerator) {
+						throw new IllegalStateException("Context-level ConfigurationBeanNameGenerator [" +
+								configurationGenerator + "] must not be overridden with processor-level generator [" +
+								this.importBeanNameGenerator + "]");
+					}
+				}
+				else {
+					this.componentScanBeanNameGenerator = configurationGenerator;
+					this.importBeanNameGenerator = configurationGenerator;
 				}
 			}
 		}
@@ -427,6 +462,9 @@ public class ConfigurationClassPostProcessor implements BeanDefinitionRegistryPo
 						this.importBeanNameGenerator, parser.getImportRegistry());
 			}
 			this.reader.loadBeanDefinitions(configClasses);
+			for (ConfigurationClass configClass : configClasses) {
+				this.beanRegistrars.addAll(configClass.getBeanRegistrars());
+			}
 			alreadyParsed.addAll(configClasses);
 			processConfig.tag("classCount", () -> String.valueOf(configClasses.size())).end();
 
@@ -453,8 +491,8 @@ public class ConfigurationClassPostProcessor implements BeanDefinitionRegistryPo
 		while (!candidates.isEmpty());
 
 		// Register the ImportRegistry as a bean in order to support ImportAware @Configuration classes
-		if (sbr != null && !sbr.containsSingleton(IMPORT_REGISTRY_BEAN_NAME)) {
-			sbr.registerSingleton(IMPORT_REGISTRY_BEAN_NAME, parser.getImportRegistry());
+		if (singletonRegistry != null && !singletonRegistry.containsSingleton(IMPORT_REGISTRY_BEAN_NAME)) {
+			singletonRegistry.registerSingleton(IMPORT_REGISTRY_BEAN_NAME, parser.getImportRegistry());
 		}
 
 		// Store the PropertySourceDescriptors to contribute them Ahead-of-time if necessary
@@ -557,8 +595,7 @@ public class ConfigurationClassPostProcessor implements BeanDefinitionRegistryPo
 		}
 
 		@Override
-		@Nullable
-		public PropertyValues postProcessProperties(@Nullable PropertyValues pvs, Object bean, String beanName) {
+		public @Nullable PropertyValues postProcessProperties(@Nullable PropertyValues pvs, Object bean, String beanName) {
 			// Inject the BeanFactory before AutowiredAnnotationBeanPostProcessor's
 			// postProcessProperties method attempts to autowire other configuration beans.
 			if (bean instanceof EnhancedConfiguration enhancedConfiguration) {
@@ -666,9 +703,9 @@ public class ConfigurationClassPostProcessor implements BeanDefinitionRegistryPo
 
 		private final List<PropertySourceDescriptor> descriptors;
 
-		private final Function<String, Resource> resourceResolver;
+		private final Function<String, @Nullable Resource> resourceResolver;
 
-		PropertySourcesAotContribution(List<PropertySourceDescriptor> descriptors, Function<String, Resource> resourceResolver) {
+		PropertySourcesAotContribution(List<PropertySourceDescriptor> descriptors, Function<String, @Nullable Resource> resourceResolver) {
 			this.descriptors = descriptors;
 			this.resourceResolver = resourceResolver;
 		}
@@ -760,12 +797,7 @@ public class ConfigurationClassPostProcessor implements BeanDefinitionRegistryPo
 		}
 
 		private CodeBlock handleNull(@Nullable Object value, Supplier<CodeBlock> nonNull) {
-			if (value == null) {
-				return CodeBlock.of("null");
-			}
-			else {
-				return nonNull.get();
-			}
+			return (value == null ? CodeBlock.of("null") : nonNull.get());
 		}
 	}
 
@@ -785,8 +817,9 @@ public class ConfigurationClassPostProcessor implements BeanDefinitionRegistryPo
 		}
 
 		@Override
-		public CodeBlock generateSetBeanDefinitionPropertiesCode(GenerationContext generationContext,
-				BeanRegistrationCode beanRegistrationCode, RootBeanDefinition beanDefinition, Predicate<String> attributeFilter) {
+		public CodeBlock generateSetBeanDefinitionPropertiesCode(
+				GenerationContext generationContext, BeanRegistrationCode beanRegistrationCode,
+				RootBeanDefinition beanDefinition, Predicate<String> attributeFilter) {
 
 			CodeBlock.Builder code = CodeBlock.builder();
 			code.add(super.generateSetBeanDefinitionPropertiesCode(generationContext,
@@ -797,27 +830,271 @@ public class ConfigurationClassPostProcessor implements BeanDefinitionRegistryPo
 		}
 
 		@Override
-		public CodeBlock generateInstanceSupplierCode(GenerationContext generationContext,
-				BeanRegistrationCode beanRegistrationCode, boolean allowDirectSupplierShortcut) {
+		public CodeBlock generateInstanceSupplierCode(
+				GenerationContext generationContext, BeanRegistrationCode beanRegistrationCode,
+				boolean allowDirectSupplierShortcut) {
 
-			Executable executableToUse = proxyExecutable(generationContext.getRuntimeHints(),
-					this.registeredBean.resolveConstructorOrFactoryMethod());
+			InstantiationDescriptor instantiationDescriptor = proxyInstantiationDescriptor(
+					generationContext.getRuntimeHints(), this.registeredBean.resolveInstantiationDescriptor());
+
 			return new InstanceSupplierCodeGenerator(generationContext,
 					beanRegistrationCode.getClassName(), beanRegistrationCode.getMethods(), allowDirectSupplierShortcut)
-					.generateCode(this.registeredBean, executableToUse);
+					.generateCode(this.registeredBean, instantiationDescriptor);
 		}
 
-		private Executable proxyExecutable(RuntimeHints runtimeHints, Executable userExecutable) {
+		private InstantiationDescriptor proxyInstantiationDescriptor(
+				RuntimeHints runtimeHints, InstantiationDescriptor instantiationDescriptor) {
+
+			Executable userExecutable = instantiationDescriptor.executable();
 			if (userExecutable instanceof Constructor<?> userConstructor) {
 				try {
-					runtimeHints.reflection().registerConstructor(userConstructor, ExecutableMode.INTROSPECT);
-					return this.proxyClass.getConstructor(userExecutable.getParameterTypes());
+					runtimeHints.reflection().registerType(userConstructor.getDeclaringClass());
+					Constructor<?> constructor = this.proxyClass.getConstructor(userExecutable.getParameterTypes());
+					return new InstantiationDescriptor(constructor);
 				}
 				catch (NoSuchMethodException ex) {
 					throw new IllegalStateException("No matching constructor found on proxy " + this.proxyClass, ex);
 				}
 			}
-			return userExecutable;
+			return instantiationDescriptor;
+		}
+	}
+
+
+	private static class BeanRegistrarAotContribution implements BeanFactoryInitializationAotContribution {
+
+		private static final String CUSTOMIZER_MAP_VARIABLE = "customizers";
+
+		private static final String ENVIRONMENT_VARIABLE = "environment";
+
+		private final MultiValueMap<String, BeanRegistrar> beanRegistrars;
+
+		private final ConfigurableListableBeanFactory beanFactory;
+
+		private final AotServices<BeanRegistrationAotProcessor> aotProcessors;
+
+		public BeanRegistrarAotContribution(MultiValueMap<String, BeanRegistrar> beanRegistrars, ConfigurableListableBeanFactory beanFactory) {
+			this.beanRegistrars = beanRegistrars;
+			this.beanFactory = beanFactory;
+			this.aotProcessors = AotServices.factoriesAndBeans(this.beanFactory).load(BeanRegistrationAotProcessor.class);
+		}
+
+		@Override
+		public void applyTo(GenerationContext generationContext, BeanFactoryInitializationCode beanFactoryInitializationCode) {
+			GeneratedMethod generatedMethod = beanFactoryInitializationCode.getMethods().add(
+					"applyBeanRegistrars", builder -> this.generateApplyBeanRegistrarsMethod(builder,
+							generationContext, beanFactoryInitializationCode.getClassName()));
+			beanFactoryInitializationCode.addInitializer(generatedMethod.toMethodReference());
+		}
+
+		private void generateApplyBeanRegistrarsMethod(MethodSpec.Builder method, GenerationContext generationContext,
+				ClassName className) {
+
+			ReflectionHints reflectionHints = generationContext.getRuntimeHints().reflection();
+			method.addJavadoc("Apply bean registrars.");
+			method.addModifiers(Modifier.PRIVATE);
+			method.addParameter(ListableBeanFactory.class, BeanFactoryInitializationCode.BEAN_FACTORY_VARIABLE);
+			method.addParameter(Environment.class, ENVIRONMENT_VARIABLE);
+			method.addCode(generateCustomizerMap());
+
+			for (String name : this.beanFactory.getBeanDefinitionNames()) {
+				BeanDefinition beanDefinition = this.beanFactory.getMergedBeanDefinition(name);
+				if (beanDefinition.getSource() instanceof Class<?> sourceClass &&
+						BeanRegistrar.class.isAssignableFrom(sourceClass)) {
+
+					for (BeanRegistrationAotProcessor aotProcessor : this.aotProcessors) {
+						BeanRegistrationAotContribution contribution =
+								aotProcessor.processAheadOfTime(RegisteredBean.of(this.beanFactory, name));
+						if (contribution != null) {
+							contribution.applyTo(generationContext,
+									new UnsupportedBeanRegistrationCode(name, aotProcessor.getClass()));
+						}
+					}
+					if (beanDefinition instanceof RootBeanDefinition rootBeanDefinition) {
+						if (rootBeanDefinition.getPreferredConstructors() != null) {
+							for (Constructor<?> constructor : rootBeanDefinition.getPreferredConstructors()) {
+								reflectionHints.registerConstructor(constructor, ExecutableMode.INVOKE);
+							}
+						}
+						if (!ObjectUtils.isEmpty(rootBeanDefinition.getInitMethodNames())) {
+							method.addCode(generateInitDestroyMethods(name, rootBeanDefinition,
+									rootBeanDefinition.getInitMethodNames(), "setInitMethodNames", reflectionHints));
+						}
+						if (!ObjectUtils.isEmpty(rootBeanDefinition.getDestroyMethodNames())) {
+							method.addCode(generateInitDestroyMethods(name, rootBeanDefinition,
+									rootBeanDefinition.getDestroyMethodNames(), "setDestroyMethodNames", reflectionHints));
+						}
+						checkUnsupportedFeatures(rootBeanDefinition);
+					}
+				}
+			}
+			method.addCode(generateRegisterCode(className, generationContext));
+		}
+
+		private void checkUnsupportedFeatures(AbstractBeanDefinition beanDefinition) {
+			if (!ObjectUtils.isEmpty(beanDefinition.getFactoryBeanName())) {
+				throw new UnsupportedOperationException("AOT post processing of the factory bean name is not supported yet with BeanRegistrar");
+			}
+			if (beanDefinition.hasConstructorArgumentValues()) {
+				throw new UnsupportedOperationException("AOT post processing of argument values is not supported yet with BeanRegistrar");
+			}
+			if (!beanDefinition.getQualifiers().isEmpty()) {
+				throw new UnsupportedOperationException("AOT post processing of qualifiers is not supported yet with BeanRegistrar");
+			}
+		}
+
+		private CodeBlock generateCustomizerMap() {
+			Builder code = CodeBlock.builder();
+			code.addStatement("$T<$T, $T> $L = new $T<>()", MultiValueMap.class, String.class, BeanDefinitionCustomizer.class,
+					CUSTOMIZER_MAP_VARIABLE, LinkedMultiValueMap.class);
+			return code.build();
+		}
+
+		private CodeBlock generateRegisterCode(ClassName className, GenerationContext generationContext) {
+			Builder code = CodeBlock.builder();
+			Builder metadataReaderFactoryCode = null;
+			NameAllocator nameAllocator = new NameAllocator();
+			for (Map.Entry<String, List<BeanRegistrar>> beanRegistrarEntry : this.beanRegistrars.entrySet()) {
+				for (BeanRegistrar beanRegistrar : beanRegistrarEntry.getValue()) {
+					String beanRegistrarName = nameAllocator.newName(StringUtils.uncapitalize(beanRegistrar.getClass().getSimpleName()));
+					Constructor<?> constructor = BeanUtils.getResolvableConstructor(beanRegistrar.getClass());
+					boolean visible = isVisible(constructor, className);
+					if (visible) {
+						code.addStatement("$T $L = new $T()", beanRegistrar.getClass(), beanRegistrarName, beanRegistrar.getClass());
+					}
+					else {
+						try {
+							Class<?> configClass = ClassUtils.forName(beanRegistrarEntry.getKey(), beanRegistrar.getClass().getClassLoader());
+							GeneratedClass generatedClass = generationContext.getGeneratedClasses()
+									.getOrAddForFeatureComponent("BeanRegistrars", configClass, type ->
+											type.addJavadoc("Bean registrars for {@link $T}.", configClass)
+													.addModifiers(Modifier.PUBLIC));
+							GeneratedMethod generatedMethod = generatedClass.getMethods().add(
+									"get" + beanRegistrar.getClass().getSimpleName(),
+									method -> method
+											.addModifiers(Modifier.PUBLIC, Modifier.STATIC)
+											.returns(BeanRegistrar.class)
+											.addStatement("return new $T()", beanRegistrar.getClass()));
+							code.addStatement("$T $L = $L", BeanRegistrar.class, beanRegistrarName,
+									generatedMethod.toMethodReference().toInvokeCodeBlock(ArgumentCodeGenerator.none()));
+						}
+						catch (ClassNotFoundException ex) {
+							throw new IllegalStateException(ex);
+						}
+					}
+					if (beanRegistrar instanceof ImportAware) {
+						if (metadataReaderFactoryCode == null) {
+							metadataReaderFactoryCode = CodeBlock.builder();
+							metadataReaderFactoryCode.addStatement("$T metadataReaderFactory = new $T()",
+									MetadataReaderFactory.class, CachingMetadataReaderFactory.class);
+						}
+						CodeBlock setImportMetadataCode;
+						if (visible) {
+							setImportMetadataCode = CodeBlock.builder()
+									.addStatement("$L.setImportMetadata(metadataReaderFactory.getMetadataReader($S).getAnnotationMetadata())",
+									beanRegistrarName, beanRegistrarEntry.getKey()).build();
+						}
+						else {
+							setImportMetadataCode = CodeBlock.builder()
+									.addStatement("(($T)$L).setImportMetadata(metadataReaderFactory.getMetadataReader($S).getAnnotationMetadata())",
+									ImportAware.class, beanRegistrarName, beanRegistrarEntry.getKey()).build();
+						}
+						code.beginControlFlow("try")
+								.add(setImportMetadataCode)
+								.nextControlFlow("catch ($T ex)", IOException.class)
+								.addStatement("throw new $T(\"Failed to read metadata for '$L'\", ex)",
+										IllegalStateException.class, beanRegistrarEntry.getKey())
+								.endControlFlow();
+						generationContext.getRuntimeHints().resources().registerType(TypeReference.of(beanRegistrarEntry.getKey()));
+					}
+					code.addStatement("$L.register(new $T(($T)$L, $L, $L, $L.getClass(), $L), $L)", beanRegistrarName,
+							BeanRegistryAdapter.class, BeanDefinitionRegistry.class, BeanFactoryInitializationCode.BEAN_FACTORY_VARIABLE,
+							BeanFactoryInitializationCode.BEAN_FACTORY_VARIABLE, ENVIRONMENT_VARIABLE, beanRegistrarName,
+							CUSTOMIZER_MAP_VARIABLE, ENVIRONMENT_VARIABLE);
+				}
+			}
+			return (metadataReaderFactoryCode == null ? code.build() : metadataReaderFactoryCode.add(code.build()).build());
+		}
+
+		private boolean isVisible(Constructor<?> ctor, ClassName className) {
+			AccessControl classAccessControl = AccessControl.forClass(ctor.getDeclaringClass());
+			AccessControl memberAccessControl = AccessControl.forMember(ctor);
+			AccessControl.Visibility visibility = AccessControl.lowest(classAccessControl, memberAccessControl).getVisibility();
+			return (visibility == AccessControl.Visibility.PUBLIC || (visibility != AccessControl.Visibility.PRIVATE &&
+					ctor.getDeclaringClass().getPackageName().equals(className.packageName())));
+		}
+
+		private CodeBlock generateInitDestroyMethods(String beanName, AbstractBeanDefinition beanDefinition,
+				String[] methodNames, String method, ReflectionHints reflectionHints) {
+
+			Builder code = CodeBlock.builder();
+			// For Publisher-based destroy methods
+			reflectionHints.registerType(TypeReference.of("org.reactivestreams.Publisher"));
+			Class<?> beanType = ClassUtils.getUserClass(beanDefinition.getResolvableType().toClass());
+			Arrays.stream(methodNames).forEach(methodName -> addInitDestroyHint(beanType, methodName, reflectionHints));
+			CodeBlock arguments = Arrays.stream(methodNames)
+					.map(name -> CodeBlock.of("$S", name))
+					.collect(CodeBlock.joining(", "));
+
+			code.addStatement("$L.add($S, $L -> (($T)$L).$L($L))", CUSTOMIZER_MAP_VARIABLE, beanName, "bd",
+					AbstractBeanDefinition.class, "bd", method, arguments);
+			return code.build();
+		}
+
+		// Inspired from BeanDefinitionPropertiesCodeGenerator#addInitDestroyHint
+		private static void addInitDestroyHint(Class<?> beanUserClass, String methodName, ReflectionHints reflectionHints) {
+			Class<?> methodDeclaringClass = beanUserClass;
+
+			// Parse fully-qualified method name if necessary.
+			int indexOfDot = methodName.lastIndexOf('.');
+			if (indexOfDot > 0) {
+				String className = methodName.substring(0, indexOfDot);
+				methodName = methodName.substring(indexOfDot + 1);
+				if (!beanUserClass.getName().equals(className)) {
+					try {
+						methodDeclaringClass = ClassUtils.forName(className, beanUserClass.getClassLoader());
+					}
+					catch (Throwable ex) {
+						throw new IllegalStateException("Failed to load Class [" + className +
+								"] from ClassLoader [" + beanUserClass.getClassLoader() + "]", ex);
+					}
+				}
+			}
+
+			Method method = ReflectionUtils.findMethod(methodDeclaringClass, methodName);
+			if (method != null) {
+				reflectionHints.registerMethod(method, ExecutableMode.INVOKE);
+				Method publiclyAccessibleMethod = ClassUtils.getPubliclyAccessibleMethodIfPossible(method, beanUserClass);
+				if (!publiclyAccessibleMethod.equals(method)) {
+					reflectionHints.registerMethod(publiclyAccessibleMethod, ExecutableMode.INVOKE);
+				}
+			}
+		}
+
+
+		static class UnsupportedBeanRegistrationCode implements BeanRegistrationCode {
+
+			private final String message;
+
+			public UnsupportedBeanRegistrationCode(String beanName, Class<?> aotProcessorClass) {
+				this.message = "Code generation attempted for bean " + beanName + " by the AOT Processor " +
+						aotProcessorClass + " is not supported with BeanRegistrar yet";
+			}
+
+			@Override
+			public ClassName getClassName() {
+				throw new UnsupportedOperationException(this.message);
+			}
+
+			@Override
+			public GeneratedMethods getMethods() {
+				throw new UnsupportedOperationException(this.message);
+			}
+
+			@Override
+			public void addInstancePostProcessor(MethodReference methodReference) {
+				throw new UnsupportedOperationException(this.message);
+			}
 		}
 	}
 

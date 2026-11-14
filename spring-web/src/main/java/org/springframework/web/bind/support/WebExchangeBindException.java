@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2023 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,10 +21,11 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
+import org.jspecify.annotations.Nullable;
+
 import org.springframework.beans.PropertyEditorRegistry;
 import org.springframework.context.MessageSource;
 import org.springframework.core.MethodParameter;
-import org.springframework.lang.Nullable;
 import org.springframework.util.Assert;
 import org.springframework.validation.BeanPropertyBindingResult;
 import org.springframework.validation.BindingResult;
@@ -78,19 +79,6 @@ public class WebExchangeBindException extends ServerWebInputException implements
 				BindErrorUtils.resolveAndJoin(getFieldErrors(), source, locale)};
 	}
 
-	/**
-	 * Resolve global and field errors to messages with the given
-	 * {@link MessageSource} and {@link Locale}.
-	 * @return a Map with errors as key and resolves messages as value
-	 * @since 6.0.3
-	 * @deprecated in favor of using {@link BindErrorUtils} and
-	 * {@link #getAllErrors()}, to be removed in 6.2
-	 */
-	@Deprecated(since = "6.1", forRemoval = true)
-	public Map<ObjectError, String> resolveErrorMessages(MessageSource messageSource, Locale locale) {
-		return BindErrorUtils.resolve(getAllErrors(), messageSource, locale);
-	}
-
 
 	// BindingResult implementation methods
 
@@ -130,7 +118,7 @@ public class WebExchangeBindException extends ServerWebInputException implements
 	}
 
 	@Override
-	public void reject(String errorCode, @Nullable Object[] errorArgs, @Nullable String defaultMessage) {
+	public void reject(String errorCode, Object @Nullable [] errorArgs, @Nullable String defaultMessage) {
 		this.bindingResult.reject(errorCode, errorArgs, defaultMessage);
 	}
 
@@ -146,7 +134,7 @@ public class WebExchangeBindException extends ServerWebInputException implements
 
 	@Override
 	public void rejectValue(@Nullable String field, String errorCode,
-			@Nullable Object[] errorArgs, @Nullable String defaultMessage) {
+			Object @Nullable [] errorArgs, @Nullable String defaultMessage) {
 
 		this.bindingResult.rejectValue(field, errorCode, errorArgs, defaultMessage);
 	}
@@ -187,8 +175,7 @@ public class WebExchangeBindException extends ServerWebInputException implements
 	}
 
 	@Override
-	@Nullable
-	public ObjectError getGlobalError() {
+	public @Nullable ObjectError getGlobalError() {
 		return this.bindingResult.getGlobalError();
 	}
 
@@ -208,8 +195,7 @@ public class WebExchangeBindException extends ServerWebInputException implements
 	}
 
 	@Override
-	@Nullable
-	public FieldError getFieldError() {
+	public @Nullable FieldError getFieldError() {
 		return this.bindingResult.getFieldError();
 	}
 
@@ -229,26 +215,22 @@ public class WebExchangeBindException extends ServerWebInputException implements
 	}
 
 	@Override
-	@Nullable
-	public FieldError getFieldError(String field) {
+	public @Nullable FieldError getFieldError(String field) {
 		return this.bindingResult.getFieldError(field);
 	}
 
 	@Override
-	@Nullable
-	public Object getFieldValue(String field) {
+	public @Nullable Object getFieldValue(String field) {
 		return this.bindingResult.getFieldValue(field);
 	}
 
 	@Override
-	@Nullable
-	public Class<?> getFieldType(String field) {
+	public @Nullable Class<?> getFieldType(String field) {
 		return this.bindingResult.getFieldType(field);
 	}
 
 	@Override
-	@Nullable
-	public Object getTarget() {
+	public @Nullable Object getTarget() {
 		return this.bindingResult.getTarget();
 	}
 
@@ -258,21 +240,18 @@ public class WebExchangeBindException extends ServerWebInputException implements
 	}
 
 	@Override
-	@Nullable
-	public Object getRawFieldValue(String field) {
+	public @Nullable Object getRawFieldValue(String field) {
 		return this.bindingResult.getRawFieldValue(field);
 	}
 
 	@Override
 	@SuppressWarnings("rawtypes")
-	@Nullable
-	public PropertyEditor findEditor(@Nullable String field, @Nullable Class valueType) {
+	public @Nullable PropertyEditor findEditor(@Nullable String field, @Nullable Class valueType) {
 		return this.bindingResult.findEditor(field, valueType);
 	}
 
 	@Override
-	@Nullable
-	public PropertyEditorRegistry getPropertyEditorRegistry() {
+	public @Nullable PropertyEditorRegistry getPropertyEditorRegistry() {
 		return this.bindingResult.getPropertyEditorRegistry();
 	}
 

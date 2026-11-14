@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2023 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,7 +16,6 @@
 
 package org.springframework.util;
 
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.Locale;
 import java.util.Properties;
@@ -24,6 +23,8 @@ import java.util.Properties;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.NullAndEmptySource;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
@@ -36,21 +37,29 @@ import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException
  */
 class StringUtilsTests {
 
-	@Test
-	void hasTextBlank() {
-		String blank = "          ";
-		assertThat(StringUtils.hasText(blank)).isFalse();
+	@ParameterizedTest
+	@ValueSource(strings = {"text", "  text  ", "  ", "\t", "\n text"})
+	void hasLengthForValidValues(String value) {
+		assertThat(StringUtils.hasLength(value)).isTrue();
 	}
 
-	@Test
-	void hasTextNullEmpty() {
-		assertThat(StringUtils.hasText(null)).isFalse();
-		assertThat(StringUtils.hasText("")).isFalse();
+	@ParameterizedTest
+	@NullAndEmptySource
+	void hasLengthForInvalidValues(String value) {
+		assertThat(StringUtils.hasLength(value)).isFalse();
 	}
 
-	@Test
-	void hasTextValid() {
-		assertThat(StringUtils.hasText("t")).isTrue();
+	@ParameterizedTest
+	@ValueSource(strings = {"text", "  text  ", "\n text"})
+	void hasTextForValidValues(String value) {
+		assertThat(StringUtils.hasText(value)).isTrue();
+	}
+
+	@ParameterizedTest
+	@NullAndEmptySource
+	@ValueSource(strings = {"  ", "\t"})
+	void hasTextForInvalidValues(String value) {
+		assertThat(StringUtils.hasText(value)).isFalse();
 	}
 
 	@Test
@@ -349,11 +358,11 @@ class StringUtilsTests {
 		assertThat(StringUtils.getFilename(null)).isNull();
 		assertThat(StringUtils.getFilename("")).isEmpty();
 		assertThat(StringUtils.getFilename("myfile")).isEqualTo("myfile");
-		assertThat(StringUtils.getFilename("mypath/myfile")).isEqualTo("myfile");
+		assertThat(StringUtils.getFilename("my/path/myfile")).isEqualTo("myfile");
 		assertThat(StringUtils.getFilename("myfile.")).isEqualTo("myfile.");
 		assertThat(StringUtils.getFilename("mypath/myfile.")).isEqualTo("myfile.");
 		assertThat(StringUtils.getFilename("myfile.txt")).isEqualTo("myfile.txt");
-		assertThat(StringUtils.getFilename("mypath/myfile.txt")).isEqualTo("myfile.txt");
+		assertThat(StringUtils.getFilename("my/path/myfile.txt")).isEqualTo("myfile.txt");
 	}
 
 	@Test
@@ -419,6 +428,7 @@ class StringUtilsTests {
 		assertThat(StringUtils.cleanPath("file:///c:/some/../path/the%20file.txt")).isEqualTo("file:///c:/path/the%20file.txt");
 		assertThat(StringUtils.cleanPath("jar:file:///c:\\some\\..\\path\\.\\the%20file.txt")).isEqualTo("jar:file:///c:/path/the%20file.txt");
 		assertThat(StringUtils.cleanPath("jar:file:///c:/some/../path/./the%20file.txt")).isEqualTo("jar:file:///c:/path/the%20file.txt");
+		assertThat(StringUtils.cleanPath("jar:file:///c:\\\\some\\\\..\\\\path\\\\.\\\\the%20file.txt")).isEqualTo("jar:file:///c:/path/the%20file.txt");
 	}
 
 	@Test
@@ -467,6 +477,18 @@ class StringUtilsTests {
 	}
 
 	@Test
+	void trimArrayElements() {
+		assertThat(StringUtils.trimArrayElements(null)).isNull();
+		assertThat(StringUtils.trimArrayElements(new String[] {})).isEmpty();
+		assertThat(StringUtils.trimArrayElements(new String[] { "", " ", "  ", "   " })).containsExactly("", "", "", "");
+		assertThat(StringUtils.trimArrayElements(new String[] { "\n", "\t ", "\n\t" })).containsExactly("", "", "");
+		assertThat(StringUtils.trimArrayElements(new String[] { "a", "b", "c" })).containsExactly("a", "b", "c");
+		assertThat(StringUtils.trimArrayElements(new String[] { "  a  ", "  b b ", "  cc  " })).containsExactly("a", "b b", "cc");
+		assertThat(StringUtils.trimArrayElements(new String[] { "  a  ", "b", "  c  " })).containsExactly("a", "b", "c");
+		assertThat(StringUtils.trimArrayElements(new String[] { null, "  a  ", null })).containsExactly(null, "a", null);
+	}
+
+	@Test
 	void removeDuplicateStrings() {
 		String[] input = new String[] {"myString2", "myString1", "myString2"};
 		input = StringUtils.removeDuplicateStrings(input);
@@ -492,108 +514,106 @@ class StringUtilsTests {
 
 	@Test
 	void tokenizeToStringArray() {
-		String[] sa = StringUtils.tokenizeToStringArray("a,b , ,c", ",");
-		assertThat(sa).hasSize(3);
-		assertThat(sa[0].equals("a") && sa[1].equals("b") && sa[2].equals("c")).as("components are correct").isTrue();
+		String[] array = StringUtils.tokenizeToStringArray("a,b , ,c", ",");
+		assertThat(array).containsExactly("a", "b", "c");
 	}
 
 	@Test
 	void tokenizeToStringArrayWithNotIgnoreEmptyTokens() {
-		String[] sa = StringUtils.tokenizeToStringArray("a,b , ,c", ",", true, false);
-		assertThat(sa).hasSize(4);
-		assertThat(sa[0].equals("a") && sa[1].equals("b") && sa[2].isEmpty() && sa[3].equals("c")).as("components are correct").isTrue();
+		String[] array = StringUtils.tokenizeToStringArray("a,b , ,c", ",", true, false);
+		assertThat(array).containsExactly("a", "b", "", "c");
 	}
 
 	@Test
 	void tokenizeToStringArrayWithNotTrimTokens() {
-		String[] sa = StringUtils.tokenizeToStringArray("a,b ,c", ",", false, true);
-		assertThat(sa).hasSize(3);
-		assertThat(sa[0].equals("a") && sa[1].equals("b ") && sa[2].equals("c")).as("components are correct").isTrue();
+		String[] array = StringUtils.tokenizeToStringArray("a,b ,c", ",", false, true);
+		assertThat(array).containsExactly("a", "b ", "c");
 	}
 
 	@Test
 	void commaDelimitedListToStringArrayWithNullProducesEmptyArray() {
-		String[] sa = StringUtils.commaDelimitedListToStringArray(null);
-		assertThat(sa).as("String array isn't null with null input").isNotNull();
-		assertThat(sa.length).as("String array length == 0 with null input").isEqualTo(0);
+		String[] array = StringUtils.commaDelimitedListToStringArray(null);
+		assertThat(array).isEmpty();
 	}
 
 	@Test
 	void commaDelimitedListToStringArrayWithEmptyStringProducesEmptyArray() {
-		String[] sa = StringUtils.commaDelimitedListToStringArray("");
-		assertThat(sa).as("String array isn't null with null input").isNotNull();
-		assertThat(sa.length).as("String array length == 0 with null input").isEqualTo(0);
+		String[] array = StringUtils.commaDelimitedListToStringArray("");
+		assertThat(array).isEmpty();
 	}
 
 	@Test
 	void delimitedListToStringArrayWithComma() {
-		String[] sa = StringUtils.delimitedListToStringArray("a,b", ",");
-		assertThat(sa).hasSize(2);
-		assertThat(sa[0]).isEqualTo("a");
-		assertThat(sa[1]).isEqualTo("b");
+		String[] array = StringUtils.delimitedListToStringArray("a,b", ",");
+		assertThat(array).containsExactly("a", "b");
 	}
 
 	@Test
 	void delimitedListToStringArrayWithSemicolon() {
-		String[] sa = StringUtils.delimitedListToStringArray("a;b", ";");
-		assertThat(sa).hasSize(2);
-		assertThat(sa[0]).isEqualTo("a");
-		assertThat(sa[1]).isEqualTo("b");
+		String[] array = StringUtils.delimitedListToStringArray("a;b", ";");
+		assertThat(array).containsExactly("a", "b");
 	}
 
 	@Test
 	void delimitedListToStringArrayWithEmptyDelimiter() {
-		String[] sa = StringUtils.delimitedListToStringArray("a,b", "");
-		assertThat(sa).hasSize(3);
-		assertThat(sa[0]).isEqualTo("a");
-		assertThat(sa[1]).isEqualTo(",");
-		assertThat(sa[2]).isEqualTo("b");
+		String[] array = StringUtils.delimitedListToStringArray("a,b", "");
+		assertThat(array).containsExactly("a", ",", "b");
 	}
 
 	@Test
 	void delimitedListToStringArrayWithNullDelimiter() {
-		String[] sa = StringUtils.delimitedListToStringArray("a,b", null);
-		assertThat(sa).hasSize(1);
-		assertThat(sa[0]).isEqualTo("a,b");
+		String[] array = StringUtils.delimitedListToStringArray("a,b", null);
+		assertThat(array).containsExactly("a,b");
+	}
+
+	@Test
+	void delimitedListToStringArrayWithCharacterToDelete() {
+		String[] array = StringUtils.delimitedListToStringArray("a,b,c", ",", "a");
+		assertThat(array).containsExactly("", "b", "c");
+	}
+
+	@Test
+	void delimitedListToStringArrayWithCharacterToDeleteEqualsToDelimiter() {
+		String[] array = StringUtils.delimitedListToStringArray("a,b,c", ",", ",");
+		assertThat(array).containsExactly("a", "b", "c");
 	}
 
 	@Test
 	void commaDelimitedListToStringArrayMatchWords() {
 		// Could read these from files
-		String[] sa = new String[] {"foo", "bar", "big"};
-		doTestCommaDelimitedListToStringArrayLegalMatch(sa);
-		doTestStringArrayReverseTransformationMatches(sa);
+		String[] array = new String[] {"foo", "bar", "big"};
+		doTestCommaDelimitedListToStringArrayLegalMatch(array);
+		doTestStringArrayReverseTransformationMatches(array);
 
-		sa = new String[] {"a", "b", "c"};
-		doTestCommaDelimitedListToStringArrayLegalMatch(sa);
-		doTestStringArrayReverseTransformationMatches(sa);
+		array = new String[] {"a", "b", "c"};
+		doTestCommaDelimitedListToStringArrayLegalMatch(array);
+		doTestStringArrayReverseTransformationMatches(array);
 
 		// Test same words
-		sa = new String[] {"AA", "AA", "AA", "AA", "AA"};
-		doTestCommaDelimitedListToStringArrayLegalMatch(sa);
-		doTestStringArrayReverseTransformationMatches(sa);
+		array = new String[] {"AA", "AA", "AA", "AA", "AA"};
+		doTestCommaDelimitedListToStringArrayLegalMatch(array);
+		doTestStringArrayReverseTransformationMatches(array);
 	}
 
-	private void doTestStringArrayReverseTransformationMatches(String[] sa) {
+	private void doTestStringArrayReverseTransformationMatches(String[] array) {
 		String[] reverse =
-				StringUtils.commaDelimitedListToStringArray(StringUtils.arrayToCommaDelimitedString(sa));
-		assertThat(Arrays.asList(reverse)).as("Reverse transformation is equal").isEqualTo(Arrays.asList(sa));
+				StringUtils.commaDelimitedListToStringArray(StringUtils.arrayToCommaDelimitedString(array));
+		assertThat(reverse).as("Reverse transformation is equal").isEqualTo(array);
 	}
 
 	@Test
 	void commaDelimitedListToStringArraySingleString() {
 		// Could read these from files
 		String s = "woeirqupoiewuropqiewuorpqiwueopriquwopeiurqopwieur";
-		String[] sa = StringUtils.commaDelimitedListToStringArray(s);
-		assertThat(sa.length).as("Found one String with no delimiters").isEqualTo(1);
-		assertThat(sa[0]).as("Single array entry matches input String with no delimiters").isEqualTo(s);
+		String[] array = StringUtils.commaDelimitedListToStringArray(s);
+		assertThat(array).as("Single array entry matches input String with no delimiters").containsExactly(s);
 	}
 
 	@Test
 	void commaDelimitedListToStringArrayWithOtherPunctuation() {
 		// Could read these from files
-		String[] sa = new String[] {"xcvwert4456346&*.", "///", ".!", ".", ";"};
-		doTestCommaDelimitedListToStringArrayLegalMatch(sa);
+		String[] array = new String[] {"xcvwert4456346&*.", "///", ".!", ".", ";"};
+		doTestCommaDelimitedListToStringArrayLegalMatch(array);
 	}
 
 	/**
@@ -602,20 +622,17 @@ class StringUtilsTests {
 	@Test
 	void commaDelimitedListToStringArrayEmptyStrings() {
 		// Could read these from files
-		String[] sa = StringUtils.commaDelimitedListToStringArray("a,,b");
-		assertThat(sa.length).as("a,,b produces array length 3").isEqualTo(3);
-		assertThat(sa[0].equals("a") && sa[1].isEmpty() && sa[2].equals("b")).as("components are correct").isTrue();
+		String[] array = StringUtils.commaDelimitedListToStringArray("a,,b");
+		assertThat(array).containsExactly("a", "", "b");
 
-		sa = new String[] {"", "", "a", ""};
-		doTestCommaDelimitedListToStringArrayLegalMatch(sa);
+		array = new String[] {"", "", "a", ""};
+		doTestCommaDelimitedListToStringArrayLegalMatch(array);
 	}
 
 	private void doTestCommaDelimitedListToStringArrayLegalMatch(String[] components) {
 		String sb = String.join(String.valueOf(','), components);
-		String[] sa = StringUtils.commaDelimitedListToStringArray(sb);
-		assertThat(sa).as("String array isn't null with legal match").isNotNull();
-		assertThat(sa.length).as("String array length is correct with legal match").isEqualTo(components.length);
-		assertThat(Arrays.equals(sa, components)).as("Output equals input").isTrue();
+		String[] array = StringUtils.commaDelimitedListToStringArray(sb);
+		assertThat(array).as("Output equals input").isEqualTo(components);
 	}
 
 
@@ -717,6 +734,7 @@ class StringUtilsTests {
 	}
 
 	@Test
+	@SuppressWarnings("deprecation")  // for Locale constructors on JDK 19
 	void invalidLocaleWithLocaleString() {
 		assertThat(StringUtils.parseLocaleString("invalid")).isEqualTo(new Locale("invalid"));
 		assertThat(StringUtils.parseLocaleString("invalidvalue")).isEqualTo(new Locale("invalidvalue"));
@@ -725,6 +743,7 @@ class StringUtilsTests {
 	}
 
 	@Test
+	@SuppressWarnings("deprecation")  // for Locale constructors on JDK 19
 	void invalidLocaleWithLanguageTag() {
 		assertThat(StringUtils.parseLocale("invalid")).isEqualTo(new Locale("invalid"));
 		assertThat(StringUtils.parseLocale("invalidvalue")).isEqualTo(new Locale("invalidvalue"));
@@ -760,6 +779,25 @@ class StringUtilsTests {
 	}
 
 	@Test
+	void applyRelativePath() {
+		// Basic combination
+		assertThat(StringUtils.applyRelativePath("mypath/myfile", "otherfile")).isEqualTo("mypath/otherfile");
+		// Relative path starts with slash
+		assertThat(StringUtils.applyRelativePath("mypath/myfile", "/otherfile")).isEqualTo("mypath/otherfile");
+		// Includes root path
+		assertThat(StringUtils.applyRelativePath("/mypath/myfile", "otherfile")).isEqualTo("/mypath/otherfile");
+		assertThat(StringUtils.applyRelativePath("/mypath/myfile", "/otherfile")).isEqualTo("/mypath/otherfile");
+		// When base path has no slash
+		assertThat(StringUtils.applyRelativePath("myfile", "otherfile")).isEqualTo("otherfile");
+		// Keep parent directory token as-is
+		assertThat(StringUtils.applyRelativePath("mypath/myfile", "../otherfile")).isEqualTo("mypath/../otherfile");
+		// Base path ends with slash
+		assertThat(StringUtils.applyRelativePath("mypath/", "otherfile")).isEqualTo("mypath/otherfile");
+		// Empty relative path
+		assertThat(StringUtils.applyRelativePath("mypath/myfile", "")).isEqualTo("mypath/");
+	}
+
+	@Test
 	void truncatePreconditions() {
 		assertThatIllegalArgumentException()
 				.isThrownBy(() -> StringUtils.truncate("foo", 0))
@@ -780,6 +818,24 @@ class StringUtilsTests {
 	)
 	void truncate(String text, String truncated) {
 		assertThat(StringUtils.truncate(text, 10)).isEqualTo(truncated);
+	}
+
+	@ParameterizedTest  // gh37435
+	@CsvSource(delimiter = '|', textBlock = """
+			a\uD83D\uDE00  | 3 | a\uD83D\uDE00
+			a\uD83D\uDE00b | 4 | a\uD83D\uDE00b
+			a\uD83D\uDE00b | 3 | a\uD83D\uDE00 (truncated)...
+			a\uD83D\uDE00b | 2 | a (truncated)...
+			\uD83D\uDE00b  | 1 | ' (truncated)...'
+			a\uD83Db       | 2 | a\uD83D (truncated)...
+			a\uDE00b       | 2 | a\uDE00 (truncated)...
+			a\uDE00b       | 1 | a (truncated)...
+			"""
+	)
+	// \uD83D\uDE00 is the "Grinning Face" emoji.
+	void truncateSurrogatePairs(String text, int threshold, String truncated) {
+		assertThat(StringUtils.truncate(text, threshold)).isEqualTo(truncated);
+		assertThat(StringUtils.truncate(new StringBuilder(text), threshold)).isEqualTo(truncated);
 	}
 
 }

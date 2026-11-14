@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,6 +19,7 @@ package org.springframework.expression.spel;
 import java.util.Arrays;
 import java.util.List;
 
+import org.springframework.expression.EvaluationContext;
 import org.springframework.expression.Expression;
 import org.springframework.expression.ExpressionParser;
 import org.springframework.expression.spel.standard.SpelExpressionParser;
@@ -42,7 +43,7 @@ public abstract class AbstractExpressionTests {
 	protected static final boolean SHOULD_NOT_BE_WRITABLE = false;
 
 
-	protected final ExpressionParser parser = new SpelExpressionParser();
+	protected final SpelExpressionParser parser = new SpelExpressionParser();
 
 	protected final StandardEvaluationContext context = TestScenarioCreator.getTestEvaluationContext();
 
@@ -172,6 +173,23 @@ public abstract class AbstractExpressionTests {
 	 * Evaluate the specified expression and ensure the expected message comes out.
 	 * The message may have inserts and they will be checked if otherProperties is specified.
 	 * The first entry in otherProperties should always be the position.
+	 * @param evaluationContext the evaluation context to use
+	 * @param expression the expression to evaluate
+	 * @param expectedReturnType ask the expression return value to be of this type if possible
+	 * ({@code null} indicates don't ask for conversion)
+	 * @param expectedMessage the expected message
+	 * @param otherProperties the expected inserts within the message
+	 */
+	protected void evaluateAndCheckError(EvaluationContext evaluationContext, String expression,
+			Class<?> expectedReturnType, SpelMessage expectedMessage, Object... otherProperties) {
+
+		evaluateAndCheckError(this.parser, evaluationContext, expression, expectedReturnType, expectedMessage, otherProperties);
+	}
+
+	/**
+	 * Evaluate the specified expression and ensure the expected message comes out.
+	 * The message may have inserts and they will be checked if otherProperties is specified.
+	 * The first entry in otherProperties should always be the position.
 	 * @param parser the expression parser to use
 	 * @param expression the expression to evaluate
 	 * @param expectedReturnType ask the expression return value to be of this type if possible
@@ -182,14 +200,32 @@ public abstract class AbstractExpressionTests {
 	protected void evaluateAndCheckError(ExpressionParser parser, String expression, Class<?> expectedReturnType, SpelMessage expectedMessage,
 			Object... otherProperties) {
 
+		evaluateAndCheckError(parser, this.context, expression, expectedReturnType, expectedMessage, otherProperties);
+	}
+
+	/**
+	 * Evaluate the specified expression and ensure the expected message comes out.
+	 * The message may have inserts and they will be checked if otherProperties is specified.
+	 * The first entry in otherProperties should always be the position.
+	 * @param parser the expression parser to use
+	 * @param evaluationContext the evaluation context to use
+	 * @param expression the expression to evaluate
+	 * @param expectedReturnType ask the expression return value to be of this type if possible
+	 * ({@code null} indicates don't ask for conversion)
+	 * @param expectedMessage the expected message
+	 * @param otherProperties the expected inserts within the message
+	 */
+	protected void evaluateAndCheckError(ExpressionParser parser, EvaluationContext evaluationContext,
+			String expression, Class<?> expectedReturnType, SpelMessage expectedMessage, Object... otherProperties) {
+
 		assertThatExceptionOfType(SpelEvaluationException.class).isThrownBy(() -> {
 			Expression expr = parser.parseExpression(expression);
 			assertThat(expr).as("expression").isNotNull();
 			if (expectedReturnType != null) {
-				expr.getValue(context, expectedReturnType);
+				expr.getValue(evaluationContext, expectedReturnType);
 			}
 			else {
-				expr.getValue(context);
+				expr.getValue(evaluationContext);
 			}
 		}).satisfies(ex -> {
 			assertThat(ex.getMessageCode()).isEqualTo(expectedMessage);

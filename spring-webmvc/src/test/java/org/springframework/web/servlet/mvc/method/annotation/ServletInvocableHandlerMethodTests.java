@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -41,7 +41,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageConverter;
 import org.springframework.http.converter.HttpMessageNotWritableException;
 import org.springframework.http.converter.StringHttpMessageConverter;
-import org.springframework.http.converter.json.MappingJackson2HttpMessageConverter;
+import org.springframework.http.converter.json.JacksonJsonHttpMessageConverter;
 import org.springframework.web.accept.ContentNegotiationManager;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
@@ -175,7 +175,7 @@ class ServletInvocableHandlerMethodTests {
 	}
 
 	@Test  // SPR-9159
-	public void invokeAndHandle_NotVoidWithResponseStatusAndReason() throws Exception {
+	void invokeAndHandle_NotVoidWithResponseStatusAndReason() throws Exception {
 		ServletInvocableHandlerMethod handlerMethod = getHandlerMethod(new Handler(), "responseStatusWithReason");
 		handlerMethod.invokeAndHandle(this.webRequest, this.mavContainer);
 
@@ -218,7 +218,7 @@ class ServletInvocableHandlerMethodTests {
 	}
 
 	@Test // gh-23775, gh-24635
-	public void invokeAndHandle_ETagFilterHasNoImpactWhenETagPresent() throws Exception {
+	void invokeAndHandle_ETagFilterHasNoImpactWhenETagPresent() throws Exception {
 
 		String eTagValue = "\"deadb33f8badf00d\"";
 
@@ -326,7 +326,7 @@ class ServletInvocableHandlerMethodTests {
 	}
 
 	@Test  // SPR-12287
-	public void wrapConcurrentResult_ResponseEntityNullBody() throws Exception {
+	void wrapConcurrentResult_ResponseEntityNullBody() throws Exception {
 		this.returnValueHandlers.addHandler(new HttpEntityMethodProcessor(this.converters));
 		ServletInvocableHandlerMethod handlerMethod = getHandlerMethod(new ResponseEntityHandler(), "handleDeferred");
 		handlerMethod = handlerMethod.wrapConcurrentResult(new ResponseEntity<>(HttpStatus.OK));
@@ -373,7 +373,7 @@ class ServletInvocableHandlerMethodTests {
 
 	@Test
 	void wrapConcurrentResult_CollectedValuesList() throws Exception {
-		List<HttpMessageConverter<?>> converters = Collections.singletonList(new MappingJackson2HttpMessageConverter());
+		List<HttpMessageConverter<?>> converters = Collections.singletonList(new JacksonJsonHttpMessageConverter());
 		ResolvableType elementType = ResolvableType.forClass(List.class);
 		ReactiveTypeHandler.CollectedValuesList result = new ReactiveTypeHandler.CollectedValuesList(elementType);
 		result.add(Arrays.asList("foo1", "bar1"));
@@ -390,8 +390,8 @@ class ServletInvocableHandlerMethodTests {
 	}
 
 	@Test // SPR-15478
-	public void wrapConcurrentResult_CollectedValuesListWithResponseEntity() throws Exception {
-		List<HttpMessageConverter<?>> converters = Collections.singletonList(new MappingJackson2HttpMessageConverter());
+	void wrapConcurrentResult_CollectedValuesListWithResponseEntity() throws Exception {
+		List<HttpMessageConverter<?>> converters = Collections.singletonList(new JacksonJsonHttpMessageConverter());
 		ResolvableType elementType = ResolvableType.forClass(Bar.class);
 		ReactiveTypeHandler.CollectedValuesList result = new ReactiveTypeHandler.CollectedValuesList(elementType);
 		result.add(new Bar("foo"));
@@ -408,7 +408,7 @@ class ServletInvocableHandlerMethodTests {
 	}
 
 	@Test  // SPR-12287 (16/Oct/14 comments)
-	public void responseEntityRawTypeWithNullBody() throws Exception {
+	void responseEntityRawTypeWithNullBody() throws Exception {
 		this.returnValueHandlers.addHandler(new HttpEntityMethodProcessor(this.converters));
 		ServletInvocableHandlerMethod handlerMethod = getHandlerMethod(new ResponseEntityHandler(), "handleRawType");
 		handlerMethod.invokeAndHandle(this.webRequest, this.mavContainer);

@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -60,7 +60,7 @@ import static org.mockito.Mockito.verifyNoMoreInteractions;
  */
 @ExtendWith(MockitoExtension.class)
 @SuppressWarnings("unchecked")
-public class SimpleBrokerMessageHandlerTests {
+class SimpleBrokerMessageHandlerTests {
 
 	private SimpleBrokerMessageHandler messageHandler;
 
@@ -183,7 +183,7 @@ public class SimpleBrokerMessageHandlerTests {
 
 	@Test
 	@SuppressWarnings("rawtypes")
-	public void startAndStopWithHeartbeatValue() {
+	void startAndStopWithHeartbeatValue() {
 		ScheduledFuture future = mock();
 		given(this.taskScheduler.scheduleWithFixedDelay(any(Runnable.class), eq(Duration.ofMillis(15000)))).willReturn(future);
 

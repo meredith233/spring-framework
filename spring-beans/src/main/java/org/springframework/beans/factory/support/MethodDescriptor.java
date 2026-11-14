@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -25,11 +25,11 @@ import org.springframework.util.ClassUtils;
  * reference to the method's {@linkplain #declaringClass declaring class},
  * {@linkplain #methodName name}, and {@linkplain #parameterTypes parameter types}.
  *
+ * @author Sam Brannen
+ * @since 6.0.11
  * @param declaringClass the method's declaring class
  * @param methodName the name of the method
  * @param parameterTypes the types of parameters accepted by the method
- * @author Sam Brannen
- * @since 6.0.11
  */
 record MethodDescriptor(Class<?> declaringClass, String methodName, Class<?>... parameterTypes) {
 

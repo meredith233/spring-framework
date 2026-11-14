@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2023 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -25,14 +25,13 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.jsp.JspException;
 import jakarta.servlet.jsp.PageContext;
+import org.jspecify.annotations.Nullable;
 
 import org.springframework.beans.PropertyAccessor;
 import org.springframework.core.Conventions;
 import org.springframework.http.HttpMethod;
-import org.springframework.lang.Nullable;
 import org.springframework.util.Assert;
 import org.springframework.util.CollectionUtils;
-import org.springframework.util.ObjectUtils;
 import org.springframework.util.StringUtils;
 import org.springframework.web.servlet.support.RequestDataValueProcessor;
 import org.springframework.web.util.HtmlUtils;
@@ -126,7 +125,7 @@ import org.springframework.web.util.UriUtils;
  * <td><p>methodParam</p></td>
  * <td><p>false</p></td>
  * <td><p>true</p></td>
- * <td><p>The parameter name used for HTTP methods other then GET and POST.
+ * <td><p>The parameter name used for HTTP methods other than GET and POST.
  * Default is '_method'.</p></td>
  * </tr>
  * <tr class="odd-row-color">
@@ -239,6 +238,7 @@ import org.springframework.web.util.UriUtils;
  * @author Juergen Hoeller
  * @author Scott Andrews
  * @author Rossen Stoyanchev
+ * @author Sebastien Deleuze
  * @since 2.0
  */
 @SuppressWarnings("serial")
@@ -290,45 +290,34 @@ public class FormTag extends AbstractHtmlElementTag {
 	private static final String TYPE_ATTRIBUTE = "type";
 
 
-	@Nullable
-	private TagWriter tagWriter;
+	private @Nullable TagWriter tagWriter;
 
 	private String modelAttribute = DEFAULT_COMMAND_NAME;
 
-	@Nullable
-	private String name;
+	private @Nullable String name;
 
-	@Nullable
-	private String action;
+	private @Nullable String action;
 
-	@Nullable
-	private String servletRelativeAction;
+	private @Nullable String servletRelativeAction;
 
 	private String method = DEFAULT_METHOD;
 
-	@Nullable
-	private String target;
+	private @Nullable String target;
 
-	@Nullable
-	private String enctype;
+	private @Nullable String enctype;
 
-	@Nullable
-	private String acceptCharset;
+	private @Nullable String acceptCharset;
 
-	@Nullable
-	private String onsubmit;
+	private @Nullable String onsubmit;
 
-	@Nullable
-	private String onreset;
+	private @Nullable String onreset;
 
-	@Nullable
-	private String autocomplete;
+	private @Nullable String autocomplete;
 
 	private String methodParam = DEFAULT_METHOD_PARAM;
 
 	/** Caching a previous nested path, so that it may be reset. */
-	@Nullable
-	private String previousNestedPath;
+	private @Nullable String previousNestedPath;
 
 
 	/**
@@ -360,8 +349,7 @@ public class FormTag extends AbstractHtmlElementTag {
 	 * Get the value of the '{@code name}' attribute.
 	 */
 	@Override
-	@Nullable
-	protected String getName() throws JspException {
+	protected @Nullable String getName() throws JspException {
 		return this.name;
 	}
 
@@ -376,8 +364,7 @@ public class FormTag extends AbstractHtmlElementTag {
 	/**
 	 * Get the value of the '{@code action}' attribute.
 	 */
-	@Nullable
-	protected String getAction() {
+	protected @Nullable String getAction() {
 		return this.action;
 	}
 
@@ -395,8 +382,7 @@ public class FormTag extends AbstractHtmlElementTag {
 	 * Get the servlet-relative value of the '{@code action}' attribute.
 	 * @since 3.2.3
 	 */
-	@Nullable
-	protected String getServletRelativeAction() {
+	protected @Nullable String getServletRelativeAction() {
 		return this.servletRelativeAction;
 	}
 
@@ -426,8 +412,7 @@ public class FormTag extends AbstractHtmlElementTag {
 	/**
 	 * Get the value of the '{@code target}' attribute.
 	 */
-	@Nullable
-	public String getTarget() {
+	public @Nullable String getTarget() {
 		return this.target;
 	}
 
@@ -442,8 +427,7 @@ public class FormTag extends AbstractHtmlElementTag {
 	/**
 	 * Get the value of the '{@code enctype}' attribute.
 	 */
-	@Nullable
-	protected String getEnctype() {
+	protected @Nullable String getEnctype() {
 		return this.enctype;
 	}
 
@@ -458,8 +442,7 @@ public class FormTag extends AbstractHtmlElementTag {
 	/**
 	 * Get the value of the '{@code acceptCharset}' attribute.
 	 */
-	@Nullable
-	protected String getAcceptCharset() {
+	protected @Nullable String getAcceptCharset() {
 		return this.acceptCharset;
 	}
 
@@ -474,8 +457,7 @@ public class FormTag extends AbstractHtmlElementTag {
 	/**
 	 * Get the value of the '{@code onsubmit}' attribute.
 	 */
-	@Nullable
-	protected String getOnsubmit() {
+	protected @Nullable String getOnsubmit() {
 		return this.onsubmit;
 	}
 
@@ -490,8 +472,7 @@ public class FormTag extends AbstractHtmlElementTag {
 	/**
 	 * Get the value of the '{@code onreset}' attribute.
 	 */
-	@Nullable
-	protected String getOnreset() {
+	protected @Nullable String getOnreset() {
 		return this.onreset;
 	}
 
@@ -506,8 +487,7 @@ public class FormTag extends AbstractHtmlElementTag {
 	/**
 	 * Get the value of the '{@code autocomplete}' attribute.
 	 */
-	@Nullable
-	protected String getAutocomplete() {
+	protected @Nullable String getAutocomplete() {
 		return this.autocomplete;
 	}
 
@@ -739,7 +719,7 @@ public class FormTag extends AbstractHtmlElementTag {
 	 */
 	@Override
 	protected String resolveCssClass() throws JspException {
-		return ObjectUtils.getDisplayString(evaluate("cssClass", getCssClass()));
+		return getDisplayString(evaluate("cssClass", getCssClass()));
 	}
 
 	/**

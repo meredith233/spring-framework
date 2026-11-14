@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,6 +23,7 @@ import io.micrometer.observation.ObservationRegistry;
 import io.micrometer.observation.contextpropagation.ObservationThreadLocalAccessor;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.jspecify.annotations.Nullable;
 import reactor.core.observability.DefaultSignalListener;
 import reactor.core.publisher.Mono;
 import reactor.util.context.Context;
@@ -41,7 +42,6 @@ import org.springframework.http.server.reactive.observation.DefaultServerRequest
 import org.springframework.http.server.reactive.observation.ServerHttpObservationDocumentation;
 import org.springframework.http.server.reactive.observation.ServerRequestObservationContext;
 import org.springframework.http.server.reactive.observation.ServerRequestObservationConvention;
-import org.springframework.lang.Nullable;
 import org.springframework.util.Assert;
 import org.springframework.util.StringUtils;
 import org.springframework.web.server.ServerWebExchange;
@@ -86,20 +86,19 @@ public class HttpWebHandlerAdapter extends WebHandlerDecorator implements HttpHa
 
 	private WebSessionManager sessionManager = new DefaultWebSessionManager();
 
-	@Nullable
-	private ServerCodecConfigurer codecConfigurer;
+	private @Nullable ServerCodecConfigurer codecConfigurer;
 
 	private LocaleContextResolver localeContextResolver = new AcceptHeaderLocaleContextResolver();
 
-	@Nullable
-	private ForwardedHeaderTransformer forwardedHeaderTransformer;
+	private @Nullable ForwardedHeaderTransformer forwardedHeaderTransformer;
 
 	private ObservationRegistry observationRegistry = ObservationRegistry.NOOP;
 
 	private ServerRequestObservationConvention observationConvention = DEFAULT_OBSERVATION_CONVENTION;
 
-	@Nullable
-	private ApplicationContext applicationContext;
+	private @Nullable Boolean defaultHtmlEscape;
+
+	private @Nullable ApplicationContext applicationContext;
 
 	/** Whether to log potentially sensitive info (form data at DEBUG, headers at TRACE). */
 	private boolean enableLoggingRequestDetails = false;
@@ -152,12 +151,13 @@ public class HttpWebHandlerAdapter extends WebHandlerDecorator implements HttpHa
 	/**
 	 * Return the configured {@link ServerCodecConfigurer}.
 	 */
-	@SuppressWarnings("NullAway")
 	public ServerCodecConfigurer getCodecConfigurer() {
-		if (this.codecConfigurer == null) {
-			setCodecConfigurer(ServerCodecConfigurer.create());
+		ServerCodecConfigurer codecConfigurer = this.codecConfigurer;
+		if (codecConfigurer == null) {
+			codecConfigurer = ServerCodecConfigurer.create();
+			setCodecConfigurer(codecConfigurer);
 		}
-		return this.codecConfigurer;
+		return codecConfigurer;
 	}
 
 	/**
@@ -194,8 +194,7 @@ public class HttpWebHandlerAdapter extends WebHandlerDecorator implements HttpHa
 	 * Return the configured {@link ForwardedHeaderTransformer}.
 	 * @since 5.1
 	 */
-	@Nullable
-	public ForwardedHeaderTransformer getForwardedHeaderTransformer() {
+	public @Nullable ForwardedHeaderTransformer getForwardedHeaderTransformer() {
 		return this.forwardedHeaderTransformer;
 	}
 
@@ -236,6 +235,26 @@ public class HttpWebHandlerAdapter extends WebHandlerDecorator implements HttpHa
 	}
 
 	/**
+	 * Configure whether default HTML escaping is enabled for the web application.
+	 * The setting is then exposed as the exchanger attribute
+	 * {@link ServerWebExchange#HTML_ESCAPE_ATTRIBUTE}.
+	 * @param defaultHtmlEscape whether to enable default HTML escaping
+	 * @since 7.0.6
+	 */
+	public void setDefaultHtmlEscape(Boolean defaultHtmlEscape) {
+		this.defaultHtmlEscape = defaultHtmlEscape;
+	}
+
+	/**
+	 * Return the configured default HTML escape setting,
+	 * or {@code null} if not configured.
+	 * @since 7.0.6
+	 */
+	public @Nullable Boolean getDefaultHtmlEscape() {
+		return this.defaultHtmlEscape;
+	}
+
+	/**
 	 * Configure the {@code ApplicationContext} associated with the web application,
 	 * if it was initialized with one via
 	 * {@link org.springframework.web.server.adapter.WebHttpHandlerBuilder#applicationContext(ApplicationContext)}.
@@ -250,10 +269,10 @@ public class HttpWebHandlerAdapter extends WebHandlerDecorator implements HttpHa
 	 * Return the configured {@code ApplicationContext}, if any.
 	 * @since 5.0.3
 	 */
-	@Nullable
-	public ApplicationContext getApplicationContext() {
+	public @Nullable ApplicationContext getApplicationContext() {
 		return this.applicationContext;
 	}
+
 
 	/**
 	 * This method must be invoked after all properties have been set to
@@ -294,6 +313,10 @@ public class HttpWebHandlerAdapter extends WebHandlerDecorator implements HttpHa
 				exchange.getRequest(), exchange.getResponse(), exchange.getAttributes());
 		exchange.getAttributes().put(
 				ServerRequestObservationContext.CURRENT_OBSERVATION_CONTEXT_ATTRIBUTE, observationContext);
+
+		if (this.defaultHtmlEscape != null) {
+			exchange.getAttributes().put(ServerWebExchange.HTML_ESCAPE_ATTRIBUTE, this.defaultHtmlEscape);
+		}
 
 		return getDelegate().handle(exchange)
 				.doOnSuccess(aVoid -> logResponse(exchange))
@@ -340,15 +363,14 @@ public class HttpWebHandlerAdapter extends WebHandlerDecorator implements HttpHa
 		ServerHttpResponse response = exchange.getResponse();
 		String logPrefix = exchange.getLogPrefix();
 
-		// Sometimes a remote call error can look like a disconnected client.
-		// Try to set the response first before the "isDisconnectedClient" check.
-
-		if (response.setStatusCode(HttpStatus.INTERNAL_SERVER_ERROR)) {
-			logger.error(logPrefix + "500 Server Error for " + formatRequest(request), ex);
+		if (disconnectedClientHelper.checkAndLogClientDisconnectedException(ex)) {
+			// Attempt to send 500 in case of onward (rather than client) connection issue
+			response.setStatusCode(HttpStatus.INTERNAL_SERVER_ERROR);
+			observationContext.setConnectionAborted(true);
 			return Mono.empty();
 		}
-		else if (disconnectedClientHelper.checkAndLogClientDisconnectedException(ex)) {
-			observationContext.setConnectionAborted(true);
+		else if (response.setStatusCode(HttpStatus.INTERNAL_SERVER_ERROR)) {
+			logger.error(logPrefix + "500 Server Error for " + formatRequest(request), ex);
 			return Mono.empty();
 		}
 		else {

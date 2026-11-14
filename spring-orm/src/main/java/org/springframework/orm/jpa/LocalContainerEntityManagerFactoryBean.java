@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,22 +16,31 @@
 
 package org.springframework.orm.jpa;
 
+import java.util.List;
+
 import javax.sql.DataSource;
 
 import jakarta.persistence.EntityManagerFactory;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.PersistenceConfiguration;
 import jakarta.persistence.PersistenceException;
 import jakarta.persistence.SharedCacheMode;
 import jakarta.persistence.ValidationMode;
 import jakarta.persistence.spi.PersistenceProvider;
 import jakarta.persistence.spi.PersistenceUnitInfo;
+import org.jspecify.annotations.Nullable;
 
 import org.springframework.beans.BeanUtils;
+import org.springframework.beans.factory.BeanFactory;
+import org.springframework.beans.factory.config.BeanDefinition;
+import org.springframework.beans.factory.config.ConfigurableBeanFactory;
+import org.springframework.beans.factory.support.AbstractBeanDefinition;
+import org.springframework.beans.factory.support.AutowireCandidateQualifier;
 import org.springframework.context.ResourceLoaderAware;
 import org.springframework.context.weaving.LoadTimeWeaverAware;
 import org.springframework.core.io.ResourceLoader;
 import org.springframework.instrument.classloading.LoadTimeWeaver;
 import org.springframework.jdbc.datasource.lookup.SingleDataSourceLookup;
-import org.springframework.lang.Nullable;
 import org.springframework.orm.jpa.persistenceunit.DefaultPersistenceUnitManager;
 import org.springframework.orm.jpa.persistenceunit.ManagedClassNameFilter;
 import org.springframework.orm.jpa.persistenceunit.PersistenceManagedTypes;
@@ -40,6 +49,8 @@ import org.springframework.orm.jpa.persistenceunit.PersistenceUnitPostProcessor;
 import org.springframework.orm.jpa.persistenceunit.SmartPersistenceUnitInfo;
 import org.springframework.util.Assert;
 import org.springframework.util.ClassUtils;
+import org.springframework.util.CollectionUtils;
+import org.springframework.util.StringUtils;
 
 /**
  * {@link org.springframework.beans.factory.FactoryBean} that creates a JPA
@@ -75,27 +86,22 @@ import org.springframework.util.ClassUtils;
  * @author Juergen Hoeller
  * @author Rod Johnson
  * @since 2.0
- * @see #setPersistenceXmlLocation
  * @see #setJpaProperties
  * @see #setJpaVendorAdapter
  * @see #setLoadTimeWeaver
  * @see #setDataSource
- * @see EntityManagerFactoryInfo
  * @see LocalEntityManagerFactoryBean
- * @see org.springframework.orm.jpa.support.SharedEntityManagerBean
  * @see jakarta.persistence.spi.PersistenceProvider#createContainerEntityManagerFactory
  */
 @SuppressWarnings("serial")
 public class LocalContainerEntityManagerFactoryBean extends AbstractEntityManagerFactoryBean
 		implements ResourceLoaderAware, LoadTimeWeaverAware {
 
-	@Nullable
-	private PersistenceUnitManager persistenceUnitManager;
+	private @Nullable PersistenceUnitManager persistenceUnitManager;
 
 	private final DefaultPersistenceUnitManager internalPersistenceUnitManager = new DefaultPersistenceUnitManager();
 
-	@Nullable
-	private PersistenceUnitInfo persistenceUnitInfo;
+	private @Nullable PersistenceUnitInfo persistenceUnitInfo;
 
 
 	/**
@@ -133,9 +139,10 @@ public class LocalContainerEntityManagerFactoryBean extends AbstractEntityManage
 	}
 
 	/**
-	 * Uses the specified persistence unit name as the name of the default
-	 * persistence unit, if applicable.
-	 * <p><b>NOTE: Only applied if no external PersistenceUnitManager specified.</b>
+	 * Specify the name of the persistence unit configuration to use.
+	 * <p>Uses the specified persistence unit name as the name of the
+	 * default persistence unit, if applicable. Otherwise, it selects
+	 * among the available persistence units.
 	 * @see DefaultPersistenceUnitManager#setDefaultPersistenceUnitName
 	 */
 	@Override
@@ -157,6 +164,22 @@ public class LocalContainerEntityManagerFactoryBean extends AbstractEntityManage
 	 */
 	public void setPersistenceUnitRootLocation(String defaultPersistenceUnitRootLocation) {
 		this.internalPersistenceUnitManager.setDefaultPersistenceUnitRootLocation(defaultPersistenceUnitRootLocation);
+	}
+
+	/**
+	 * Set a local JPA 3.2 {@link PersistenceConfiguration} to use for this
+	 * persistence unit.
+	 * <p>Note: {@link PersistenceConfiguration} includes a persistence unit name,
+	 * so this effectively overrides the {@link #setPersistenceUnitName} method.
+	 * In contrast, all other settings will be merged with the settings in the
+	 * {@code PersistenceConfiguration} instance.
+	 * @since 7.0
+	 * @see DefaultPersistenceUnitManager#setPersistenceConfiguration
+	 */
+	public void setPersistenceConfiguration(PersistenceConfiguration configuration) {
+		Assert.notNull(configuration, "PersistenceConfiguration must not be null");
+		super.setPersistenceUnitName(configuration.name());
+		this.internalPersistenceUnitManager.setPersistenceConfiguration(configuration);
 	}
 
 	/**
@@ -184,7 +207,7 @@ public class LocalContainerEntityManagerFactoryBean extends AbstractEntityManage
 	 * In particular, JPA providers may pick up annotated packages for provider-specific
 	 * annotations only when driven by {@code persistence.xml}. As of 4.1, Spring's
 	 * scan can detect annotated packages as well if supported by the given
-	 * {@link JpaVendorAdapter} (e.g. for Hibernate).
+	 * {@link JpaVendorAdapter} (for example, for Hibernate).
 	 * <p>If no explicit {@link #setMappingResources mapping resources} have been
 	 * specified in addition to these packages, Spring's setup looks for a default
 	 * {@code META-INF/orm.xml} file in the classpath, registering it as a mapping
@@ -218,7 +241,7 @@ public class LocalContainerEntityManagerFactoryBean extends AbstractEntityManage
 	 * Can be used on its own or in combination with entity scanning in the classpath,
 	 * in both cases avoiding {@code persistence.xml}.
 	 * <p>Note that mapping resources must be relative to the classpath root,
-	 * e.g. "META-INF/mappings.xml" or "com/mycompany/repository/mappings.xml",
+	 * for example, "META-INF/mappings.xml" or "com/mycompany/repository/mappings.xml",
 	 * so that they can be loaded through {@code ClassLoader.getResource}.
 	 * <p>If no explicit mapping resources have been specified next to
 	 * {@link #setPackagesToScan packages to scan}, Spring's setup looks for a default
@@ -260,6 +283,17 @@ public class LocalContainerEntityManagerFactoryBean extends AbstractEntityManage
 	 */
 	public void setValidationMode(ValidationMode validationMode) {
 		this.internalPersistenceUnitManager.setValidationMode(validationMode);
+	}
+
+	/**
+	 * Specify the JPA 4.0 default fetch type for all of this manager's persistence
+	 * units, overriding any value in {@code persistence.xml} if set.
+	 * <p><b>NOTE: Only applied if no external PersistenceUnitManager specified. Also,
+	 * this requires a JPA 4.0+ persistence provider and will be ignored otherwise.</b>
+	 * @since 7.0.4
+	 */
+	public void setDefaultToOneFetchType(FetchType defaultToOneFetchType) {
+		this.internalPersistenceUnitManager.setDefaultToOneFetchType(defaultToOneFetchType);
 	}
 
 	/**
@@ -363,6 +397,25 @@ public class LocalContainerEntityManagerFactoryBean extends AbstractEntityManage
 			}
 		}
 
+		String scope = this.persistenceUnitInfo.getScopeAnnotationName();
+		if (StringUtils.hasText(scope)) {
+			logger.info("Scope annotation name for persistence unit ignored by Spring: " + scope);
+		}
+
+		List<String> qualifiers = this.persistenceUnitInfo.getQualifierAnnotationNames();
+		if (!CollectionUtils.isEmpty(qualifiers)) {
+			BeanFactory beanFactory = getBeanFactory();
+			String beanName = getBeanName();
+			if (beanFactory instanceof ConfigurableBeanFactory cbf && beanName != null) {
+				BeanDefinition bd = cbf.getMergedBeanDefinition(beanName);
+				if (bd instanceof AbstractBeanDefinition abd) {
+					for (String qualifier : qualifiers) {
+						abd.addQualifier(new AutowireCandidateQualifier(qualifier));
+					}
+				}
+			}
+		}
+
 		super.afterPropertiesSet();
 	}
 
@@ -398,15 +451,16 @@ public class LocalContainerEntityManagerFactoryBean extends AbstractEntityManage
 	 * Determine the PersistenceUnitInfo to use for the EntityManagerFactory
 	 * created by this bean.
 	 * <p>The default implementation reads in all persistence unit infos from
-	 * {@code persistence.xml}, as defined in the JPA specification.
-	 * If no entity manager name was specified, it takes the first info in the
-	 * array as returned by the reader. Otherwise, it checks for a matching name.
+	 * {@code persistence.xml}, as defined in the JPA specification, selecting a unit
+	 * by name. If no persistence unit name was specified, it takes the default one
+	 * if configured, or otherwise the first persistence unit as found by the reader.
 	 * @param persistenceUnitManager the PersistenceUnitManager to obtain from
 	 * @return the chosen PersistenceUnitInfo
 	 */
 	protected PersistenceUnitInfo determinePersistenceUnitInfo(PersistenceUnitManager persistenceUnitManager) {
-		if (getPersistenceUnitName() != null) {
-			return persistenceUnitManager.obtainPersistenceUnitInfo(getPersistenceUnitName());
+		String persistenceUnitName = getPersistenceUnitName();
+		if (persistenceUnitName != null) {
+			return persistenceUnitManager.obtainPersistenceUnitInfo(persistenceUnitName);
 		}
 		else {
 			return persistenceUnitManager.obtainDefaultPersistenceUnitInfo();
@@ -426,14 +480,12 @@ public class LocalContainerEntityManagerFactoryBean extends AbstractEntityManage
 
 
 	@Override
-	@Nullable
-	public PersistenceUnitInfo getPersistenceUnitInfo() {
+	public @Nullable PersistenceUnitInfo getPersistenceUnitInfo() {
 		return this.persistenceUnitInfo;
 	}
 
 	@Override
-	@Nullable
-	public String getPersistenceUnitName() {
+	public @Nullable String getPersistenceUnitName() {
 		if (this.persistenceUnitInfo != null) {
 			return this.persistenceUnitInfo.getPersistenceUnitName();
 		}
@@ -441,8 +493,7 @@ public class LocalContainerEntityManagerFactoryBean extends AbstractEntityManage
 	}
 
 	@Override
-	@Nullable
-	public DataSource getDataSource() {
+	public @Nullable DataSource getDataSource() {
 		if (this.persistenceUnitInfo != null) {
 			return (this.persistenceUnitInfo.getJtaDataSource() != null ?
 					this.persistenceUnitInfo.getJtaDataSource() :

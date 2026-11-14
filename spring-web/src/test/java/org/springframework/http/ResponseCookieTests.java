@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -37,12 +37,12 @@ class ResponseCookieTests {
 		assertThat(ResponseCookie.from("id", "1fWa").build().toString()).isEqualTo("id=1fWa");
 
 		ResponseCookie cookie = ResponseCookie.from("id", "1fWa")
-				.domain("abc").path("/path").maxAge(0).httpOnly(true).secure(true).sameSite("None")
+				.domain("abc").path("/path").maxAge(0).httpOnly(true).partitioned(true).secure(true).sameSite("None")
 				.build();
 
 		assertThat(cookie.toString()).isEqualTo("id=1fWa; Path=/path; Domain=abc; " +
 				"Max-Age=0; Expires=Thu, 01 Jan 1970 00:00:00 GMT; " +
-				"Secure; HttpOnly; SameSite=None");
+				"Secure; HttpOnly; Partitioned; SameSite=None");
 	}
 
 	@Test
@@ -82,8 +82,19 @@ class ResponseCookieTests {
 						.hasMessageContaining("invalid cookie domain char"));
 	}
 
+	@Test
+	void sameSiteChecks() {
+
+		Arrays.asList("Strict", "Lax", "None")
+				.forEach(sameSite -> ResponseCookie.from("n", "v").sameSite(sameSite).build());
+
+		Arrays.asList("Lax\r\nSet-Cookie: x=y", "Lax\n", "La;x", "Lax\t", "Lax\u0005")
+				.forEach(sameSite -> assertThatThrownBy(() -> ResponseCookie.from("n", "v").sameSite(sameSite).build())
+						.hasMessageContaining("Invalid cookie SameSite char"));
+	}
+
 	@Test // gh-24663
-	public void domainWithEmptyDoubleQuotes() {
+	void domainWithEmptyDoubleQuotes() {
 
 		Arrays.asList("\"\"", "\t\"\" ", " \" \t \"\t")
 				.forEach(domain -> {

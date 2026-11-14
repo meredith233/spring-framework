@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2023 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,6 +21,7 @@ import java.util.function.Consumer;
 
 import javax.sql.DataSource;
 
+import org.hibernate.annotations.CreationTimestamp;
 import org.junit.jupiter.api.Test;
 
 import org.springframework.aot.hint.MemberCategory;
@@ -30,7 +31,6 @@ import org.springframework.aot.test.generate.TestGenerationContext;
 import org.springframework.context.ApplicationContextInitializer;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
 import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
 import org.springframework.context.aot.ApplicationContextAotGenerator;
 import org.springframework.context.support.GenericApplicationContext;
 import org.springframework.core.io.ResourceLoader;
@@ -38,6 +38,7 @@ import org.springframework.core.test.tools.Compiled;
 import org.springframework.core.test.tools.TestCompiler;
 import org.springframework.orm.jpa.JpaVendorAdapter;
 import org.springframework.orm.jpa.LocalContainerEntityManagerFactoryBean;
+import org.springframework.orm.jpa.domain.Car;
 import org.springframework.orm.jpa.domain.DriversLicense;
 import org.springframework.orm.jpa.domain.Employee;
 import org.springframework.orm.jpa.domain.EmployeeCategoryConverter;
@@ -64,39 +65,39 @@ class PersistenceManagedTypesBeanRegistrationAotProcessorTests {
 	@Test
 	void processEntityManagerWithPackagesToScan() {
 		GenericApplicationContext context = new AnnotationConfigApplicationContext();
-		context.registerBean(EntityManagerWithPackagesToScanConfiguration.class);
+		context.registerBean(JpaDomainConfiguration.class);
 		compile(context, (initializer, compiled) -> {
-			GenericApplicationContext freshApplicationContext = toFreshApplicationContext(
-					initializer);
+			GenericApplicationContext freshApplicationContext = toFreshApplicationContext(initializer);
 			PersistenceManagedTypes persistenceManagedTypes = freshApplicationContext.getBean(
 					"persistenceManagedTypes", PersistenceManagedTypes.class);
 			assertThat(persistenceManagedTypes.getManagedClassNames()).containsExactlyInAnyOrder(
-					DriversLicense.class.getName(), Person.class.getName(), Employee.class.getName(),
-					EmployeeLocationConverter.class.getName());
+					Person.class.getName(), DriversLicense.class.getName(), Employee.class.getName(),
+					EmployeeCategoryConverter.class.getName(), EmployeeKindConverter.class.getName(),
+					EmployeeLocationConverter.class.getName(), Car.class.getName());
 			assertThat(persistenceManagedTypes.getManagedPackages()).isEmpty();
 			assertThat(freshApplicationContext.getBean(
-					EntityManagerWithPackagesToScanConfiguration.class).scanningInvoked).isFalse();
+					JpaDomainConfiguration.class).scanningInvoked).isFalse();
 		});
 	}
 
 	@Test
-	void contributeHints() {
+	void contributeJpaHints() {
 		GenericApplicationContext context = new AnnotationConfigApplicationContext();
-		context.registerBean(EntityManagerWithPackagesToScanConfiguration.class);
+		context.registerBean(JpaDomainConfiguration.class);
 		contributeHints(context, hints -> {
 			assertThat(RuntimeHintsPredicates.reflection().onType(DriversLicense.class)
-					.withMemberCategories(MemberCategory.DECLARED_FIELDS)).accepts(hints);
+					.withMemberCategories(MemberCategory.ACCESS_DECLARED_FIELDS)).accepts(hints);
 			assertThat(RuntimeHintsPredicates.reflection().onType(Person.class)
-					.withMemberCategories(MemberCategory.DECLARED_FIELDS)).accepts(hints);
+					.withMemberCategories(MemberCategory.ACCESS_DECLARED_FIELDS)).accepts(hints);
 			assertThat(RuntimeHintsPredicates.reflection().onType(PersonListener.class)
 					.withMemberCategories(MemberCategory.INVOKE_DECLARED_CONSTRUCTORS, MemberCategory.INVOKE_PUBLIC_METHODS))
 					.accepts(hints);
 			assertThat(RuntimeHintsPredicates.reflection().onType(Employee.class)
-					.withMemberCategories(MemberCategory.DECLARED_FIELDS)).accepts(hints);
-			assertThat(RuntimeHintsPredicates.reflection().onMethod(Employee.class, "preRemove"))
+					.withMemberCategories(MemberCategory.ACCESS_DECLARED_FIELDS)).accepts(hints);
+			assertThat(RuntimeHintsPredicates.reflection().onMethodInvocation(Employee.class, "preRemove"))
 					.accepts(hints);
 			assertThat(RuntimeHintsPredicates.reflection().onType(EmployeeId.class)
-					.withMemberCategories(MemberCategory.DECLARED_FIELDS)).accepts(hints);
+					.withMemberCategories(MemberCategory.ACCESS_DECLARED_FIELDS)).accepts(hints);
 			assertThat(RuntimeHintsPredicates.reflection().onType(EmployeeLocationConverter.class)
 					.withMemberCategories(MemberCategory.INVOKE_DECLARED_CONSTRUCTORS)).accepts(hints);
 			assertThat(RuntimeHintsPredicates.reflection().onType(EmployeeCategoryConverter.class)
@@ -104,14 +105,28 @@ class PersistenceManagedTypesBeanRegistrationAotProcessorTests {
 			assertThat(RuntimeHintsPredicates.reflection().onType(EmployeeKindConverter.class)
 					.withMemberCategories(MemberCategory.INVOKE_DECLARED_CONSTRUCTORS)).accepts(hints);
 			assertThat(RuntimeHintsPredicates.reflection().onType(EmployeeLocation.class)
-					.withMemberCategories(MemberCategory.DECLARED_FIELDS)).accepts(hints);
+					.withMemberCategories(MemberCategory.ACCESS_DECLARED_FIELDS)).accepts(hints);
+			assertThat(RuntimeHintsPredicates.reflection().onMethodInvocation(Car.class, "setId")).accepts(hints);
+			assertThat(RuntimeHintsPredicates.reflection().onMethodInvocation(Car.class, "getId")).accepts(hints);
+			assertThat(RuntimeHintsPredicates.reflection().onMethodInvocation(Car.class, "setModel")).accepts(hints);
+			assertThat(RuntimeHintsPredicates.reflection().onMethodInvocation(Car.class, "getModel")).accepts(hints);
 		});
+	}
+
+	// @Test
+	void contributeHibernateHints() {
+		GenericApplicationContext context = new AnnotationConfigApplicationContext();
+		context.registerBean(HibernateDomainConfiguration.class);
+		contributeHints(context, hints ->
+				assertThat(RuntimeHintsPredicates.reflection().onType(CreationTimestamp.class)
+				.withMemberCategories(MemberCategory.INVOKE_DECLARED_CONSTRUCTORS)).accepts(hints));
 	}
 
 
 	@SuppressWarnings("unchecked")
 	private void compile(GenericApplicationContext applicationContext,
 			BiConsumer<ApplicationContextInitializer<GenericApplicationContext>, Compiled> result) {
+
 		ApplicationContextAotGenerator generator = new ApplicationContextAotGenerator();
 		TestGenerationContext generationContext = new TestGenerationContext();
 		generator.processAheadOfTime(applicationContext, generationContext);
@@ -122,6 +137,7 @@ class PersistenceManagedTypesBeanRegistrationAotProcessorTests {
 
 	private GenericApplicationContext toFreshApplicationContext(
 			ApplicationContextInitializer<GenericApplicationContext> initializer) {
+
 		GenericApplicationContext freshApplicationContext = new GenericApplicationContext();
 		initializer.initialize(freshApplicationContext);
 		freshApplicationContext.refresh();
@@ -135,10 +151,10 @@ class PersistenceManagedTypesBeanRegistrationAotProcessorTests {
 		result.accept(generationContext.getRuntimeHints());
 	}
 
-	@Configuration(proxyBeanMethods = false)
-	public static class EntityManagerWithPackagesToScanConfiguration {
 
-		private boolean scanningInvoked;
+	public abstract static class AbstractEntityManagerWithPackagesToScanConfiguration {
+
+		protected boolean scanningInvoked;
 
 		@Bean
 		public DataSource mockDataSource() {
@@ -155,13 +171,13 @@ class PersistenceManagedTypesBeanRegistrationAotProcessorTests {
 		@Bean
 		public PersistenceManagedTypes persistenceManagedTypes(ResourceLoader resourceLoader) {
 			this.scanningInvoked = true;
-			return new PersistenceManagedTypesScanner(resourceLoader)
-					.scan("org.springframework.orm.jpa.domain");
+			return new PersistenceManagedTypesScanner(resourceLoader).scan(packageToScan());
 		}
 
 		@Bean
 		public LocalContainerEntityManagerFactoryBean entityManagerFactory(DataSource dataSource,
 				JpaVendorAdapter jpaVendorAdapter, PersistenceManagedTypes persistenceManagedTypes) {
+
 			LocalContainerEntityManagerFactoryBean entityManagerFactoryBean = new LocalContainerEntityManagerFactoryBean();
 			entityManagerFactoryBean.setDataSource(dataSource);
 			entityManagerFactoryBean.setJpaVendorAdapter(jpaVendorAdapter);
@@ -169,6 +185,25 @@ class PersistenceManagedTypesBeanRegistrationAotProcessorTests {
 			return entityManagerFactoryBean;
 		}
 
+		protected abstract String packageToScan();
+	}
+
+
+	public static class JpaDomainConfiguration extends AbstractEntityManagerWithPackagesToScanConfiguration {
+
+		@Override
+		protected String packageToScan() {
+			return "org.springframework.orm.jpa.domain";
+		}
+	}
+
+
+	public static class HibernateDomainConfiguration extends AbstractEntityManagerWithPackagesToScanConfiguration {
+
+		@Override
+		protected String packageToScan() {
+			return "org.springframework.orm.jpa.hibernate.domain";
+		}
 	}
 
 }

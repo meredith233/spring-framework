@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2019 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -26,7 +26,7 @@ import java.io.Writer
  * @author Sebastien Deleuze
  * @since 5.2
  */
-class MockMvcResultHandlersDsl internal constructor (private val actions: ResultActions) {
+class MockMvcResultHandlersDsl(private val actions: ResultActions) {
 
 	/**
 	 * @see MockMvcResultHandlers.print

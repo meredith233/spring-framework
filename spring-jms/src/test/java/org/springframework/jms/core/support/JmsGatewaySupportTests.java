@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2023 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -31,10 +31,11 @@ import static org.mockito.Mockito.mock;
  * @author Mark Pollack
  * @since 24.9.2004
  */
+@SuppressWarnings("removal")
 class JmsGatewaySupportTests {
 
 	@Test
-	void testJmsGatewaySupportWithConnectionFactory() {
+	void jmsGatewaySupportWithConnectionFactory() {
 		ConnectionFactory mockConnectionFactory = mock();
 		final List<String> test = new ArrayList<>(1);
 		JmsGatewaySupport gateway = new JmsGatewaySupport() {
@@ -51,7 +52,7 @@ class JmsGatewaySupportTests {
 	}
 
 	@Test
-	void testJmsGatewaySupportWithJmsTemplate() {
+	void jmsGatewaySupportWithJmsTemplate() {
 		JmsTemplate template = new JmsTemplate();
 		final List<String> test = new ArrayList<>(1);
 		JmsGatewaySupport gateway = new JmsGatewaySupport() {

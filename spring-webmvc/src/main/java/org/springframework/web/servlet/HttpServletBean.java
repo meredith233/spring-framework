@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2018 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -25,6 +25,7 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServlet;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.jspecify.annotations.Nullable;
 
 import org.springframework.beans.BeanWrapper;
 import org.springframework.beans.BeansException;
@@ -39,7 +40,6 @@ import org.springframework.core.env.EnvironmentCapable;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.ResourceEditor;
 import org.springframework.core.io.ResourceLoader;
-import org.springframework.lang.Nullable;
 import org.springframework.util.Assert;
 import org.springframework.util.CollectionUtils;
 import org.springframework.util.StringUtils;
@@ -55,7 +55,7 @@ import org.springframework.web.context.support.StandardServletEnvironment;
  * parameters is automatic, with the corresponding setter method getting
  * invoked with the converted value. It is also possible for subclasses to
  * specify required properties. Parameters without matching bean property
- * setter will simply be ignored.
+ * setters will simply be ignored.
  *
  * <p>This servlet leaves request handling to subclasses, inheriting the default
  * behavior of HttpServlet ({@code doGet}, {@code doPost}, etc).
@@ -69,7 +69,7 @@ import org.springframework.web.context.support.StandardServletEnvironment;
  *
  * <p>The {@link FrameworkServlet} class is a more specific servlet base
  * class which loads its own application context. FrameworkServlet serves
- * as direct base class of Spring's full-fledged {@link DispatcherServlet}.
+ * as the direct base class of Spring's full-fledged {@link DispatcherServlet}.
  *
  * @author Rod Johnson
  * @author Juergen Hoeller
@@ -84,8 +84,7 @@ public abstract class HttpServletBean extends HttpServlet implements Environment
 	/** Logger available to subclasses. */
 	protected final Log logger = LogFactory.getLog(getClass());
 
-	@Nullable
-	private ConfigurableEnvironment environment;
+	private @Nullable ConfigurableEnvironment environment;
 
 	private final Set<String> requiredProperties = new HashSet<>(4);
 
@@ -109,6 +108,7 @@ public abstract class HttpServletBean extends HttpServlet implements Environment
 	 * provided by default.
 	 * @throws IllegalArgumentException if environment is not assignable to
 	 * {@code ConfigurableEnvironment}
+	 * @since 3.1
 	 */
 	@Override
 	public void setEnvironment(Environment environment) {
@@ -120,6 +120,7 @@ public abstract class HttpServletBean extends HttpServlet implements Environment
 	 * Return the {@link Environment} associated with this servlet.
 	 * <p>If none specified, a default environment will be initialized via
 	 * {@link #createEnvironment()}.
+	 * @since 3.1
 	 */
 	@Override
 	public ConfigurableEnvironment getEnvironment() {
@@ -133,6 +134,7 @@ public abstract class HttpServletBean extends HttpServlet implements Environment
 	 * Create and return a new {@link StandardServletEnvironment}.
 	 * <p>Subclasses may override this in order to configure the environment or
 	 * specialize the environment type returned.
+	 * @since 3.1
 	 */
 	protected ConfigurableEnvironment createEnvironment() {
 		return new StandardServletEnvironment();
@@ -196,8 +198,7 @@ public abstract class HttpServletBean extends HttpServlet implements Environment
 	 * @see #getServletConfig()
 	 */
 	@Override
-	@Nullable
-	public String getServletName() {
+	public @Nullable String getServletName() {
 		return (getServletConfig() != null ? getServletConfig().getServletName() : null);
 	}
 

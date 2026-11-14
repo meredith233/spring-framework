@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -40,7 +40,7 @@ class BeanFactoryDataSourceLookupTests {
 
 
 	@Test
-	void testLookupSunnyDay() {
+	void lookupSunnyDay() {
 		BeanFactory beanFactory = mock();
 
 		StubDataSource expectedDataSource = new StubDataSource();
@@ -55,7 +55,7 @@ class BeanFactoryDataSourceLookupTests {
 	}
 
 	@Test
-	void testLookupWhereBeanFactoryYieldsNonDataSourceType() {
+	void lookupWhereBeanFactoryYieldsNonDataSourceType() {
 		final BeanFactory beanFactory = mock();
 
 		given(beanFactory.getBean(DATASOURCE_BEAN_NAME, DataSource.class)).willThrow(
@@ -68,7 +68,7 @@ class BeanFactoryDataSourceLookupTests {
 	}
 
 	@Test
-	void testLookupWhereBeanFactoryHasNotBeenSupplied() {
+	void lookupWhereBeanFactoryHasNotBeenSupplied() {
 		BeanFactoryDataSourceLookup lookup = new BeanFactoryDataSourceLookup();
 		assertThatIllegalStateException().isThrownBy(() ->
 				lookup.getDataSource(DATASOURCE_BEAN_NAME));

@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -72,7 +72,7 @@ class ServerHttpRequestTests {
 	}
 
 	@Test  // SPR-15140
-	public void queryParamsWithEncodedValue() throws Exception {
+	void queryParamsWithEncodedValue() throws Exception {
 		MultiValueMap<String, String> params = createRequest("/path?a=%20%2B+%C3%A0").getQueryParams();
 		assertThat(params).hasSize(1);
 		assertThat(params.get("a")).isEqualTo(Collections.singletonList(" + \u00e0"));
@@ -121,7 +121,7 @@ class ServerHttpRequestTests {
 	}
 
 	@Test  // SPR-16434
-	public void mutatePathWithEncodedQueryParams() throws Exception {
+	void mutatePathWithEncodedQueryParams() throws Exception {
 		ServerHttpRequest request = createRequest("/path?name=%E6%89%8E%E6%A0%B9");
 		request = request.mutate().path("/mutatedPath").build();
 
@@ -194,17 +194,27 @@ class ServerHttpRequestTests {
 		assertThat(mutated.getURI().getRawPath()).isEqualTo("/other/path");
 	}
 
+	@Test // gh-37099
+	void mutateContextPathToNull() throws Exception {
+		ServerHttpRequest request = createRequest("/context/path", "/context");
+
+		ServerHttpRequest mutated = request.mutate().contextPath(null).path("/path").build();
+		assertThat(mutated.getPath().contextPath().value()).isEmpty();
+		assertThat(mutated.getPath().pathWithinApplication().value()).isEqualTo("/path");
+		assertThat(mutated.getURI().getRawPath()).isEqualTo("/path");
+	}
+
 	@Test
 	void mutateContextPathWithoutUpdatingPathShouldFail() throws Exception {
 		ServerHttpRequest request = createRequest("/context/path", "/context");
 
-		assertThatThrownBy(() -> request.mutate().contextPath("/fail").build())
+		assertThatThrownBy(() -> request.mutate().contextPath("/fail").build().getPath())
 				.isInstanceOf(IllegalArgumentException.class)
 				.hasMessage("Invalid contextPath '/fail': must match the start of requestPath: '/context/path'");
 	}
 
 	@Test // gh-26304
-	public void mutateDoesNotPreventAccessToNativeRequest() throws Exception {
+	void mutateDoesNotPreventAccessToNativeRequest() throws Exception {
 		ServerHttpRequest request = createRequest("/path");
 		request = request.mutate().header("key", "value").build();
 

@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,10 +17,14 @@
 package org.springframework.validation;
 
 import java.beans.PropertyEditorSupport;
+import java.util.List;
 import java.util.Map;
 
 import org.junit.jupiter.api.Test;
 
+import org.springframework.beans.ConfigurablePropertyAccessor;
+import org.springframework.beans.InvalidPropertyException;
+import org.springframework.beans.InvalidPropertyPathException;
 import org.springframework.beans.MutablePropertyValues;
 import org.springframework.beans.NotWritablePropertyException;
 import org.springframework.beans.NullValueInNestedPathException;
@@ -30,6 +34,7 @@ import org.springframework.tests.sample.beans.FieldAccessBean;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
+import static org.mockito.Mockito.mock;
 
 /**
  * @author Juergen Hoeller
@@ -58,7 +63,7 @@ class DataBinderFieldAccessTests {
 		Map<?, ?> m = binder.getBindingResult().getModel();
 		assertThat(m).as("There is one element in map").hasSize(2);
 		FieldAccessBean tb = (FieldAccessBean) m.get("person");
-		assertThat(tb.equals(rod)).as("Same object").isTrue();
+		assertThat(tb).as("Same object").isEqualTo(rod);
 	}
 
 	@Test
@@ -135,6 +140,69 @@ class DataBinderFieldAccessTests {
 	}
 
 	@Test
+	void directFieldAccessHonorsDefaultAutoGrowCollectionLimit() {
+		FieldAccessForm target = new FieldAccessForm();
+		DataBinder binder = new DataBinder(target);
+		binder.initDirectFieldAccess();
+
+		MutablePropertyValues pvs = new MutablePropertyValues();
+		pvs.add("items[255].name", "value");
+		binder.bind(pvs);
+
+		assertThat(target.items).hasSize(256);
+		assertThat(target.items.get(255).name).isEqualTo("value");
+
+		MutablePropertyValues outOfBounds = new MutablePropertyValues();
+		outOfBounds.add("items[256].name", "too-far");
+		assertThatExceptionOfType(InvalidPropertyException.class).isThrownBy(() ->
+				binder.bind(outOfBounds));
+	}
+
+	@Test  // gh-37252
+	void directFieldAccessHonorsMaxNestedPathDepth() {
+		TestBean rod = new TestBean("rod", 31);
+		TestBean kerry = new TestBean("kerry", 35);
+		rod.setSpouse(kerry);
+		kerry.setSpouse(rod);
+
+		DataBinder binder = new DataBinder(rod, "rod");
+		binder.setMaxNestedPathDepth(2);
+		binder.initDirectFieldAccess();
+
+		MutablePropertyValues pvs = new MutablePropertyValues();
+		pvs.add("spouse.spouse.name", "Jane");
+		binder.bind(pvs);
+		assertThat(rod.getName()).isEqualTo("Jane");
+
+		MutablePropertyValues tooDeep = new MutablePropertyValues();
+		tooDeep.add("spouse.spouse.spouse.name", "Joe");
+		binder.bind(tooDeep);
+		assertThat(kerry.getName()).isEqualTo("kerry");
+		assertThat(binder.getBindingResult().hasErrors()).isFalse();
+
+		binder.setIgnoreUnknownFields(false);
+		MutablePropertyValues tooDeepAgain = new MutablePropertyValues();
+		tooDeepAgain.add("spouse.spouse.spouse.name", "Joe");
+		assertThatExceptionOfType(NotWritablePropertyException.class)
+				.isThrownBy(() -> binder.bind(tooDeepAgain))
+				.withCauseInstanceOf(InvalidPropertyPathException.class);
+		assertThat(kerry.getName()).isEqualTo("kerry");
+	}
+
+	@Test
+	@SuppressWarnings("serial")
+	void customDirectFieldAccessor() {
+		ConfigurablePropertyAccessor accessor = mock(ConfigurablePropertyAccessor.class);
+		DirectFieldBindingResult result = new DirectFieldBindingResult(new FieldAccessForm(), "form", true, 10) {
+			@Override
+			protected ConfigurablePropertyAccessor createDirectFieldAccessor() {
+				return accessor;
+			}
+		};
+		assertThat(result.getPropertyAccessor()).isSameAs(accessor);
+	}
+
+	@Test
 	void bindingWithErrorsAndCustomEditors() {
 		FieldAccessBean rod = new FieldAccessBean();
 		DataBinder binder = new DataBinder(rod, "person");
@@ -175,5 +243,17 @@ class DataBinderFieldAccessTests {
 				assertThat(binder.getBindingResult().getFieldValue("spouse")).isEqualTo("Kerry");
 				assertThat(tb.getSpouse()).isNotNull();
 			});
+	}
+
+
+	static class FieldAccessForm {
+
+		public List<FieldAccessItem> items;
+	}
+
+
+	static class FieldAccessItem {
+
+		public String name;
 	}
 }

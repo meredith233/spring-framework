@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2023 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -30,7 +30,7 @@ import static org.mockito.Mockito.mock;
 class JmsDestinationAccessorTests {
 
 	@Test
-	void testChokesIfDestinationResolverIsetToNullExplicitly() {
+	void chokesIfDestinationResolverIsetToNullExplicitly() {
 		ConnectionFactory connectionFactory = mock();
 
 		JmsDestinationAccessor accessor = new StubJmsDestinationAccessor();
@@ -40,7 +40,7 @@ class JmsDestinationAccessorTests {
 	}
 
 	@Test
-	void testSessionTransactedModeReallyDoesDefaultToFalse() {
+	void sessionTransactedModeReallyDoesDefaultToFalse() {
 		JmsDestinationAccessor accessor = new StubJmsDestinationAccessor();
 		assertThat(accessor.isPubSubDomain()).as("The [pubSubDomain] property of JmsDestinationAccessor must default to " +
 				"false (i.e. Queues are used by default). Change this test (and the " +

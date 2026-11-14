@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -33,8 +33,11 @@ import org.dom4j.Document;
 import org.dom4j.Element;
 import org.dom4j.io.SAXReader;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.xml.sax.SAXException;
 
+import org.springframework.context.ApplicationContextException;
 import org.springframework.context.support.StaticApplicationContext;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.core.io.Resource;
@@ -44,6 +47,7 @@ import org.springframework.web.testfixture.servlet.MockHttpServletResponse;
 import static java.util.Collections.emptyMap;
 import static java.util.Collections.singletonMap;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
 
 /**
@@ -81,34 +85,34 @@ class XsltViewTests {
 	}
 
 	@Test
-	void testSimpleTransformWithDocument() throws Exception {
+	void simpleTransformWithDocument() throws Exception {
 		org.w3c.dom.Document document = getDomDocument();
 		doTestWithModel(singletonMap("someKey", document));
 	}
 
 	@Test
-	void testSimpleTransformWithNode() throws Exception {
+	void simpleTransformWithNode() throws Exception {
 		org.w3c.dom.Document document = getDomDocument();
 		doTestWithModel(singletonMap("someKey", document.getDocumentElement()));
 	}
 
 	@Test
-	void testSimpleTransformWithInputStream() throws Exception {
+	void simpleTransformWithInputStream() throws Exception {
 		doTestWithModel(singletonMap("someKey", getProductDataResource().getInputStream()));
 	}
 
 	@Test
-	void testSimpleTransformWithReader() throws Exception {
+	void simpleTransformWithReader() throws Exception {
 		doTestWithModel(singletonMap("someKey", new InputStreamReader(getProductDataResource().getInputStream())));
 	}
 
 	@Test
-	void testSimpleTransformWithResource() throws Exception {
+	void simpleTransformWithResource() throws Exception {
 		doTestWithModel(singletonMap("someKey", getProductDataResource()));
 	}
 
 	@Test
-	void testWithSourceKey() throws Exception {
+	void withSourceKey() throws Exception {
 		XsltView view = getXsltView(HTML_OUTPUT);
 		view.setSourceKey("actualData");
 
@@ -121,7 +125,7 @@ class XsltViewTests {
 	}
 
 	@Test
-	void testContentTypeCarriedFromTemplate() throws Exception {
+	void contentTypeCarriedFromTemplate() throws Exception {
 		XsltView view = getXsltView(HTML_OUTPUT);
 
 		Source source = new StreamSource(getProductDataResource().getInputStream());
@@ -131,7 +135,7 @@ class XsltViewTests {
 	}
 
 	@Test
-	void testModelParametersCarriedAcross() throws Exception {
+	void modelParametersCarriedAcross() throws Exception {
 		Map<String, Object> model = new HashMap<>();
 		model.put("someKey", getProductDataResource());
 		model.put("title", "Product List");
@@ -140,7 +144,7 @@ class XsltViewTests {
 	}
 
 	@Test
-	void testStaticAttributesCarriedAcross() throws Exception {
+	void staticAttributesCarriedAcross() throws Exception {
 		XsltView view = getXsltView(HTML_OUTPUT);
 		view.setSourceKey("actualData");
 		view.addStaticAttribute("title", "Product List");
@@ -153,6 +157,14 @@ class XsltViewTests {
 		assertHtmlOutput(this.response.getContentAsString());
 		assertThat(this.response.getContentAsString()).contains("Product List");
 
+	}
+
+	@ParameterizedTest
+	@ValueSource(strings = {"file:products.xsl", "/file:products.xsl"})
+	void invalidStylesheetLocation(String location) {
+		assertThatExceptionOfType(ApplicationContextException.class)
+				.isThrownBy(() -> getXsltView(location))
+				.withMessageStartingWith("Invalid XSLT stylesheet location");
 	}
 
 	private org.w3c.dom.Document getDomDocument() throws ParserConfigurationException, SAXException, IOException {

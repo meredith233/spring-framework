@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,13 +16,13 @@
 
 package org.springframework.jdbc.config;
 
-import java.util.function.Predicate;
-
 import javax.sql.DataSource;
 
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 
 import org.springframework.beans.PropertyValue;
+import org.springframework.beans.factory.BeanCreationException;
 import org.springframework.beans.factory.config.BeanDefinition;
 import org.springframework.beans.factory.support.DefaultListableBeanFactory;
 import org.springframework.beans.factory.xml.XmlBeanDefinitionReader;
@@ -34,6 +34,7 @@ import org.springframework.jdbc.BadSqlGrammarException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.AbstractDriverBasedDataSource;
 import org.springframework.jdbc.datasource.embedded.EmbeddedDatabaseFactoryBean;
+import org.springframework.jdbc.datasource.init.CannotReadScriptException;
 import org.springframework.jdbc.datasource.init.DataSourceInitializer;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -69,27 +70,32 @@ class JdbcNamespaceIntegrationTests {
 	}
 
 	@Test
+	void createWithNonExistentResource() {
+		assertThatExceptionOfType(BeanCreationException.class)
+				.isThrownBy(() -> assertCorrectSetup("jdbc-config-nonexistent.xml", "dataSource"))
+				.withCauseInstanceOf(CannotReadScriptException.class);
+	}
+
+	@Test
 	void createWithAnonymousDataSourceAndDefaultDatabaseName() {
-		assertCorrectSetupForSingleDataSource("jdbc-config-db-name-default-and-anonymous-datasource.xml",
-			url -> url.endsWith(DEFAULT_DATABASE_NAME));
+		assertThat(extractDataSourceUrl("jdbc-config-db-name-default-and-anonymous-datasource.xml"))
+				.endsWith(DEFAULT_DATABASE_NAME);
 	}
 
 	@Test
 	void createWithImplicitDatabaseName() {
-		assertCorrectSetupForSingleDataSource("jdbc-config-db-name-implicit.xml", url -> url.endsWith("dataSource"));
+		assertThat(extractDataSourceUrl("jdbc-config-db-name-implicit.xml")).endsWith("dataSource");
 	}
 
 	@Test
 	void createWithExplicitDatabaseName() {
-		assertCorrectSetupForSingleDataSource("jdbc-config-db-name-explicit.xml", url -> url.endsWith("customDbName"));
+		assertThat(extractDataSourceUrl("jdbc-config-db-name-explicit.xml")).endsWith("customDbName");
 	}
 
 	@Test
 	void createWithGeneratedDatabaseName() {
-		Predicate<String> urlPredicate = url -> url.startsWith("jdbc:hsqldb:mem:");
-		urlPredicate.and(url -> !url.endsWith("dataSource"));
-		urlPredicate.and(url -> !url.endsWith("shouldBeOverriddenByGeneratedName"));
-		assertCorrectSetupForSingleDataSource("jdbc-config-db-name-generated.xml", urlPredicate);
+		assertThat(extractDataSourceUrl("jdbc-config-db-name-generated.xml")).startsWith("jdbc:hsqldb:mem:")
+				.doesNotEndWith("dataSource").doesNotEndWith("shouldBeOverriddenByGeneratedName");
 	}
 
 	@Test
@@ -191,13 +197,13 @@ class JdbcNamespaceIntegrationTests {
 		}
 	}
 
-	private void assertCorrectSetupForSingleDataSource(String file, Predicate<String> urlPredicate) {
+	private @Nullable String extractDataSourceUrl(String file) {
 		try (ConfigurableApplicationContext context = context(file)) {
 			DataSource dataSource = context.getBean(DataSource.class);
 			assertNumRowsInTestTable(new JdbcTemplate(dataSource), 1);
 			assertThat(dataSource).isInstanceOf(AbstractDriverBasedDataSource.class);
 			AbstractDriverBasedDataSource adbDataSource = (AbstractDriverBasedDataSource) dataSource;
-			assertThat(urlPredicate.test(adbDataSource.getUrl())).isTrue();
+			return adbDataSource.getUrl();
 		}
 	}
 

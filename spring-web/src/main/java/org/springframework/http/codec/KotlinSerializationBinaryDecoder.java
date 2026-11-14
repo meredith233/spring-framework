@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2022 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,9 +18,11 @@ package org.springframework.http.codec;
 
 import java.util.List;
 import java.util.Map;
+import java.util.function.Predicate;
 
 import kotlinx.serialization.BinaryFormat;
 import kotlinx.serialization.KSerializer;
+import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Publisher;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
@@ -30,12 +32,17 @@ import org.springframework.core.codec.ByteArrayDecoder;
 import org.springframework.core.codec.Decoder;
 import org.springframework.core.codec.DecodingException;
 import org.springframework.core.io.buffer.DataBuffer;
-import org.springframework.lang.Nullable;
 import org.springframework.util.MimeType;
 
 /**
  * Abstract base class for {@link Decoder} implementations that defer to Kotlin
  * {@linkplain BinaryFormat binary serializers}.
+ *
+ * <p>As of Spring Framework 7.0, by default it only decodes types annotated with
+ * {@link kotlinx.serialization.Serializable @Serializable} at type or generics level
+ * since it allows combined usage with other general purpose decoders without conflicts.
+ * Alternative constructors with a {@code Predicate<ResolvableType>} parameter can be used
+ * to customize this behavior.
  *
  * @author Sebastien Deleuze
  * @author Iain Henderson
@@ -50,8 +57,24 @@ public abstract class KotlinSerializationBinaryDecoder<T extends BinaryFormat> e
 	private final ByteArrayDecoder byteArrayDecoder = new ByteArrayDecoder();
 
 
+	/**
+	 * Creates a new instance with the given format and supported mime types
+	 * which only decodes types annotated with
+	 * {@link kotlinx.serialization.Serializable @Serializable} at type or
+	 * generics level.
+	 */
 	public KotlinSerializationBinaryDecoder(T format, MimeType... supportedMimeTypes) {
 		super(format, supportedMimeTypes);
+	}
+
+	/**
+	 * Creates a new instance with the given format and supported mime types
+	 * which only decodes types for which the specified predicate returns
+	 * {@code true}.
+	 * @since 7.0
+	 */
+	public KotlinSerializationBinaryDecoder(T format, Predicate<ResolvableType> typePredicate, MimeType... supportedMimeTypes) {
+		super(format, typePredicate, supportedMimeTypes);
 	}
 
 	/**
@@ -60,7 +83,7 @@ public abstract class KotlinSerializationBinaryDecoder<T extends BinaryFormat> e
 	 * decoding to a single {@code DataBuffer},
 	 * {@link java.nio.ByteBuffer ByteBuffer}, {@code byte[]},
 	 * {@link org.springframework.core.io.Resource Resource}, {@code String}, etc.
-	 * It can also occur when splitting the input stream, e.g. delimited text,
+	 * It can also occur when splitting the input stream, for example, delimited text,
 	 * in which case the limit applies to data buffered between delimiters.
 	 * <p>By default this is set to 256K.
 	 * @param byteCount the max number of bytes to buffer, or -1 for unlimited
@@ -109,7 +132,15 @@ public abstract class KotlinSerializationBinaryDecoder<T extends BinaryFormat> e
 			}
 			return this.byteArrayDecoder
 					.decodeToMono(inputStream, elementType, mimeType, hints)
-					.map(byteArray -> format().decodeFromByteArray(serializer, byteArray));
+					.handle((byteArray, sink) -> {
+						try {
+							sink.next(format().decodeFromByteArray(serializer, byteArray));
+							sink.complete();
+						}
+						catch (IllegalArgumentException ex) {
+							sink.error(new DecodingException("Decoding error: " + ex.getMessage(), ex));
+						}
+					});
 		});
 	}
 

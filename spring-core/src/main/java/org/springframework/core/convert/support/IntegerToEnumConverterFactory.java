@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2019 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,8 +16,13 @@
 
 package org.springframework.core.convert.support;
 
+import org.jspecify.annotations.Nullable;
+
+import org.springframework.core.convert.TypeDescriptor;
+import org.springframework.core.convert.converter.ConditionalConverter;
 import org.springframework.core.convert.converter.Converter;
 import org.springframework.core.convert.converter.ConverterFactory;
+import org.springframework.util.Assert;
 
 /**
  * Converts from an Integer to a {@link java.lang.Enum} by calling {@link Class#getEnumConstants()}.
@@ -27,11 +32,18 @@ import org.springframework.core.convert.converter.ConverterFactory;
  * @since 4.3
  */
 @SuppressWarnings({"rawtypes", "unchecked"})
-final class IntegerToEnumConverterFactory implements ConverterFactory<Integer, Enum> {
+final class IntegerToEnumConverterFactory implements ConverterFactory<Integer, Enum>, ConditionalConverter {
 
 	@Override
-	public <T extends Enum> Converter<Integer, T> getConverter(Class<T> targetType) {
-		return new IntegerToEnum(ConversionUtils.getEnumType(targetType));
+	public <T extends Enum> Converter<Integer, @Nullable T> getConverter(Class<T> targetType) {
+		Class<?> enumType = ConversionUtils.resolveEnumType(targetType);
+		Assert.notNull(enumType, () -> "The target type " + targetType.getName() + " does not refer to an enum");
+		return new IntegerToEnum(enumType);
+	}
+
+	@Override
+	public boolean matches(TypeDescriptor sourceType, TypeDescriptor targetType) {
+		return (ConversionUtils.resolveEnumType(targetType.getType()) != null);
 	}
 
 

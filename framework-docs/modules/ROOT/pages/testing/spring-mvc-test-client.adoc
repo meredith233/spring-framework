@@ -1,16 +1,32 @@
 [[spring-mvc-test-client]]
 = Testing Client Applications
 
-You can use client-side tests to test code that internally uses the `RestTemplate`. The
-idea is to declare expected requests and to provide "`stub`" responses so that you can
-focus on testing the code in isolation (that is, without running a server). The following
-example shows how to do so:
+To test code that uses the `RestClient` or `RestTemplate`, you can use a mock web server, such as
+https://github.com/square/okhttp#mockwebserver[OkHttp MockWebServer] or
+https://wiremock.org/[WireMock]. Mock web servers accept requests over HTTP like a regular
+server, and that means you can test with the same HTTP client that is also configured in
+the same way as in production, which is important because there are often subtle
+differences in the way different clients handle network I/O. Another advantage of mock
+web servers is the ability to simulate specific network issues and conditions at the
+transport level, in combination with the client used in production.
+
+In addition to dedicated mock web servers, historically the Spring Framework has provided
+a built-in option to test `RestClient` or `RestTemplate` through `MockRestServiceServer`.
+This relies on configuring the client under test with a custom `ClientHttpRequestFactory`
+backed by the mock server that is in turn set up to expect requests and send "`stub`"
+responses so that you can focus on testing the code in isolation, without running a server.
+
+TIP: `MockRestServiceServer` predates the existence of mock web servers. At present, we
+recommend using mock web servers for more complete testing of the transport layer and
+network conditions.
+
+The following example shows an example of using `MockRestServiceServer`:
 
 [tabs]
 ======
 Java::
 +
-[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+[source,java,indent=0,subs="verbatim,quotes"]
 ----
 	RestTemplate restTemplate = new RestTemplate();
 
@@ -24,7 +40,7 @@ Java::
 
 Kotlin::
 +
-[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+[source,kotlin,indent=0,subs="verbatim,quotes"]
 ----
 	val restTemplate = RestTemplate()
 
@@ -55,14 +71,14 @@ requests are allowed to come in any order. The following example uses `ignoreExp
 ======
 Java::
 +
-[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+[source,java,indent=0,subs="verbatim,quotes"]
 ----
 	server = MockRestServiceServer.bindTo(restTemplate).ignoreExpectOrder(true).build();
 ----
 
 Kotlin::
 +
-[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+[source,kotlin,indent=0,subs="verbatim,quotes"]
 ----
 	server = MockRestServiceServer.bindTo(restTemplate).ignoreExpectOrder(true).build()
 ----
@@ -77,7 +93,7 @@ argument that specifies a count range (for example, `once`, `manyTimes`, `max`, 
 ======
 Java::
 +
-[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+[source,java,indent=0,subs="verbatim,quotes"]
 ----
 	RestTemplate restTemplate = new RestTemplate();
 
@@ -92,7 +108,7 @@ Java::
 
 Kotlin::
 +
-[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+[source,kotlin,indent=0,subs="verbatim,quotes"]
 ----
 	val restTemplate = RestTemplate()
 
@@ -122,7 +138,7 @@ logic but without running a server. The following example shows how to do so:
 ======
 Java::
 +
-[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+[source,java,indent=0,subs="verbatim,quotes"]
 ----
 	MockMvc mockMvc = MockMvcBuilders.webAppContextSetup(this.wac).build();
 	this.restTemplate = new RestTemplate(new MockMvcClientHttpRequestFactory(mockMvc));
@@ -132,10 +148,10 @@ Java::
 
 Kotlin::
 +
-[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+[source,kotlin,indent=0,subs="verbatim,quotes"]
 ----
 	val mockMvc = MockMvcBuilders.webAppContextSetup(this.wac).build()
-	restTemplate = RestTemplate(MockMvcClientHttpRequestFactory(mockMvc))
+	this.restTemplate = RestTemplate(MockMvcClientHttpRequestFactory(mockMvc))
 
 	// Test code that uses the above RestTemplate ...
 ----
@@ -149,7 +165,7 @@ of mocking the response. The following example shows how to do that through
 ======
 Java::
 +
-[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+[source,java,indent=0,subs="verbatim,quotes"]
 ----
 	RestTemplate restTemplate = new RestTemplate();
 
@@ -167,12 +183,12 @@ Java::
 
 Kotlin::
 +
-[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+[source,kotlin,indent=0,subs="verbatim,quotes"]
 ----
 	val restTemplate = RestTemplate()
 
 	// Create ExecutingResponseCreator with the original request factory
-	val withActualResponse = new ExecutingResponseCreator(restTemplate.getRequestFactory())
+	val withActualResponse = ExecutingResponseCreator(restTemplate.getRequestFactory())
 
 	val mockServer = MockRestServiceServer.bindTo(restTemplate).build()
 	mockServer.expect(requestTo("/profile")).andRespond(withSuccess())
@@ -193,8 +209,9 @@ Then we define expectations with two kinds of responses:
  * a response obtained through a call to the `/quoteOfTheDay` endpoint
 
 In the second case, the request is executed through the `ClientHttpRequestFactory` that was
-captured earlier. This generates a response that could e.g. come from an actual remote server,
+captured earlier. This generates a response that could, for example, come from an actual remote server,
 depending on how the `RestTemplate` was originally configured.
+
 
 [[spring-mvc-test-client-static-imports]]
 == Static Imports

@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2023 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -122,7 +122,7 @@ public abstract class BodyExtractors {
 	/**
 	 * Extractor to read form data into {@code MultiValueMap<String, String>}.
 	 * <p>As of 5.1 this method can also be used on the client side to read form
-	 * data from a server response (e.g. OAuth).
+	 * data from a server response (for example, OAuth).
 	 * @return {@code BodyExtractor} for form data
 	 */
 	public static BodyExtractor<Mono<MultiValueMap<String, String>>, ReactiveHttpInputMessage> toFormData() {

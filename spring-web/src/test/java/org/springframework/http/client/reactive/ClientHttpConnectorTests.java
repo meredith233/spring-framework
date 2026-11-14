@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,6 +23,10 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
+import java.time.ZoneOffset;
+import java.time.ZonedDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -30,14 +34,17 @@ import java.util.Random;
 import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 import java.util.function.Consumer;
+import java.util.function.Function;
 
-import okhttp3.mockwebserver.MockResponse;
-import okhttp3.mockwebserver.MockWebServer;
-import okhttp3.mockwebserver.RecordedRequest;
+import mockwebserver3.MockResponse;
+import mockwebserver3.MockWebServer;
+import mockwebserver3.RecordedRequest;
 import okio.Buffer;
+import org.apache.hc.client5.http.impl.async.HttpAsyncClientBuilder;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Named;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -53,11 +60,16 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ReactiveHttpOutputMessage;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
 import static org.assertj.core.api.Assertions.fail;
+import static org.assertj.core.api.Assumptions.assumeThat;
 import static org.junit.jupiter.api.Named.named;
 
 /**
+ * Tests for {@link ClientHttpConnector} implementations.
  * @author Arjen Poutsma
+ * @author Brian Clozel
+ * @author Sebastien Deleuze
  */
 class ClientHttpConnectorTests {
 
@@ -74,8 +86,8 @@ class ClientHttpConnectorTests {
 	}
 
 	@AfterEach
-	void stopServer() throws IOException {
-		server.shutdown();
+	void stopServer() {
+		server.close();
 	}
 
 	// Do not auto-close arguments since HttpComponentsClientHttpConnector implements
@@ -86,11 +98,10 @@ class ClientHttpConnectorTests {
 		URI uri = this.server.url("/").uri();
 
 		String responseBody = "bar\r\n";
-		prepareResponse(response -> {
-			response.setResponseCode(200);
-			response.addHeader("Baz", "Qux");
-			response.setBody(responseBody);
-		});
+		prepareResponse(builder -> builder
+				.code(200)
+				.addHeader("Baz", "Qux")
+				.body(responseBody));
 
 		String requestBody = "foo\r\n";
 		boolean requestHasBody = METHODS_WITH_BODY.contains(method);
@@ -134,9 +145,9 @@ class ClientHttpConnectorTests {
 
 		expectRequest(request -> {
 			assertThat(request.getMethod()).isEqualTo(method.name());
-			assertThat(request.getHeader("Foo")).isEqualTo("Bar");
+			assertThat(request.getHeaders().get("Foo")).isEqualTo("Bar");
 			if (requestHasBody) {
-				assertThat(request.getBody().readUtf8()).isEqualTo(requestBody);
+				assertThat(request.getBody().utf8()).isEqualTo(requestBody);
 			}
 		});
 	}
@@ -148,18 +159,22 @@ class ClientHttpConnectorTests {
 				stringBuffer("foo"),
 				Mono.error(error)
 		);
-		prepareResponse(response -> response.setResponseCode(200));
+		prepareResponse(builder -> builder.code(200));
 		Mono<ClientHttpResponse> futureResponse =
 				connector.connect(HttpMethod.POST, this.server.url("/").uri(), request -> request.writeWith(body));
 		StepVerifier.create(futureResponse)
-				.expectErrorSatisfies(throwable -> assertThat(throwable).isSameAs(error))
+				.expectErrorSatisfies(throwable -> assertThat(throwable).satisfiesAnyOf(
+						// All other connectors and the JDK HttpClient prior to Java 26.
+						ex -> assertThat(ex).isSameAs(error),
+						// As of Java 26, the JDK HttpClient wraps the error in an IOException.
+						ex -> assertThat(ex).isInstanceOf(IOException.class).cause().isSameAs(error)))
 				.verify();
 	}
 
 	@ParameterizedConnectorTest
 	void cancelResponseBody(ClientHttpConnector connector) {
 		Buffer responseBody = randomBody(100);
-		prepareResponse(response -> response.setBody(responseBody));
+		prepareResponse(builder -> builder.body(responseBody));
 
 		ClientHttpResponse response = connector.connect(HttpMethod.POST, this.server.url("/").uri(),
 				ReactiveHttpOutputMessage::setComplete).block();
@@ -170,6 +185,86 @@ class ClientHttpConnectorTests {
 				.thenRequest(1)
 				.thenCancel()
 				.verify();
+	}
+
+	@ParameterizedConnectorTest
+	void cookieExpireValueSetAsMaxAge(ClientHttpConnector connector) {
+		ZonedDateTime tomorrow = ZonedDateTime.now(ZoneOffset.UTC).plusDays(1);
+		String formattedDate = tomorrow.format(DateTimeFormatter.RFC_1123_DATE_TIME);
+
+		prepareResponse(builder -> builder
+				.code(200)
+				.addHeader("Set-Cookie", "id=test; Expires= " + formattedDate + ";"));
+		Mono<ClientHttpResponse> futureResponse =
+				connector.connect(HttpMethod.GET, this.server.url("/").uri(), ReactiveHttpOutputMessage::setComplete);
+		StepVerifier.create(futureResponse)
+				.assertNext(response -> {
+							assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+							assertThat(response.getCookies().getFirst("id").getMaxAge()).isCloseTo(Duration.ofDays(1), Duration.ofSeconds(10));
+						}
+				)
+				.verifyComplete();
+	}
+
+	@ParameterizedConnectorTest
+	void partitionedCookieSupport(ClientHttpConnector connector) {
+		assumeThat(connector).as("Jetty and JDK clients do not support partitioned cookies")
+				.isNotInstanceOfAny(JettyClientHttpConnector.class, JdkClientHttpConnector.class);
+
+		prepareResponse(builder -> builder
+				.code(200)
+				.addHeader("Set-Cookie", "id=test; Partitioned;"));
+		Mono<ClientHttpResponse> futureResponse =
+				connector.connect(HttpMethod.GET, this.server.url("/").uri(), ReactiveHttpOutputMessage::setComplete);
+		StepVerifier.create(futureResponse)
+				.assertNext(response -> {
+							assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+							assertThat(response.getCookies().getFirst("id").isPartitioned()).isTrue();
+						}
+				)
+				.verifyComplete();
+	}
+
+	@Test
+	void disableCookieWithHttpComponents() {
+		ClientHttpConnector connector = new HttpComponentsClientHttpConnector(
+				HttpAsyncClientBuilder.create().disableCookieManagement().build()
+		);
+
+		prepareResponse(builder -> builder
+				.code(200)
+				.addHeader("Set-Cookie", "id=test;"));
+		Mono<ClientHttpResponse> futureResponse =
+				connector.connect(HttpMethod.GET, this.server.url("/").uri(), ReactiveHttpOutputMessage::setComplete);
+		StepVerifier.create(futureResponse)
+				.assertNext(response -> {
+							assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+							assertThat(response.getCookies()).isEmpty();
+						}
+				)
+				.verifyComplete();
+
+	}
+
+	@Test
+	void readTimeoutZeroWithJdk() {
+		JdkClientHttpConnector connector = new JdkClientHttpConnector();
+		connector.setReadTimeout(Duration.ZERO);
+
+		prepareResponse(builder -> builder.code(200));
+		Mono<ClientHttpResponse> futureResponse =
+				connector.connect(HttpMethod.GET, this.server.url("/").uri(), ReactiveHttpOutputMessage::setComplete);
+		StepVerifier.create(futureResponse)
+				.assertNext(response -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK))
+				.verifyComplete();
+	}
+
+	@Test  // gh-37425
+	void negativeReadTimeoutIsRejectedWithJdk() {
+		JdkClientHttpConnector connector = new JdkClientHttpConnector();
+		assertThatIllegalArgumentException()
+				.isThrownBy(() -> connector.setReadTimeout(Duration.ofMillis(-1)))
+				.withMessage("Timeout must be a non-negative value");
 	}
 
 	private Buffer randomBody(int size) {
@@ -183,10 +278,9 @@ class ClientHttpConnectorTests {
 		return responseBody;
 	}
 
-	private void prepareResponse(Consumer<MockResponse> consumer) {
-		MockResponse response = new MockResponse();
-		consumer.accept(response);
-		this.server.enqueue(response);
+	private void prepareResponse(Function<MockResponse.Builder, MockResponse.Builder> f) {
+		MockResponse.Builder builder = new MockResponse.Builder();
+		this.server.enqueue(f.apply(builder).build());
 	}
 
 	private void expectRequest(Consumer<RecordedRequest> consumer) {
@@ -211,7 +305,8 @@ class ClientHttpConnectorTests {
 		return Arrays.asList(
 				named("Reactor Netty", new ReactorClientHttpConnector()),
 				named("Jetty", new JettyClientHttpConnector()),
-				named("HttpComponents", new HttpComponentsClientHttpConnector())
+				named("HttpComponents", new HttpComponentsClientHttpConnector()),
+				named("Jdk", new JdkClientHttpConnector())
 		);
 	}
 

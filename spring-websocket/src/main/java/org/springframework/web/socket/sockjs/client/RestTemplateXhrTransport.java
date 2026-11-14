@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2023 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,6 +22,8 @@ import java.io.InputStream;
 import java.net.URI;
 import java.util.concurrent.CompletableFuture;
 
+import org.jspecify.annotations.Nullable;
+
 import org.springframework.core.task.SimpleAsyncTaskExecutor;
 import org.springframework.core.task.TaskExecutor;
 import org.springframework.http.HttpHeaders;
@@ -32,7 +34,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.http.StreamingHttpOutputMessage;
 import org.springframework.http.client.ClientHttpRequest;
 import org.springframework.http.client.ClientHttpResponse;
-import org.springframework.lang.Nullable;
 import org.springframework.util.Assert;
 import org.springframework.util.StreamUtils;
 import org.springframework.web.client.HttpServerErrorException;
@@ -52,7 +53,10 @@ import org.springframework.web.socket.sockjs.frame.SockJsFrame;
  *
  * @author Rossen Stoyanchev
  * @since 4.1
+ * @deprecated as of 7.1 in favor of {@link RestClientXhrTransport}.
  */
+@Deprecated(since = "7.1", forRemoval = true)
+@SuppressWarnings("removal")
 public class RestTemplateXhrTransport extends AbstractXhrTransport {
 
 	private final RestOperations restTemplate;
@@ -167,8 +171,7 @@ public class RestTemplateXhrTransport extends AbstractXhrTransport {
 
 		private final HttpHeaders headers;
 
-		@Nullable
-		private final String body;
+		private final @Nullable String body;
 
 		public XhrRequestCallback(HttpHeaders headers) {
 			this(headers, null);
@@ -207,8 +210,7 @@ public class RestTemplateXhrTransport extends AbstractXhrTransport {
 		}
 
 		@Override
-		@Nullable
-		public Object extractData(ClientHttpResponse response) throws IOException {
+		public @Nullable Object extractData(ClientHttpResponse response) throws IOException {
 			HttpStatusCode httpStatus = response.getStatusCode();
 			if (httpStatus != HttpStatus.OK) {
 				throw new HttpServerErrorException(

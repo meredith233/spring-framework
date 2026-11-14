@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -42,7 +42,7 @@ import static org.mockito.Mockito.mock;
 class SingleColumnRowMapperTests {
 
 	@Test  // SPR-16483
-	public void useDefaultConversionService() throws SQLException {
+	void useDefaultConversionService() throws SQLException {
 		Timestamp timestamp = new Timestamp(0);
 
 		SingleColumnRowMapper<LocalDateTime> rowMapper = SingleColumnRowMapper.newInstance(LocalDateTime.class);
@@ -61,7 +61,7 @@ class SingleColumnRowMapperTests {
 	}
 
 	@Test  // SPR-16483
-	public void useCustomConversionService() throws SQLException {
+	void useCustomConversionService() throws SQLException {
 		Timestamp timestamp = new Timestamp(0);
 
 		DefaultConversionService myConversionService = new DefaultConversionService();
@@ -85,7 +85,7 @@ class SingleColumnRowMapperTests {
 	}
 
 	@Test // SPR-16483
-	public void doesNotUseConversionService() throws SQLException {
+	void doesNotUseConversionService() throws SQLException {
 		SingleColumnRowMapper<LocalDateTime> rowMapper =
 				SingleColumnRowMapper.newInstance(LocalDateTime.class, null);
 

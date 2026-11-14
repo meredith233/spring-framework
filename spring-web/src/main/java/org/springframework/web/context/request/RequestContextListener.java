@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2022 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -30,9 +30,9 @@ import org.springframework.context.i18n.LocaleContextHolder;
  * <p>Alternatively, Spring's {@link org.springframework.web.filter.RequestContextFilter}
  * and Spring's {@link org.springframework.web.servlet.DispatcherServlet} also expose
  * the same request context to the current thread. In contrast to this listener,
- * advanced options are available there (e.g. "threadContextInheritable").
+ * advanced options are available there (for example, "threadContextInheritable").
  *
- * <p>This listener is mainly for use with third-party servlets, e.g. the JSF FacesServlet.
+ * <p>This listener is mainly for use with third-party servlets, for example, the JSF FacesServlet.
  * Within Spring's own web support, DispatcherServlet's processing is perfectly sufficient.
  *
  * @author Juergen Hoeller

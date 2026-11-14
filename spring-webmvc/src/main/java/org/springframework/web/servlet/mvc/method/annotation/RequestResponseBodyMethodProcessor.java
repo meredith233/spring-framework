@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,8 +18,11 @@ package org.springframework.web.servlet.mvc.method.annotation;
 
 import java.io.IOException;
 import java.lang.reflect.Type;
-import java.net.URI;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+
+import org.jspecify.annotations.Nullable;
 
 import org.springframework.core.Conventions;
 import org.springframework.core.MethodParameter;
@@ -32,7 +35,6 @@ import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.http.converter.HttpMessageNotWritableException;
 import org.springframework.http.server.ServletServerHttpRequest;
 import org.springframework.http.server.ServletServerHttpResponse;
-import org.springframework.lang.Nullable;
 import org.springframework.validation.BindingResult;
 import org.springframework.web.ErrorResponse;
 import org.springframework.web.HttpMediaTypeNotAcceptableException;
@@ -65,6 +67,9 @@ import org.springframework.web.servlet.mvc.support.DefaultHandlerExceptionResolv
  * @since 3.1
  */
 public class RequestResponseBodyMethodProcessor extends AbstractMessageConverterMethodProcessor {
+
+	private final Map<Class<?>, Boolean> responseBodyControllerCache = new ConcurrentHashMap<>();
+
 
 	/**
 	 * Basic constructor with converters only. Suitable for resolving
@@ -131,7 +136,8 @@ public class RequestResponseBodyMethodProcessor extends AbstractMessageConverter
 
 	@Override
 	public boolean supportsReturnType(MethodParameter returnType) {
-		return (AnnotatedElementUtils.hasAnnotation(returnType.getContainingClass(), ResponseBody.class) ||
+		return (this.responseBodyControllerCache.computeIfAbsent(returnType.getContainingClass(),
+				clazz -> AnnotatedElementUtils.hasAnnotation(clazz, ResponseBody.class)) ||
 				returnType.hasMethodAnnotation(ResponseBody.class));
 	}
 
@@ -142,8 +148,7 @@ public class RequestResponseBodyMethodProcessor extends AbstractMessageConverter
 	 * converter to read the content with.
 	 */
 	@Override
-	@Nullable
-	public Object resolveArgument(MethodParameter parameter, @Nullable ModelAndViewContainer mavContainer,
+	public @Nullable Object resolveArgument(MethodParameter parameter, @Nullable ModelAndViewContainer mavContainer,
 			NativeWebRequest webRequest, @Nullable WebDataBinderFactory binderFactory) throws Exception {
 
 		parameter = parameter.nestedIfOptional();
@@ -168,8 +173,7 @@ public class RequestResponseBodyMethodProcessor extends AbstractMessageConverter
 	}
 
 	@Override
-	@Nullable
-	protected <T> Object readWithMessageConverters(NativeWebRequest webRequest, MethodParameter parameter,
+	protected @Nullable Object readWithMessageConverters(NativeWebRequest webRequest, MethodParameter parameter,
 			Type paramType) throws IOException, HttpMediaTypeNotSupportedException, HttpMessageNotReadableException {
 
 		ServletServerHttpRequest inputMessage = createInputMessage(webRequest);
@@ -197,11 +201,10 @@ public class RequestResponseBodyMethodProcessor extends AbstractMessageConverter
 
 		if (returnValue instanceof ProblemDetail detail) {
 			outputMessage.setStatusCode(HttpStatusCode.valueOf(detail.getStatus()));
-			if (detail.getInstance() == null) {
-				URI path = URI.create(inputMessage.getServletRequest().getRequestURI());
-				detail.setInstance(path);
+			invokeErrorResponseInterceptors(detail, null, inputMessage);
+			if (resolveErrorView(detail, null, HttpStatusCode.valueOf(detail.getStatus()), mavContainer, webRequest)) {
+				return;
 			}
-			invokeErrorResponseInterceptors(detail, null);
 		}
 
 		// Try even with null return value. ResponseBodyAdvice could get involved.

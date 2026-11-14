@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,19 +22,19 @@ import java.time.Duration;
 import java.util.Collections;
 import java.util.Map;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import org.reactivestreams.Publisher;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.test.StepVerifier;
+import tools.jackson.databind.SerializationFeature;
+import tools.jackson.databind.json.JsonMapper;
 
 import org.springframework.core.ResolvableType;
 import org.springframework.core.io.buffer.DataBufferFactory;
 import org.springframework.core.io.buffer.DataBufferUtils;
 import org.springframework.core.testfixture.io.buffer.AbstractDataBufferAllocatingTests;
 import org.springframework.http.MediaType;
-import org.springframework.http.codec.json.Jackson2JsonEncoder;
-import org.springframework.http.converter.json.Jackson2ObjectMapperBuilder;
+import org.springframework.http.codec.json.JacksonJsonEncoder;
 import org.springframework.web.testfixture.http.server.reactive.MockServerHttpResponse;
 import org.springframework.web.testfixture.xml.Pojo;
 
@@ -54,7 +54,7 @@ class ServerSentEventHttpMessageWriterTests extends AbstractDataBufferAllocating
 	private static final Map<String, Object> HINTS = Collections.emptyMap();
 
 	private ServerSentEventHttpMessageWriter messageWriter =
-			new ServerSentEventHttpMessageWriter(new Jackson2JsonEncoder());
+			new ServerSentEventHttpMessageWriter(new JacksonJsonEncoder());
 
 
 	@ParameterizedDataBufferAllocatingTest
@@ -85,7 +85,7 @@ class ServerSentEventHttpMessageWriterTests extends AbstractDataBufferAllocating
 
 		StepVerifier.create(outputMessage.getBody())
 				.consumeNextWith(stringConsumer(
-						"id:c42\nevent:foo\nretry:123\n:bla\n:bla bla\n:bla bla bla\ndata:bar\n\n"))
+						"id:c42\nevent:foo\nretry:123\n:bla\n:bla bla\n:bla bla bla\ndata: bar\n\n"))
 				.expectComplete()
 				.verify();
 	}
@@ -99,8 +99,8 @@ class ServerSentEventHttpMessageWriterTests extends AbstractDataBufferAllocating
 		testWrite(source, outputMessage, String.class);
 
 		StepVerifier.create(outputMessage.getBody())
-				.consumeNextWith(stringConsumer("data:foo\n\n"))
-				.consumeNextWith(stringConsumer("data:bar\n\n"))
+				.consumeNextWith(stringConsumer("data: foo\n\n"))
+				.consumeNextWith(stringConsumer("data: bar\n\n"))
 				.expectComplete()
 				.verify();
 	}
@@ -110,12 +110,13 @@ class ServerSentEventHttpMessageWriterTests extends AbstractDataBufferAllocating
 		super.bufferFactory = bufferFactory;
 
 		MockServerHttpResponse outputMessage = new MockServerHttpResponse(super.bufferFactory);
-		Flux<String> source = Flux.just("foo\nbar", "foo\nbaz");
+		Flux<String> source = Flux.just("first\nsecond", "first\rsecond", "first\r\nsecond");
 		testWrite(source, outputMessage, String.class);
 
 		StepVerifier.create(outputMessage.getBody())
-				.consumeNextWith(stringConsumer("data:foo\ndata:bar\n\n"))
-				.consumeNextWith(stringConsumer("data:foo\ndata:baz\n\n"))
+				.consumeNextWith(stringConsumer("data: first\ndata: second\n\n"))
+				.consumeNextWith(stringConsumer("data: first\ndata: second\n\n"))
+				.consumeNextWith(stringConsumer("data: first\ndata: second\n\n"))
 				.expectComplete()
 				.verify();
 	}
@@ -135,7 +136,7 @@ class ServerSentEventHttpMessageWriterTests extends AbstractDataBufferAllocating
 				.consumeNextWith(dataBuffer -> {
 					String value = dataBuffer.toString(charset);
 					DataBufferUtils.release(dataBuffer);
-					assertThat(value).isEqualTo("data:\u00A3\n\n");
+					assertThat(value).isEqualTo("data: \u00A3\n\n");
 				})
 				.expectComplete()
 				.verify();
@@ -150,10 +151,10 @@ class ServerSentEventHttpMessageWriterTests extends AbstractDataBufferAllocating
 		testWrite(source, outputMessage, Pojo.class);
 
 		StepVerifier.create(outputMessage.getBody())
-				.consumeNextWith(stringConsumer("data:"))
+				.consumeNextWith(stringConsumer("data: "))
 				.consumeNextWith(stringConsumer("{\"foo\":\"foofoo\",\"bar\":\"barbar\"}"))
 				.consumeNextWith(stringConsumer("\n\n"))
-				.consumeNextWith(stringConsumer("data:"))
+				.consumeNextWith(stringConsumer("data: "))
 				.consumeNextWith(stringConsumer("{\"foo\":\"foofoofoo\",\"bar\":\"barbarbar\"}"))
 				.consumeNextWith(stringConsumer("\n\n"))
 				.expectComplete()
@@ -164,27 +165,27 @@ class ServerSentEventHttpMessageWriterTests extends AbstractDataBufferAllocating
 	void writePojoWithPrettyPrint(DataBufferFactory bufferFactory) {
 		super.bufferFactory = bufferFactory;
 
-		ObjectMapper mapper = Jackson2ObjectMapperBuilder.json().indentOutput(true).build();
-		this.messageWriter = new ServerSentEventHttpMessageWriter(new Jackson2JsonEncoder(mapper));
+		JsonMapper mapper = JsonMapper.builder().enable(SerializationFeature.INDENT_OUTPUT).build();
+		this.messageWriter = new ServerSentEventHttpMessageWriter(new JacksonJsonEncoder(mapper));
 
 		MockServerHttpResponse outputMessage = new MockServerHttpResponse(super.bufferFactory);
 		Flux<Pojo> source = Flux.just(new Pojo("foofoo", "barbar"), new Pojo("foofoofoo", "barbarbar"));
 		testWrite(source, outputMessage, Pojo.class);
 
 		StepVerifier.create(outputMessage.getBody())
-				.consumeNextWith(stringConsumer("data:"))
+				.consumeNextWith(stringConsumer("data: "))
 				.consumeNextWith(stringConsumer("""
 						{
-						data:  "foo" : "foofoo",
-						data:  "bar" : "barbar"
-						data:}"""))
+						data:   "foo" : "foofoo",
+						data:   "bar" : "barbar"
+						data: }"""))
 				.consumeNextWith(stringConsumer("\n\n"))
-				.consumeNextWith(stringConsumer("data:"))
+				.consumeNextWith(stringConsumer("data: "))
 				.consumeNextWith(stringConsumer("""
 						{
-						data:  "foo" : "foofoofoo",
-						data:  "bar" : "barbarbar"
-						data:}"""))
+						data:   "foo" : "foofoofoo",
+						data:   "bar" : "barbarbar"
+						data: }"""))
 				.consumeNextWith(stringConsumer("\n\n"))
 				.expectComplete()
 				.verify();
@@ -202,7 +203,7 @@ class ServerSentEventHttpMessageWriterTests extends AbstractDataBufferAllocating
 
 		assertThat(outputMessage.getHeaders().getContentType()).isEqualTo(mediaType);
 		StepVerifier.create(outputMessage.getBody())
-				.consumeNextWith(stringConsumer("data:", charset))
+				.consumeNextWith(stringConsumer("data: ", charset))
 				.consumeNextWith(stringConsumer("{\"foo\":\"foo\uD834\uDD1E\",\"bar\":\"bar\uD834\uDD1E\"}", charset))
 				.consumeNextWith(stringConsumer("\n\n", charset))
 				.expectComplete()

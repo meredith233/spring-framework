@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2023 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,16 +22,16 @@ import java.lang.annotation.Inherited;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
+import java.util.Locale;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-
-import org.springframework.lang.Nullable;
+import org.jspecify.annotations.Nullable;
 
 /**
- * {@code @NestedTestConfiguration} is a type-level annotation that is used to
- * configure how Spring test configuration annotations are processed within
- * enclosing class hierarchies (i.e., for <em>inner</em> test classes).
+ * {@code @NestedTestConfiguration} is an annotation that can be applied to a test
+ * class to configure how Spring test configuration annotations are processed
+ * within enclosing class hierarchies (i.e., for <em>inner</em> test classes).
  *
  * <p>If {@code @NestedTestConfiguration} is not <em>present</em> or
  * <em>meta-present</em> on a test class, in its supertype hierarchy, or in its
@@ -58,10 +58,16 @@ import org.springframework.lang.Nullable;
  * <p>This annotation may be used as a <em>meta-annotation</em> to create custom
  * <em>composed annotations</em>.
  *
- * <p>As of Spring Framework 5.3, the use of this annotation typically only makes
- * sense in conjunction with {@link org.junit.jupiter.api.Nested @Nested} test
- * classes in JUnit Jupiter; however, there may be other testing frameworks with
- * support for nested test classes that could also make use of this annotation.
+ * <p>The use of this annotation typically only makes sense in conjunction with
+ * {@link org.junit.jupiter.api.Nested @Nested} test classes in JUnit Jupiter;
+ * however, there may be other testing frameworks with support for nested test
+ * classes that could also make use of this annotation.
+ *
+ * <p>If you are developing a component that integrates with the Spring TestContext
+ * Framework and needs to support annotation inheritance within enclosing class
+ * hierarchies, you must use the annotation search utilities provided in
+ * {@link TestContextAnnotationUtils} in order to honor
+ * {@code @NestedTestConfiguration} semantics.
  *
  * <h3>Supported Annotations</h3>
  * <p>The <em>Spring TestContext Framework</em> honors {@code @NestedTestConfiguration}
@@ -69,12 +75,16 @@ import org.springframework.lang.Nullable;
  * <ul>
  * <li>{@link BootstrapWith @BootstrapWith}</li>
  * <li>{@link TestExecutionListeners @TestExecutionListeners}</li>
+ * <li>{@link ContextCustomizerFactories @ContextCustomizerFactories}</li>
  * <li>{@link ContextConfiguration @ContextConfiguration}</li>
  * <li>{@link ContextHierarchy @ContextHierarchy}</li>
  * <li>{@link org.springframework.test.context.web.WebAppConfiguration @WebAppConfiguration}</li>
  * <li>{@link ActiveProfiles @ActiveProfiles}</li>
  * <li>{@link TestPropertySource @TestPropertySource}</li>
  * <li>{@link DynamicPropertySource @DynamicPropertySource}</li>
+ * <li>{@link org.springframework.test.context.bean.override.convention.TestBean @TestBean}</li>
+ * <li>{@link org.springframework.test.context.bean.override.mockito.MockitoBean @MockitoBean}</li>
+ * <li>{@link org.springframework.test.context.bean.override.mockito.MockitoSpyBean @MockitoSpyBean}</li>
  * <li>{@link org.springframework.test.annotation.DirtiesContext @DirtiesContext}</li>
  * <li>{@link org.springframework.transaction.annotation.Transactional @Transactional}</li>
  * <li>{@link org.springframework.test.annotation.Rollback @Rollback}</li>
@@ -85,10 +95,14 @@ import org.springframework.lang.Nullable;
  * <li>{@link TestConstructor @TestConstructor}</li>
  * </ul>
  *
+ * <p>Note that {@code @NestedTestConfiguration} does not apply to
+ * {@link org.springframework.test.context.junit.jupiter.SpringExtensionConfig @SpringExtensionConfig}.
+ *
  * @author Sam Brannen
  * @since 5.3
  * @see EnclosingConfiguration#INHERIT
  * @see EnclosingConfiguration#OVERRIDE
+ * @see TestContextAnnotationUtils
  */
 @Target(ElementType.TYPE)
 @Retention(RetentionPolicy.RUNTIME)
@@ -153,13 +167,12 @@ public @interface NestedTestConfiguration {
 		 * @return the corresponding enum constant or {@code null} if not found
 		 * @see EnclosingConfiguration#valueOf(String)
 		 */
-		@Nullable
-		public static EnclosingConfiguration from(@Nullable String name) {
+		public static @Nullable EnclosingConfiguration from(@Nullable String name) {
 			if (name == null) {
 				return null;
 			}
 			try {
-				return EnclosingConfiguration.valueOf(name.trim().toUpperCase());
+				return EnclosingConfiguration.valueOf(name.trim().toUpperCase(Locale.ROOT));
 			}
 			catch (IllegalArgumentException ex) {
 				Log logger = LogFactory.getLog(EnclosingConfiguration.class);
@@ -171,7 +184,6 @@ public @interface NestedTestConfiguration {
 				return null;
 			}
 		}
-
 	}
 
 }

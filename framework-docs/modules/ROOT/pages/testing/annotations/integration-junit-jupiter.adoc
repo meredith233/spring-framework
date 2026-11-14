@@ -2,16 +2,68 @@
 = Spring JUnit Jupiter Testing Annotations
 
 The following annotations are supported when used in conjunction with the
-xref:testing/testcontext-framework/support-classes.adoc#testcontext-junit-jupiter-extension[`SpringExtension`] and JUnit Jupiter
-(that is, the programming model in JUnit 5):
+xref:testing/testcontext-framework/support-classes.adoc#testcontext-junit-jupiter-extension[`SpringExtension`]
+and the JUnit Jupiter testing framework:
 
-* xref:testing/annotations/integration-junit-jupiter.adoc#integration-testing-annotations-junit-jupiter-springjunitconfig[`@SpringJUnitConfig`]
-* xref:testing/annotations/integration-junit-jupiter.adoc#integration-testing-annotations-junit-jupiter-springjunitwebconfig[`@SpringJUnitWebConfig`]
-* xref:testing/annotations/integration-junit-jupiter.adoc#integration-testing-annotations-testconstructor[`@TestConstructor`]
-* xref:testing/annotations/integration-junit-jupiter.adoc#integration-testing-annotations-nestedtestconfiguration[`@NestedTestConfiguration`]
-* xref:testing/annotations/integration-junit-jupiter.adoc#integration-testing-annotations-junit-jupiter-enabledif[`@EnabledIf`]
-* xref:testing/annotations/integration-junit-jupiter.adoc#integration-testing-annotations-junit-jupiter-disabledif[`@DisabledIf`]
+* <<integration-testing-annotations-springextensionconfig,`@SpringExtensionConfig`>>
+* <<integration-testing-annotations-junit-jupiter-springjunitconfig,`@SpringJUnitConfig`>>
+* <<integration-testing-annotations-junit-jupiter-springjunitwebconfig,`@SpringJUnitWebConfig`>>
+* <<integration-testing-annotations-testconstructor,`@TestConstructor`>>
+* <<integration-testing-annotations-nestedtestconfiguration,`@NestedTestConfiguration`>>
+* <<integration-testing-annotations-junit-jupiter-enabledif,`@EnabledIf`>>
+* <<integration-testing-annotations-junit-jupiter-disabledif,`@DisabledIf`>>
 * xref:testing/annotations/integration-spring/annotation-disabledinaotmode.adoc[`@DisabledInAotMode`]
+
+
+[[integration-testing-annotations-springextensionconfig]]
+== `@SpringExtensionConfig`
+
+`@SpringExtensionConfig` is a type-level annotation that can be used to configure the
+behavior of the `SpringExtension`.
+
+As of Spring Framework 7.0, the `SpringExtension` is configured to use a test-method
+scoped `ExtensionContext`, which enables consistent dependency injection into fields and
+constructors from the `ApplicationContext` for the current test method in a `@Nested`
+test class hierarchy. However, if a third-party `TestExecutionListener` is not compatible
+with the semantics associated with a test-method scoped extension context — or if a
+developer wishes to switch to test-class scoped semantics — the `SpringExtension` can be
+configured to use a test-class scoped `ExtensionContext` by annotating a top-level test
+class with `@SpringExtensionConfig(useTestClassScopedExtensionContext = true)`.
+
+Alternatively, you can change the global default by setting the
+`spring.test.extension.context.scope` property to `test_class`. The property is resolved
+first via the xref:appendix.adoc#appendix-spring-properties[`SpringProperties`] mechanism
+which also supports JVM system properties — for example,
+`-Dspring.test.extension.context.scope=test_class`. If the Spring property has not been
+set, the `SpringExtension` will attempt to resolve the property as a
+https://docs.junit.org/current/running-tests/configuration-parameters.html[JUnit Platform configuration parameter]
+as a fallback mechanism. If the property has not been set via either of those mechanisms,
+the `SpringExtension` will use a test-method scoped extension context by default. Note,
+however, that a `@SpringExtensionConfig` declaration always takes precedence over this
+property.
+
+[TIP]
+====
+If a test class uses JUnit Jupiter's `@TestInstance(Lifecycle.PER_CLASS)` semantics, the
+`SpringExtension` will always use a test-class scoped `ExtensionContext`, and
+configuration via `@SpringExtensionConfig(useTestClassScopedExtensionContext = true)` or
+the `spring.test.extension.context.scope` property will have no effect for that test
+class.
+====
+
+[NOTE]
+====
+This annotation is currently only applicable to `@Nested` test class hierarchies and
+should be applied to the top-level enclosing class of a `@Nested` test class hierarchy.
+Consequently, there is no need to declare this annotation on a test class that does not
+contain `@Nested` test classes.
+
+In addition,
+<<integration-testing-annotations-nestedtestconfiguration,`@NestedTestConfiguration`>>
+does not apply to this annotation. `@SpringExtensionConfig` will always be detected
+within a `@Nested` test class hierarchy, effectively disregarding any
+`@NestedTestConfiguration(OVERRIDE)` declarations.
+====
 
 [[integration-testing-annotations-junit-jupiter-springjunitconfig]]
 == `@SpringJUnitConfig`
@@ -30,7 +82,7 @@ configuration class:
 ======
 Java::
 +
-[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+[source,java,indent=0,subs="verbatim,quotes"]
 ----
 	@SpringJUnitConfig(TestConfig.class) // <1>
 	class ConfigurationClassJUnitJupiterSpringTests {
@@ -41,7 +93,7 @@ Java::
 
 Kotlin::
 +
-[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+[source,kotlin,indent=0,subs="verbatim,quotes"]
 ----
 	@SpringJUnitConfig(TestConfig::class) // <1>
 	class ConfigurationClassJUnitJupiterSpringTests {
@@ -59,7 +111,7 @@ location of a configuration file:
 ======
 Java::
 +
-[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+[source,java,indent=0,subs="verbatim,quotes"]
 ----
 	@SpringJUnitConfig(locations = "/test-config.xml") // <1>
 	class XmlJUnitJupiterSpringTests {
@@ -70,7 +122,7 @@ Java::
 
 Kotlin::
 +
-[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+[source,kotlin,indent=0,subs="verbatim,quotes"]
 ----
 	@SpringJUnitConfig(locations = ["/test-config.xml"]) // <1>
 	class XmlJUnitJupiterSpringTests {
@@ -84,6 +136,7 @@ Kotlin::
 See xref:testing/testcontext-framework/ctx-management.adoc[Context Management] as well as the javadoc for
 {spring-framework-api}/test/context/junit/jupiter/SpringJUnitConfig.html[`@SpringJUnitConfig`]
 and `@ContextConfiguration` for further details.
+
 
 [[integration-testing-annotations-junit-jupiter-springjunitwebconfig]]
 == `@SpringJUnitWebConfig`
@@ -105,7 +158,7 @@ a configuration class:
 ======
 Java::
 +
-[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+[source,java,indent=0,subs="verbatim,quotes"]
 ----
 	@SpringJUnitWebConfig(TestConfig.class) // <1>
 	class ConfigurationClassJUnitJupiterSpringWebTests {
@@ -116,7 +169,7 @@ Java::
 
 Kotlin::
 +
-[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+[source,kotlin,indent=0,subs="verbatim,quotes"]
 ----
 	@SpringJUnitWebConfig(TestConfig::class) // <1>
 	class ConfigurationClassJUnitJupiterSpringWebTests {
@@ -134,7 +187,7 @@ location of a configuration file:
 ======
 Java::
 +
-[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+[source,java,indent=0,subs="verbatim,quotes"]
 ----
 	@SpringJUnitWebConfig(locations = "/test-config.xml") // <1>
 	class XmlJUnitJupiterSpringWebTests {
@@ -145,7 +198,7 @@ Java::
 
 Kotlin::
 +
-[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+[source,kotlin,indent=0,subs="verbatim,quotes"]
 ----
 	@SpringJUnitWebConfig(locations = ["/test-config.xml"]) // <1>
 	class XmlJUnitJupiterSpringWebTests {
@@ -162,18 +215,19 @@ See xref:testing/testcontext-framework/ctx-management.adoc[Context Management] a
 {spring-framework-api}/test/context/web/WebAppConfiguration.html[`@WebAppConfiguration`]
 for further details.
 
+
 [[integration-testing-annotations-testconstructor]]
 == `@TestConstructor`
 
-`@TestConstructor` is a type-level annotation that is used to configure how the parameters
-of a test class constructor are autowired from components in the test's
+`@TestConstructor` is an annotation that can be applied to a test class to configure how
+the parameters of a test class constructor are autowired from components in the test's
 `ApplicationContext`.
 
 If `@TestConstructor` is not present or meta-present on a test class, the default _test
 constructor autowire mode_ will be used. See the tip below for details on how to change
-the default mode. Note, however, that a local declaration of `@Autowired`,
-`@jakarta.inject.Inject`, or `@javax.inject.Inject` on a constructor takes precedence
-over both `@TestConstructor` and the default mode.
+the default mode. Note, however, that a local declaration of `@Autowired` or
+`@jakarta.inject.Inject` on a constructor takes precedence over both `@TestConstructor`
+and the default mode.
 
 .Changing the default test constructor autowire mode
 [TIP]
@@ -183,25 +237,25 @@ The default _test constructor autowire mode_ can be changed by setting the
 default mode may be set via the
 xref:appendix.adoc#appendix-spring-properties[`SpringProperties`] mechanism.
 
-As of Spring Framework 5.3, the default mode may also be configured as a
-https://junit.org/junit5/docs/current/user-guide/#running-tests-config-params[JUnit Platform configuration parameter].
+The default mode may also be configured as a
+https://docs.junit.org/current/running-tests/configuration-parameters.html[JUnit Platform configuration parameter].
 
 If the `spring.test.constructor.autowire.mode` property is not set, test class
 constructors will not be automatically autowired.
 =====
 
-NOTE: As of Spring Framework 5.2, `@TestConstructor` is only supported in conjunction
-with the `SpringExtension` for use with JUnit Jupiter. Note that the `SpringExtension` is
-often automatically registered for you – for example, when using annotations such as
-`@SpringJUnitConfig` and `@SpringJUnitWebConfig` or various test-related annotations from
-Spring Boot Test.
+NOTE: `@TestConstructor` is only supported in conjunction with the `SpringExtension` for
+use with JUnit Jupiter. Note that the `SpringExtension` is often automatically registered
+for you – for example, when using annotations such as `@SpringJUnitConfig` and
+`@SpringJUnitWebConfig` or various test-related annotations from Spring Boot Test.
+
 
 [[integration-testing-annotations-nestedtestconfiguration]]
 == `@NestedTestConfiguration`
 
-`@NestedTestConfiguration` is a type-level annotation that is used to configure how
-Spring test configuration annotations are processed within enclosing class hierarchies
-for inner test classes.
+`@NestedTestConfiguration` is an annotation that can be applied to a test class to
+configure how Spring test configuration annotations are processed within enclosing class
+hierarchies for inner test classes.
 
 If `@NestedTestConfiguration` is not present or meta-present on a test class, in its
 supertype hierarchy, or in its enclosing class hierarchy, the default _enclosing
@@ -237,15 +291,16 @@ following annotations.
 * xref:testing/annotations/integration-spring/annotation-sql.adoc[`@Sql`]
 * xref:testing/annotations/integration-spring/annotation-sqlconfig.adoc[`@SqlConfig`]
 * xref:testing/annotations/integration-spring/annotation-sqlmergemode.adoc[`@SqlMergeMode`]
-* xref:testing/annotations/integration-junit-jupiter.adoc#integration-testing-annotations-testconstructor[`@TestConstructor`]
+* <<integration-testing-annotations-testconstructor,`@TestConstructor`>>
 
 NOTE: The use of `@NestedTestConfiguration` typically only makes sense in conjunction
 with `@Nested` test classes in JUnit Jupiter; however, there may be other testing
 frameworks with support for Spring and nested test classes that make use of this
 annotation.
 
-See xref:testing/testcontext-framework/support-classes.adoc#testcontext-junit-jupiter-nested-test-configuration[`@Nested` test class configuration] for an example and further
-details.
+See xref:testing/testcontext-framework/support-classes.adoc#testcontext-junit-jupiter-nested-test-configuration[`@Nested` test class configuration]
+for an example and further details.
+
 
 [[integration-testing-annotations-junit-jupiter-enabledif]]
 == `@EnabledIf`
@@ -275,7 +330,7 @@ example, you can create a custom `@EnabledOnMac` annotation as follows:
 ======
 Java::
 +
-[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+[source,java,indent=0,subs="verbatim,quotes"]
 ----
 	@Target({ElementType.TYPE, ElementType.METHOD})
 	@Retention(RetentionPolicy.RUNTIME)
@@ -288,7 +343,7 @@ Java::
 
 Kotlin::
 +
-[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+[source,kotlin,indent=0,subs="verbatim,quotes"]
 ----
 	@Target(AnnotationTarget.TYPE, AnnotationTarget.FUNCTION)
 	@Retention(AnnotationRetention.RUNTIME)
@@ -312,6 +367,7 @@ Since JUnit 5.7, JUnit Jupiter also has a condition annotation named `@EnabledIf
 if you wish to use Spring's `@EnabledIf` support make sure you import the annotation type
 from the correct package.
 ====
+
 
 [[integration-testing-annotations-junit-jupiter-disabledif]]
 == `@DisabledIf`
@@ -341,7 +397,7 @@ example, you can create a custom `@DisabledOnMac` annotation as follows:
 ======
 Java::
 +
-[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+[source,java,indent=0,subs="verbatim,quotes"]
 ----
 	@Target({ElementType.TYPE, ElementType.METHOD})
 	@Retention(RetentionPolicy.RUNTIME)
@@ -354,7 +410,7 @@ Java::
 
 Kotlin::
 +
-[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+[source,kotlin,indent=0,subs="verbatim,quotes"]
 ----
 	@Target(AnnotationTarget.TYPE, AnnotationTarget.FUNCTION)
 	@Retention(AnnotationRetention.RUNTIME)
@@ -378,6 +434,3 @@ Since JUnit 5.7, JUnit Jupiter also has a condition annotation named `@DisabledI
 if you wish to use Spring's `@DisabledIf` support make sure you import the annotation type
 from the correct package.
 ====
-
-
-

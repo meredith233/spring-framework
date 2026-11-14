@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2018 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -34,11 +34,10 @@ import org.springframework.web.server.session.WebSessionManager;
  * Unit tests with {@link ApplicationContextSpec}.
  * @author Rossen Stoyanchev
  */
-public class ApplicationContextSpecTests {
-
+class ApplicationContextSpecTests {
 
 	@Test // SPR-17094
-	public void sessionManagerBean() {
+	void sessionManagerBean() {
 		ApplicationContext context = new AnnotationConfigApplicationContext(WebConfig.class);
 		ApplicationContextSpec spec = new ApplicationContextSpec(context);
 		WebTestClient testClient = spec.configureClient().build();

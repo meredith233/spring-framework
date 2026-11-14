@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,12 +17,10 @@
 package org.springframework.test.json;
 
 import com.jayway.jsonpath.JsonPath;
-
-import org.springframework.http.converter.GenericHttpMessageConverter;
-import org.springframework.lang.Nullable;
+import org.jspecify.annotations.Nullable;
 
 /**
- * AssertJ {@link org.assertj.core.api.Assert assertions} that can be applied
+ * AssertJ {@linkplain org.assertj.core.api.Assert assertions} that can be applied
  * to a JSON value produced by evaluating a {@linkplain JsonPath JSON path}
  * expression.
  *
@@ -34,10 +32,8 @@ public class JsonPathValueAssert extends AbstractJsonValueAssert<JsonPathValueAs
 	private final String expression;
 
 
-	JsonPathValueAssert(@Nullable Object actual, String expression,
-			@Nullable GenericHttpMessageConverter<Object> httpMessageConverter) {
-
-		super(actual, JsonPathValueAssert.class, httpMessageConverter);
+	JsonPathValueAssert(@Nullable Object actual, String expression, @Nullable JsonConverterDelegate converter) {
+		super(actual, JsonPathValueAssert.class, converter);
 		this.expression = expression;
 	}
 

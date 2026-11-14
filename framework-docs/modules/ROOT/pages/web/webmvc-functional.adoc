@@ -1,13 +1,12 @@
 [[webmvc-fn]]
 = Functional Endpoints
-[.small]#<<web-reactive.adoc#webflux-fn, See equivalent in the Reactive stack>>#
+
+[.small]#xref:web/webflux-functional.adoc[See equivalent in the Reactive stack]#
 
 Spring Web MVC includes WebMvc.fn, a lightweight functional programming model in which functions
 are used to route and handle requests and contracts are designed for immutability.
 It is an alternative to the annotation-based programming model but otherwise runs on
 the same xref:web/webmvc/mvc-servlet.adoc[DispatcherServlet].
-
-
 
 
 [[webmvc-fn-overview]]
@@ -16,7 +15,7 @@ the same xref:web/webmvc/mvc-servlet.adoc[DispatcherServlet].
 
 In WebMvc.fn, an HTTP request is handled with a `HandlerFunction`: a function that takes
 `ServerRequest` and returns a `ServerResponse`.
-Both the request and the response object have immutable contracts that offer JDK 8-friendly
+Both the request and the response object have immutable contracts that offer convenient
 access to the HTTP request and response.
 `HandlerFunction` is the equivalent of the body of a `@RequestMapping` method in the
 annotation-based programming model.
@@ -34,7 +33,7 @@ as the following example shows:
 ======
 Java::
 +
-[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+[source,java,indent=0,subs="verbatim,quotes"]
 ----
 	import static org.springframework.http.MediaType.APPLICATION_JSON;
 	import static org.springframework.web.servlet.function.RequestPredicates.*;
@@ -71,7 +70,7 @@ Java::
 
 Kotlin::
 +
-[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+[source,kotlin,indent=0,subs="verbatim,quotes"]
 ----
 	import org.springframework.web.servlet.function.router
 
@@ -109,18 +108,16 @@ Kotlin::
 
 
 If you register the `RouterFunction` as a bean, for instance by exposing it in a
-`@Configuration` class, it will be auto-detected by the servlet, as explained in xref:web/webmvc-functional.adoc#webmvc-fn-running[Running a Server].
-
-
+`@Configuration` class, it will be auto-detected by the servlet, as explained in
+<<webmvc-fn-running,Running a Server>>.
 
 
 [[webmvc-fn-handler-functions]]
 == HandlerFunction
 [.small]#xref:web/webflux-functional.adoc#webflux-fn-handler-functions[See equivalent in the Reactive stack]#
 
-`ServerRequest` and `ServerResponse` are immutable interfaces that offer JDK 8-friendly
+`ServerRequest` and `ServerResponse` are immutable interfaces that offer convenient
 access to the HTTP request and response, including headers, body, method, and status code.
-
 
 [[webmvc-fn-request]]
 === ServerRequest
@@ -134,14 +131,14 @@ The following example extracts the request body to a `String`:
 ======
 Java::
 +
-[source,java,role="primary"]
+[source,java]
 ----
 String string = request.body(String.class);
 ----
 
 Kotlin::
 +
-[source,kotlin,role="secondary"]
+[source,kotlin]
 ----
 val string = request.body<String>()
 ----
@@ -155,14 +152,14 @@ where `Person` objects are decoded from a serialized form, such as JSON or XML:
 ======
 Java::
 +
-[source,java,role="primary"]
+[source,java]
 ----
 List<Person> people = request.body(new ParameterizedTypeReference<List<Person>>() {});
 ----
 
 Kotlin::
 +
-[source,kotlin,role="secondary"]
+[source,kotlin]
 ----
 val people = request.body<Person>()
 ----
@@ -174,16 +171,36 @@ The following example shows how to access parameters:
 ======
 Java::
 +
-[source,java,role="primary"]
+[source,java]
 ----
 MultiValueMap<String, String> params = request.params();
 ----
 
 Kotlin::
 +
-[source,kotlin,role="secondary"]
+[source,kotlin]
 ----
 val map = request.params()
+----
+======
+
+The following shows how to bind request parameters, URI variables, or headers via `DataBinder`,
+and also shows how to customize the `DataBinder`:
+
+[tabs]
+======
+Java::
++
+[source,java]
+----
+Pet pet = request.bind(Pet.class, dataBinder -> dataBinder.setAllowedFields("name"));
+----
+
+Kotlin::
++
+[source,kotlin]
+----
+val pet = request.bind(Pet::class.java, {dataBinder -> dataBinder.setAllowedFields("name")})
 ----
 ======
 
@@ -200,7 +217,7 @@ content:
 ======
 Java::
 +
-[source,java,role="primary"]
+[source,java]
 ----
 Person person = ...
 ServerResponse.ok().contentType(MediaType.APPLICATION_JSON).body(person);
@@ -208,7 +225,7 @@ ServerResponse.ok().contentType(MediaType.APPLICATION_JSON).body(person);
 
 Kotlin::
 +
-[source,kotlin,role="secondary"]
+[source,kotlin]
 ----
 val person: Person = ...
 ServerResponse.ok().contentType(MediaType.APPLICATION_JSON).body(person)
@@ -221,7 +238,7 @@ The following example shows how to build a 201 (CREATED) response with a `Locati
 ======
 Java::
 +
-[source,java,role="primary"]
+[source,java]
 ----
 URI location = ...
 ServerResponse.created(location).build();
@@ -229,7 +246,7 @@ ServerResponse.created(location).build();
 
 Kotlin::
 +
-[source,kotlin,role="secondary"]
+[source,kotlin]
 ----
 val location: URI = ...
 ServerResponse.created(location).build()
@@ -243,7 +260,7 @@ You can also use an asynchronous result as the body, in the form of a `Completab
 ======
 Java::
 +
-[source,java,role="primary"]
+[source,java]
 ----
 Mono<Person> person = webClient.get().retrieve().bodyToMono(Person.class);
 ServerResponse.ok().contentType(MediaType.APPLICATION_JSON).body(person);
@@ -251,7 +268,7 @@ ServerResponse.ok().contentType(MediaType.APPLICATION_JSON).body(person);
 
 Kotlin::
 +
-[source,kotlin,role="secondary"]
+[source,kotlin]
 ----
 val person = webClient.get().retrieve().awaitBody<Person>()
 ServerResponse.ok().contentType(MediaType.APPLICATION_JSON).body(person)
@@ -267,7 +284,7 @@ any other asynchronous type supported by the `ReactiveAdapterRegistry`. For inst
 ======
 Java::
 +
-[source,java,role="primary"]
+[source,java]
 ----
 Mono<ServerResponse> asyncResponse = webClient.get().retrieve().bodyToMono(Person.class)
   .map(p -> ServerResponse.ok().header("Name", p.name()).body(p));
@@ -275,7 +292,7 @@ ServerResponse.async(asyncResponse);
 ----
 ======
 
-https://www.w3.org/TR/eventsource/[Server-Sent Events] can be provided via the
+https://html.spec.whatwg.org/multipage/server-sent-events.html[Server-Sent Events] can be provided via the
 static `sse` method on `ServerResponse`. The builder provided by that method
 allows you to send Strings, or other objects as JSON. For example:
 
@@ -283,7 +300,7 @@ allows you to send Strings, or other objects as JSON. For example:
 ======
 Java::
 +
-[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+[source,java,indent=0,subs="verbatim,quotes"]
 ----
 	public RouterFunction<ServerResponse> sse() {
 		return route(GET("/sse"), request -> ServerResponse.sse(sseBuilder -> {
@@ -309,11 +326,13 @@ Java::
 
 Kotlin::
 +
-[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+[source,kotlin,indent=0,subs="verbatim,quotes"]
 ----
 	fun sse(): RouterFunction<ServerResponse> = router {
-		GET("/sse") { request -> ServerResponse.sse { sseBuilder ->
-			// Save the sseBuilder object somewhere..
+		GET("/sse") { request ->
+			ServerResponse.sse { sseBuilder ->
+				// Save the sseBuilder object somewhere..
+			}
 		}
 	}
 
@@ -334,8 +353,6 @@ Kotlin::
 ----
 ======
 
-
-
 [[webmvc-fn-handler-classes]]
 === Handler Classes
 
@@ -346,7 +363,7 @@ We can write a handler function as a lambda, as the following example shows:
 ======
 Java::
 +
-[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+[source,java,indent=0,subs="verbatim,quotes"]
 ----
 HandlerFunction<ServerResponse> helloWorld =
   request -> ServerResponse.ok().body("Hello World");
@@ -354,7 +371,7 @@ HandlerFunction<ServerResponse> helloWorld =
 
 Kotlin::
 +
-[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+[source,kotlin,indent=0,subs="verbatim,quotes"]
 ----
 val helloWorld: (ServerRequest) -> ServerResponse =
   { ServerResponse.ok().body("Hello World") }
@@ -373,7 +390,7 @@ For example, the following class exposes a reactive `Person` repository:
 ======
 Java::
 +
-[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+[source,java,indent=0,subs="verbatim,quotes"]
 ----
 import static org.springframework.http.MediaType.APPLICATION_JSON;
 import static org.springframework.web.reactive.function.server.ServerResponse.ok;
@@ -419,7 +436,7 @@ found. If it is not found, we return a 404 Not Found response.
 
 Kotlin::
 +
-[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+[source,kotlin,indent=0,subs="verbatim,quotes"]
 ----
 	class PersonHandler(private val repository: PersonRepository) {
 
@@ -451,7 +468,6 @@ found. If it is not found, we return a 404 Not Found response.
 ======
 --
 
-
 [[webmvc-fn-handler-validation]]
 === Validation
 
@@ -463,7 +479,7 @@ xref:web/webmvc/mvc-config/validation.adoc[Validator] implementation for a `Pers
 ======
 Java::
 +
-[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+[source,java,indent=0,subs="verbatim,quotes"]
 ----
 	public class PersonHandler {
 
@@ -493,7 +509,7 @@ Java::
 
 Kotlin::
 +
-[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+[source,kotlin,indent=0,subs="verbatim,quotes"]
 ----
 	class PersonHandler(private val repository: PersonRepository) {
 
@@ -527,7 +543,6 @@ a global `Validator` instance based on `LocalValidatorFactoryBean`.
 See xref:core/validation/beanvalidation.adoc[Spring Validation].
 
 
-
 [[webmvc-fn-router-functions]]
 == `RouterFunction`
 [.small]#xref:web/webflux-functional.adoc#webflux-fn-router-functions[See equivalent in the Reactive stack]#
@@ -542,28 +557,28 @@ to create a router.
 Generally, it is recommended to use the `route()` builder, as it provides
 convenient short-cuts for typical mapping scenarios without requiring hard-to-discover
 static imports.
-For instance, the router function builder offers the method `GET(String, HandlerFunction)` to create a mapping for GET requests; and `POST(String, HandlerFunction)` for POSTs.
+For instance, the router function builder offers the method `GET(String, HandlerFunction)`
+to create a mapping for GET requests; and `POST(String, HandlerFunction)` for POSTs.
 
 Besides HTTP method-based mapping, the route builder offers a way to introduce additional
 predicates when mapping to requests.
 For each HTTP method there is an overloaded variant that takes a `RequestPredicate` as a
 parameter, through which additional constraints can be expressed.
 
-
 [[webmvc-fn-predicates]]
 === Predicates
 
 You can write your own `RequestPredicate`, but the `RequestPredicates` utility class
-offers commonly used implementations, based on the request path, HTTP method, content-type,
-and so on.
-The following example uses a request predicate to create a constraint based on the `Accept`
-header:
+offers built-in options for common needs for matching based on the HTTP method, request
+path, headers, <<api-version,API version>>, and more.
+
+The following example uses an `Accept` header, request predicate:
 
 [tabs]
 ======
 Java::
 +
-[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+[source,java,indent=0,subs="verbatim,quotes"]
 ----
 	RouterFunction<ServerResponse> route = RouterFunctions.route()
 		.GET("/hello-world", accept(MediaType.TEXT_PLAIN),
@@ -572,7 +587,7 @@ Java::
 
 Kotlin::
 +
-[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+[source,kotlin,indent=0,subs="verbatim,quotes"]
 ----
 	import org.springframework.web.servlet.function.router
 
@@ -594,8 +609,6 @@ For example, `RequestPredicates.GET(String)` is composed from `RequestPredicates
 and `RequestPredicates.path(String)`.
 The example shown above also uses two request predicates, as the builder uses
 `RequestPredicates.GET` internally, and composes that with the `accept` predicate.
-
-
 
 [[webmvc-fn-routes]]
 === Routes
@@ -624,7 +637,7 @@ The following example shows the composition of four routes:
 ======
 Java::
 +
-[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+[source,java,indent=0,subs="verbatim,quotes"]
 ----
 	import static org.springframework.http.MediaType.APPLICATION_JSON;
 	import static org.springframework.web.servlet.function.RequestPredicates.*;
@@ -651,7 +664,7 @@ Java::
 
 Kotlin::
 +
-[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+[source,kotlin,indent=0,subs="verbatim,quotes"]
 ----
 	import org.springframework.http.MediaType.APPLICATION_JSON
 	import org.springframework.web.servlet.function.router
@@ -676,7 +689,6 @@ Kotlin::
 <4> `otherRoute` is a router function that is created elsewhere, and added to the route built.
 ======
 
-
 [[nested-routes]]
 === Nested Routes
 
@@ -693,7 +705,7 @@ For instance, the last few lines of the example above can be improved in the fol
 ======
 Java::
 +
-[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+[source,java,indent=0,subs="verbatim,quotes"]
 ----
 RouterFunction<ServerResponse> route = route()
 	.path("/person", builder -> builder // <1>
@@ -706,7 +718,7 @@ RouterFunction<ServerResponse> route = route()
 
 Kotlin::
 +
-[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+[source,kotlin,indent=0,subs="verbatim,quotes"]
 ----
 	import org.springframework.web.servlet.function.router
 
@@ -730,7 +742,7 @@ We can further improve by using the `nest` method together with `accept`:
 ======
 Java::
 +
-[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+[source,java,indent=0,subs="verbatim,quotes"]
 ----
 	RouterFunction<ServerResponse> route = route()
 		.path("/person", b1 -> b1
@@ -743,7 +755,7 @@ Java::
 
 Kotlin::
 +
-[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+[source,kotlin,indent=0,subs="verbatim,quotes"]
 ----
 	import org.springframework.web.servlet.function.router
 
@@ -758,6 +770,51 @@ Kotlin::
 	}
 ----
 ======
+
+
+
+[[api-version]]
+=== API Version
+
+Router functions support matching by API version.
+
+First, enable API versioning in the
+xref:web/webmvc/mvc-config/api-version.adoc[MVC Config], and then you can use the
+`version` <<webmvc-fn-predicates,predicate>> as follows:
+
+[tabs]
+======
+Java::
++
+[source,java,indent=0,subs="verbatim,quotes"]
+----
+	RouterFunction<ServerResponse> route = RouterFunctions.route()
+		.GET("/hello-world", version("1.2"),
+			request -> ServerResponse.ok().body("Hello World")).build();
+----
+
+Kotlin::
++
+[source,kotlin,indent=0,subs="verbatim,quotes"]
+----
+	val route = router {
+		GET("/hello-world", version("1.2")) {
+			ServerResponse.ok().body("Hello World")
+		}
+	}
+----
+======
+
+The `version` predicate can be:
+
+- Fixed version ("1.2") -- matches the given version only
+- Baseline version ("1.2+") -- matches the given version and above, up to the highest
+xref:web/webmvc/mvc-config/api-version.adoc[supported version].
+
+See xref:web/webmvc-versioning.adoc[API Versioning] for more details on underlying
+infrastructure and support for API Versioning.
+
+
 
 
 [[webmvc-fn-serving-resources]]
@@ -778,11 +835,10 @@ for handling redirects in Single Page Applications.
 ======
 Java::
 +
-[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+[source,java,indent=0,subs="verbatim,quotes"]
 ----
-    ClassPathResource index = new ClassPathResource("static/index.html");
-	List<String> extensions = List.of("js", "css", "ico", "png", "jpg", "gif");
-	RequestPredicate spaPredicate = path("/api/**").or(path("/error")).or(pathExtension(extensions::contains)).negate();
+	ClassPathResource index = new ClassPathResource("static/index.html");
+	RequestPredicate spaPredicate = path("/api/**").or(path("/error")).negate();
 	RouterFunction<ServerResponse> redirectToIndex = route()
 		.resource(spaPredicate, index)
 		.build();
@@ -790,13 +846,11 @@ Java::
 
 Kotlin::
 +
-[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+[source,kotlin,indent=0,subs="verbatim,quotes"]
 ----
-    val redirectToIndex = router {
+	val redirectToIndex = router {
 		val index = ClassPathResource("static/index.html")
-		val extensions = listOf("js", "css", "ico", "png", "jpg", "gif")
-		val spaPredicate = !(path("/api/**") or path("/error") or
-			pathExtension(extensions::contains))
+		val spaPredicate = !(path("/api/**") or path("/error"))
 		resource(spaPredicate, index)
 	}
 ----
@@ -811,18 +865,18 @@ It is also possible to route requests that match a given pattern to resources re
 ======
 Java::
 +
-[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+[source,java,indent=0,subs="verbatim,quotes"]
 ----
-    Resource location = new FileSystemResource("public-resources/");
-    RouterFunction<ServerResponse> resources = RouterFunctions.resources("/resources/**", location);
+	Resource location = new FileUrlResource("public-resources/");
+	RouterFunction<ServerResponse> resources = RouterFunctions.resources("/resources/**", location);
 ----
 
 Kotlin::
 +
-[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+[source,kotlin,indent=0,subs="verbatim,quotes"]
 ----
-    val location = FileSystemResource("public-resources/")
-    val resources = router { resources("/resources/**", location) }
+	val location = FileUrlResource("public-resources/")
+	val resources = router { resources("/resources/**", location) }
 ----
 ======
 
@@ -847,83 +901,9 @@ processing lifecycle and also (potentially) run side by side with annotated cont
 any are declared. It is also how functional endpoints are enabled by the Spring Boot Web
 starter.
 
-The following example shows a WebFlux Java configuration:
+The following example shows a related Spring MVC configuration:
 
-[tabs]
-======
-Java::
-+
-[source,java,indent=0,subs="verbatim,quotes",role="primary"]
-----
-	@Configuration
-	@EnableMvc
-	public class WebConfig implements WebMvcConfigurer {
-
-		@Bean
-		public RouterFunction<?> routerFunctionA() {
-			// ...
-		}
-
-		@Bean
-		public RouterFunction<?> routerFunctionB() {
-			// ...
-		}
-
-		// ...
-
-		@Override
-		public void configureMessageConverters(List<HttpMessageConverter<?>> converters) {
-			// configure message conversion...
-		}
-
-		@Override
-		public void addCorsMappings(CorsRegistry registry) {
-			// configure CORS...
-		}
-
-		@Override
-		public void configureViewResolvers(ViewResolverRegistry registry) {
-			// configure view resolution for HTML rendering...
-		}
-	}
-----
-
-Kotlin::
-+
-[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
-----
-	@Configuration
-	@EnableMvc
-	class WebConfig : WebMvcConfigurer {
-
-		@Bean
-		fun routerFunctionA(): RouterFunction<*> {
-			// ...
-		}
-
-		@Bean
-		fun routerFunctionB(): RouterFunction<*> {
-			// ...
-		}
-
-		// ...
-
-		override fun configureMessageConverters(converters: List<HttpMessageConverter<*>>) {
-			// configure message conversion...
-		}
-
-		override fun addCorsMappings(registry: CorsRegistry) {
-			// configure CORS...
-		}
-
-		override fun configureViewResolvers(registry: ViewResolverRegistry) {
-			// configure view resolution for HTML rendering...
-		}
-	}
-----
-======
-
-
+include-code::./WebConfiguration[tag=snippet,indent=0]
 
 
 [[webmvc-fn-handler-filter-function]]
@@ -941,7 +921,7 @@ For instance, consider the following example:
 ======
 Java::
 +
-[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+[source,java,indent=0,subs="verbatim,quotes"]
 ----
 	RouterFunction<ServerResponse> route = route()
 		.path("/person", b1 -> b1
@@ -960,7 +940,7 @@ Java::
 
 Kotlin::
 +
-[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+[source,kotlin,indent=0,subs="verbatim,quotes"]
 ----
 	import org.springframework.web.servlet.function.router
 
@@ -998,7 +978,7 @@ The following example shows how to do so:
 ======
 Java::
 +
-[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+[source,java,indent=0,subs="verbatim,quotes"]
 ----
 	SecurityManager securityManager = ...
 
@@ -1021,7 +1001,7 @@ Java::
 
 Kotlin::
 +
-[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+[source,kotlin,indent=0,subs="verbatim,quotes"]
 ----
 	import org.springframework.web.servlet.function.router
 

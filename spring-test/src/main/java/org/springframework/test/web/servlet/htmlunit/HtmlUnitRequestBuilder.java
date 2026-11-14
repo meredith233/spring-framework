@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -39,10 +39,10 @@ import org.htmlunit.WebClient;
 import org.htmlunit.WebRequest;
 import org.htmlunit.util.KeyDataPair;
 import org.htmlunit.util.NameValuePair;
+import org.jspecify.annotations.Nullable;
 
 import org.springframework.beans.Mergeable;
 import org.springframework.http.MediaType;
-import org.springframework.lang.Nullable;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpSession;
 import org.springframework.mock.web.MockPart;
@@ -79,17 +79,13 @@ final class HtmlUnitRequestBuilder implements RequestBuilder, Mergeable {
 
 	private final WebRequest webRequest;
 
-	@Nullable
-	private String contextPath;
+	private @Nullable String contextPath;
 
-	@Nullable
-	private RequestBuilder parentBuilder;
+	private @Nullable RequestBuilder parentBuilder;
 
-	@Nullable
-	private SmartRequestBuilder parentPostProcessor;
+	private @Nullable SmartRequestBuilder parentPostProcessor;
 
-	@Nullable
-	private RequestPostProcessor forwardPostProcessor;
+	private @Nullable RequestPostProcessor forwardPostProcessor;
 
 
 	/**
@@ -215,14 +211,11 @@ final class HtmlUnitRequestBuilder implements RequestBuilder, Mergeable {
 
 	private void ports(UriComponents uriComponents, MockHttpServletRequest request) {
 		int serverPort = uriComponents.getPort();
-		request.setServerPort(serverPort);
 		if (serverPort == -1) {
-			int portConnection = this.webRequest.getUrl().getDefaultPort();
-			request.setLocalPort(serverPort);
-			request.setRemotePort(portConnection);
+			serverPort = this.webRequest.getUrl().getDefaultPort();
 		}
-		else {
-			request.setRemotePort(serverPort);
+		if (serverPort != -1) {
+			request.setServerPort(serverPort);
 		}
 	}
 
@@ -234,8 +227,7 @@ final class HtmlUnitRequestBuilder implements RequestBuilder, Mergeable {
 		}
 	}
 
-	@Nullable
-	private String getHeader(String headerName) {
+	private @Nullable String getHeader(String headerName) {
 		return this.webRequest.getAdditionalHeaders().get(headerName);
 	}
 
@@ -301,8 +293,8 @@ final class HtmlUnitRequestBuilder implements RequestBuilder, Mergeable {
 			}
 		}
 
-		Set<org.htmlunit.util.Cookie> managedCookies = this.webClient.getCookies(this.webRequest.getUrl());
-		for (org.htmlunit.util.Cookie cookie : managedCookies) {
+		Set<org.htmlunit.http.Cookie> managedCookies = this.webClient.getCookies(this.webRequest.getUrl());
+		for (org.htmlunit.http.Cookie cookie : managedCookies) {
 			processCookie(request, cookies, new Cookie(cookie.getName(), cookie.getValue()));
 		}
 
@@ -351,8 +343,8 @@ final class HtmlUnitRequestBuilder implements RequestBuilder, Mergeable {
 		this.webClient.getCookieManager().removeCookie(createCookie(request, sessionid));
 	}
 
-	private org.htmlunit.util.Cookie createCookie(MockHttpServletRequest request, String sessionid) {
-		return new org.htmlunit.util.Cookie(request.getServerName(), "JSESSIONID", sessionid,
+	private org.htmlunit.http.Cookie createCookie(MockHttpServletRequest request, String sessionid) {
+		return new org.htmlunit.http.Cookie(request.getServerName(), "JSESSIONID", sessionid,
 				request.getContextPath() + "/", null, request.isSecure(), true);
 	}
 
@@ -451,8 +443,7 @@ final class HtmlUnitRequestBuilder implements RequestBuilder, Mergeable {
 		}
 
 		@Override
-		@Nullable
-		public HttpSession getSession(boolean create) {
+		public @Nullable HttpSession getSession(boolean create) {
 			HttpSession session = super.getSession(false);
 			if (session == null && create) {
 				HtmlUnitMockHttpSession newSession = new HtmlUnitMockHttpSession(this);

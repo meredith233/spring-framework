@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2023 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -79,7 +79,7 @@ class JmsNamespaceHandlerTests {
 
 
 	@Test
-	void testBeansCreated() {
+	void beansCreated() {
 		Map<String, ?> containers = context.getBeansOfType(DefaultMessageListenerContainer.class);
 		assertThat(containers).as("Context should contain 3 JMS listener containers").hasSize(3);
 
@@ -91,7 +91,7 @@ class JmsNamespaceHandlerTests {
 	}
 
 	@Test
-	void testContainerConfiguration() {
+	void containerConfiguration() {
 		Map<String, DefaultMessageListenerContainer> containers = context.getBeansOfType(DefaultMessageListenerContainer.class);
 		ConnectionFactory defaultConnectionFactory = context.getBean(DEFAULT_CONNECTION_FACTORY, ConnectionFactory.class);
 		ConnectionFactory explicitConnectionFactory = context.getBean(EXPLICIT_CONNECTION_FACTORY, ConnectionFactory.class);
@@ -113,7 +113,7 @@ class JmsNamespaceHandlerTests {
 	}
 
 	@Test
-	void testJcaContainerConfiguration() {
+	void jcaContainerConfiguration() {
 		Map<String, JmsMessageEndpointManager> containers = context.getBeansOfType(JmsMessageEndpointManager.class);
 
 		assertThat(containers.containsKey("listener3")).as("listener3 not found").isTrue();
@@ -133,7 +133,7 @@ class JmsNamespaceHandlerTests {
 	}
 
 	@Test
-	void testJmsContainerFactoryConfiguration() {
+	void jmsContainerFactoryConfiguration() {
 		Map<String, DefaultJmsListenerContainerFactory> containers =
 				context.getBeansOfType(DefaultJmsListenerContainerFactory.class);
 		DefaultJmsListenerContainerFactory factory = containers.get("testJmsFactory");
@@ -155,7 +155,7 @@ class JmsNamespaceHandlerTests {
 	}
 
 	@Test
-	void testJcaContainerFactoryConfiguration() {
+	void jcaContainerFactoryConfiguration() {
 		Map<String, DefaultJcaListenerContainerFactory> containers =
 				context.getBeansOfType(DefaultJcaListenerContainerFactory.class);
 		DefaultJcaListenerContainerFactory factory = containers.get("testJcaFactory");
@@ -172,7 +172,7 @@ class JmsNamespaceHandlerTests {
 	}
 
 	@Test
-	void testListeners() throws Exception {
+	void listeners() throws Exception {
 		TestBean testBean1 = context.getBean("testBean1", TestBean.class);
 		TestBean testBean2 = context.getBean("testBean2", TestBean.class);
 		TestMessageListener testBean3 = context.getBean("testBean3", TestMessageListener.class);
@@ -203,7 +203,7 @@ class JmsNamespaceHandlerTests {
 	}
 
 	@Test
-	void testRecoveryInterval() {
+	void recoveryInterval() {
 		Object testBackOff = context.getBean("testBackOff");
 		BackOff backOff1 = getBackOff("listener1");
 		BackOff backOff2 = getBackOff("listener2");
@@ -215,7 +215,7 @@ class JmsNamespaceHandlerTests {
 	}
 
 	@Test
-	void testConcurrency() {
+	void concurrency() {
 		// JMS
 		DefaultMessageListenerContainer listener0 = this.context
 				.getBean(DefaultMessageListenerContainer.class.getName() + "#0", DefaultMessageListenerContainer.class);
@@ -241,7 +241,7 @@ class JmsNamespaceHandlerTests {
 	}
 
 	@Test
-	void testResponseDestination() {
+	void responseDestination() {
 		// JMS
 		DefaultMessageListenerContainer listener1 = this.context
 				.getBean("listener1", DefaultMessageListenerContainer.class);
@@ -264,7 +264,7 @@ class JmsNamespaceHandlerTests {
 	}
 
 	@Test
-	void testErrorHandlers() {
+	void errorHandlers() {
 		ErrorHandler expected = this.context.getBean("testErrorHandler", ErrorHandler.class);
 		ErrorHandler errorHandler1 = getErrorHandler("listener1");
 		ErrorHandler errorHandler2 = getErrorHandler("listener2");
@@ -275,7 +275,7 @@ class JmsNamespaceHandlerTests {
 	}
 
 	@Test
-	void testPhases() {
+	void phases() {
 		int phase1 = getPhase("listener1");
 		int phase2 = getPhase("listener2");
 		int phase3 = getPhase("listener3");
@@ -289,21 +289,21 @@ class JmsNamespaceHandlerTests {
 	}
 
 	@Test
-	void testComponentRegistration() {
+	void componentRegistration() {
 		assertThat(context.containsComponentDefinition("listener1")).as("Parser should have registered a component named 'listener1'").isTrue();
 		assertThat(context.containsComponentDefinition("listener2")).as("Parser should have registered a component named 'listener2'").isTrue();
 		assertThat(context.containsComponentDefinition("listener3")).as("Parser should have registered a component named 'listener3'").isTrue();
-		assertThat(context.containsComponentDefinition(DefaultMessageListenerContainer.class.getName() + "#0")).as("Parser should have registered a component named '"
-				+ DefaultMessageListenerContainer.class.getName() + "#0'").isTrue();
-		assertThat(context.containsComponentDefinition(JmsMessageEndpointManager.class.getName() + "#0")).as("Parser should have registered a component named '"
-				+ JmsMessageEndpointManager.class.getName() + "#0'").isTrue();
+		assertThat(context.containsComponentDefinition(DefaultMessageListenerContainer.class.getName() + "#0")).as("Parser should have registered a component named '" +
+				DefaultMessageListenerContainer.class.getName() + "#0'").isTrue();
+		assertThat(context.containsComponentDefinition(JmsMessageEndpointManager.class.getName() + "#0")).as("Parser should have registered a component named '" +
+				JmsMessageEndpointManager.class.getName() + "#0'").isTrue();
 		assertThat(context.containsComponentDefinition("testJmsFactory")).as("Parser should have registered a component named 'testJmsFactory").isTrue();
 		assertThat(context.containsComponentDefinition("testJcaFactory")).as("Parser should have registered a component named 'testJcaFactory").isTrue();
 		assertThat(context.containsComponentDefinition("onlyJmsFactory")).as("Parser should have registered a component named 'testJcaFactory").isTrue();
 	}
 
 	@Test
-	void testSourceExtraction() {
+	void sourceExtraction() {
 		Iterator<ComponentDefinition> iterator = context.getRegisteredComponents();
 		while (iterator.hasNext()) {
 			ComponentDefinition compDef = iterator.next();

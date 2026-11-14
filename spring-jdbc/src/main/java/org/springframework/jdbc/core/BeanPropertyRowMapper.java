@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -28,6 +28,7 @@ import java.util.Set;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.jspecify.annotations.Nullable;
 
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.BeanWrapper;
@@ -40,9 +41,8 @@ import org.springframework.core.convert.support.DefaultConversionService;
 import org.springframework.dao.DataRetrievalFailureException;
 import org.springframework.dao.InvalidDataAccessApiUsageException;
 import org.springframework.jdbc.support.JdbcUtils;
-import org.springframework.lang.Nullable;
 import org.springframework.util.Assert;
-import org.springframework.util.ClassUtils;
+import org.springframework.util.CollectionUtils;
 import org.springframework.util.StringUtils;
 
 /**
@@ -95,8 +95,7 @@ public class BeanPropertyRowMapper<T> implements RowMapper<T> {
 	protected final Log logger = LogFactory.getLog(getClass());
 
 	/** The class we are mapping to. */
-	@Nullable
-	private Class<T> mappedClass;
+	private @Nullable Class<T> mappedClass;
 
 	/** Whether we're strictly validating. */
 	private boolean checkFullyPopulated = false;
@@ -109,16 +108,13 @@ public class BeanPropertyRowMapper<T> implements RowMapper<T> {
 	private boolean primitivesDefaultedForNullValue = false;
 
 	/** ConversionService for binding JDBC values to bean properties. */
-	@Nullable
-	private ConversionService conversionService = DefaultConversionService.getSharedInstance();
+	private @Nullable ConversionService conversionService = DefaultConversionService.getSharedInstance();
 
 	/** Map of the properties we provide mapping for. */
-	@Nullable
-	private Map<String, PropertyDescriptor> mappedProperties;
+	private @Nullable Map<String, PropertyDescriptor> mappedProperties;
 
 	/** Set of bean property names we provide mapping for. */
-	@Nullable
-	private Set<String> mappedPropertyNames;
+	private @Nullable Set<String> mappedPropertyNames;
 
 
 	/**
@@ -168,8 +164,7 @@ public class BeanPropertyRowMapper<T> implements RowMapper<T> {
 	/**
 	 * Get the class that we are mapping to.
 	 */
-	@Nullable
-	public final Class<T> getMappedClass() {
+	public final @Nullable Class<T> getMappedClass() {
 		return this.mappedClass;
 	}
 
@@ -219,8 +214,8 @@ public class BeanPropertyRowMapper<T> implements RowMapper<T> {
 	/**
 	 * Set a {@link ConversionService} for binding JDBC values to bean properties,
 	 * or {@code null} for none.
-	 * <p>Default is a {@link DefaultConversionService}, as of Spring 4.3. This
-	 * provides support for {@code java.time} conversion and other special types.
+	 * <p>Default is a {@link DefaultConversionService}. This provides support for
+	 * {@code java.time} conversion and other special types.
 	 * @since 4.3
 	 * @see #initBeanWrapper(BeanWrapper)
 	 */
@@ -233,8 +228,7 @@ public class BeanPropertyRowMapper<T> implements RowMapper<T> {
 	 * or {@code null} if none.
 	 * @since 4.3
 	 */
-	@Nullable
-	public ConversionService getConversionService() {
+	public @Nullable ConversionService getConversionService() {
 		return this.conversionService;
 	}
 
@@ -267,11 +261,23 @@ public class BeanPropertyRowMapper<T> implements RowMapper<T> {
 	 * @param propertyName the property name (as used by property descriptors)
 	 * @since 5.3.9
 	 */
-	protected void suppressProperty(String propertyName) {
+	protected void suppressProperty(@Nullable String propertyName) {
 		if (this.mappedProperties != null) {
 			this.mappedProperties.remove(lowerCaseName(propertyName));
 			this.mappedProperties.remove(underscoreName(propertyName));
 		}
+		if (this.mappedPropertyNames != null) {
+			this.mappedPropertyNames.remove(propertyName);
+		}
+	}
+
+	/**
+	 * Determine whether there are any mapped properties to check.
+	 * @since 7.1
+	 */
+	protected boolean hasMappedProperties() {
+		return (!CollectionUtils.isEmpty(this.mappedProperties) ||
+				(isCheckFullyPopulated() && !CollectionUtils.isEmpty(this.mappedPropertyNames)));
 	}
 
 	/**
@@ -302,7 +308,10 @@ public class BeanPropertyRowMapper<T> implements RowMapper<T> {
 	 * @since 4.2
 	 * @see #underscoreName
 	 */
-	protected String lowerCaseName(String name) {
+	protected String lowerCaseName(@Nullable String name) {
+		if (!StringUtils.hasLength(name)) {
+			return "";
+		}
 		return name.toLowerCase(Locale.US);
 	}
 
@@ -314,7 +323,7 @@ public class BeanPropertyRowMapper<T> implements RowMapper<T> {
 	 * @since 4.2
 	 * @see JdbcUtils#convertPropertyNameToUnderscoreName
 	 */
-	protected String underscoreName(String name) {
+	protected String underscoreName(@Nullable String name) {
 		return JdbcUtils.convertPropertyNameToUnderscoreName(name);
 	}
 
@@ -328,10 +337,14 @@ public class BeanPropertyRowMapper<T> implements RowMapper<T> {
 	public T mapRow(ResultSet rs, int rowNumber) throws SQLException {
 		BeanWrapperImpl bw = new BeanWrapperImpl();
 		initBeanWrapper(bw);
-
 		T mappedObject = constructMappedInstance(rs, bw);
-		bw.setBeanInstance(mappedObject);
 
+		if (!hasMappedProperties()) {
+			// Nothing left to populate via setters (for example, a record mapped through its constructor)
+			return mappedObject;
+		}
+
+		bw.setBeanInstance(mappedObject);
 		ResultSetMetaData rsmd = rs.getMetaData();
 		int columnCount = rsmd.getColumnCount();
 		Set<String> populatedProperties = (isCheckFullyPopulated() ? new HashSet<>() : null);
@@ -345,7 +358,7 @@ public class BeanPropertyRowMapper<T> implements RowMapper<T> {
 					Object value = getColumnValue(rs, index, pd);
 					if (rowNumber == 0 && logger.isDebugEnabled()) {
 						logger.debug("Mapping column '" + column + "' to property '" + pd.getName() +
-								"' of type '" + ClassUtils.getQualifiedName(pd.getPropertyType()) + "'");
+								"' of type '" + pd.getPropertyType().getTypeName() + "'");
 					}
 					try {
 						bw.setPropertyValue(pd.getName(), value);
@@ -353,7 +366,7 @@ public class BeanPropertyRowMapper<T> implements RowMapper<T> {
 					catch (TypeMismatchException ex) {
 						if (value == null && isPrimitivesDefaultedForNullValue()) {
 							if (logger.isDebugEnabled()) {
-								String propertyType = ClassUtils.getQualifiedName(pd.getPropertyType());
+								String propertyType = pd.getPropertyType().getTypeName();
 								logger.debug("""
 										Ignoring intercepted TypeMismatchException for row %d and column '%s' \
 										with null value when setting property '%s' of type '%s' on object: %s"
@@ -426,8 +439,7 @@ public class BeanPropertyRowMapper<T> implements RowMapper<T> {
 	 * @throws SQLException in case of extraction failure
 	 * @see #getColumnValue(ResultSet, int, Class)
 	 */
-	@Nullable
-	protected Object getColumnValue(ResultSet rs, int index, PropertyDescriptor pd) throws SQLException {
+	protected @Nullable Object getColumnValue(ResultSet rs, int index, PropertyDescriptor pd) throws SQLException {
 		return JdbcUtils.getResultSetValue(rs, index, pd.getPropertyType());
 	}
 
@@ -445,8 +457,7 @@ public class BeanPropertyRowMapper<T> implements RowMapper<T> {
 	 * @since 5.3
 	 * @see org.springframework.jdbc.support.JdbcUtils#getResultSetValue(java.sql.ResultSet, int, Class)
 	 */
-	@Nullable
-	protected Object getColumnValue(ResultSet rs, int index, Class<?> paramType) throws SQLException {
+	protected @Nullable Object getColumnValue(ResultSet rs, int index, Class<?> paramType) throws SQLException {
 		return JdbcUtils.getResultSetValue(rs, index, paramType);
 	}
 

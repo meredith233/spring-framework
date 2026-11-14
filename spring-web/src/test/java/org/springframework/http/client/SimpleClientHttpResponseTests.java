@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -47,9 +47,9 @@ class SimpleClientHttpResponseTests {
 
 
 	@Test  // SPR-14040
-	public void shouldNotCloseConnectionWhenResponseClosed() throws Exception {
+	void shouldNotCloseConnectionWhenResponseClosed() throws Exception {
 		TestByteArrayInputStream is = new TestByteArrayInputStream("Spring".getBytes(StandardCharsets.UTF_8));
-		given(this.connection.getErrorStream()).willReturn(null);
+		given(this.connection.getResponseCode()).willReturn(200);
 		given(this.connection.getInputStream()).willReturn(is);
 
 		InputStream responseStream = this.response.getBody();
@@ -61,10 +61,10 @@ class SimpleClientHttpResponseTests {
 	}
 
 	@Test  // SPR-14040
-	public void shouldDrainStreamWhenResponseClosed() throws Exception {
+	void shouldDrainStreamWhenResponseClosed() throws Exception {
 		byte[] buf = new byte[6];
 		TestByteArrayInputStream is = new TestByteArrayInputStream("SpringSpring".getBytes(StandardCharsets.UTF_8));
-		given(this.connection.getErrorStream()).willReturn(null);
+		given(this.connection.getResponseCode()).willReturn(200);
 		given(this.connection.getInputStream()).willReturn(is);
 
 		InputStream responseStream = this.response.getBody();
@@ -79,9 +79,10 @@ class SimpleClientHttpResponseTests {
 	}
 
 	@Test  // SPR-14040
-	public void shouldDrainErrorStreamWhenResponseClosed() throws Exception {
+	void shouldDrainErrorStreamWhenResponseClosed() throws Exception {
 		byte[] buf = new byte[6];
 		TestByteArrayInputStream is = new TestByteArrayInputStream("SpringSpring".getBytes(StandardCharsets.UTF_8));
+		given(this.connection.getResponseCode()).willReturn(404);
 		given(this.connection.getErrorStream()).willReturn(is);
 
 		InputStream responseStream = this.response.getBody();
@@ -96,8 +97,9 @@ class SimpleClientHttpResponseTests {
 	}
 
 	@Test  // SPR-16773
-	public void shouldNotDrainWhenErrorStreamClosed() throws Exception {
+	void shouldNotDrainWhenErrorStreamClosed() throws Exception {
 		InputStream is = mock();
+		given(this.connection.getResponseCode()).willReturn(404);
 		given(this.connection.getErrorStream()).willReturn(is);
 		willDoNothing().given(is).close();
 		given(is.transferTo(any())).willCallRealMethod();
@@ -113,9 +115,9 @@ class SimpleClientHttpResponseTests {
 	}
 
 	@Test // SPR-17181
-	public void shouldDrainResponseEvenIfResponseNotRead() throws Exception {
+	void shouldDrainResponseEvenIfResponseNotRead() throws Exception {
 		TestByteArrayInputStream is = new TestByteArrayInputStream("SpringSpring".getBytes(StandardCharsets.UTF_8));
-		given(this.connection.getErrorStream()).willReturn(null);
+		given(this.connection.getResponseCode()).willReturn(200);
 		given(this.connection.getInputStream()).willReturn(is);
 
 		this.response.close();

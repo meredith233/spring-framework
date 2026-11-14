@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2023 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,15 +19,29 @@ package org.springframework.context.i18n;
 import java.util.Locale;
 import java.util.TimeZone;
 
+import org.jspecify.annotations.Nullable;
+
 import org.springframework.core.NamedInheritableThreadLocal;
 import org.springframework.core.NamedThreadLocal;
-import org.springframework.lang.Nullable;
 
 /**
  * Simple holder class that associates a LocaleContext instance
  * with the current thread. The LocaleContext will be inherited
  * by any child threads spawned by the current thread if the
  * {@code inheritable} flag is set to {@code true}.
+ *
+ * <p>Note, the {@code inheritable} flag relies on JDK
+ * {@link java.lang.InheritableThreadLocal} semantics, which only propagates
+ * the context value to <em>newly created</em> child threads at the time of
+ * their creation. In thread pool environments where threads are reused across
+ * tasks, the context is not refreshed per task submission; reused threads
+ * retain whatever value was inherited when they were originally created.
+ * This mechanism is therefore not suitable for per-task context propagation
+ * in thread pool environments. Instead, consider using a
+ * {@link org.springframework.core.task.TaskDecorator} that captures the
+ * locale context in the caller thread, applies it around each task execution,
+ * and resets it afterward. The {@code inheritable} flag works as expected
+ * with virtual threads, since those are newly created for every task.
  *
  * <p>Used as a central holder for the current Locale in Spring,
  * wherever necessary: for example, in MessageSourceAccessor.
@@ -41,6 +55,7 @@ import org.springframework.lang.Nullable;
  * @see LocaleContext
  * @see org.springframework.context.support.MessageSourceAccessor
  * @see org.springframework.web.servlet.DispatcherServlet
+ * @see org.springframework.core.task.TaskDecorator
  */
 public final class LocaleContextHolder {
 
@@ -51,12 +66,10 @@ public final class LocaleContextHolder {
 			new NamedInheritableThreadLocal<>("LocaleContext");
 
 	// Shared default locale at the framework level
-	@Nullable
-	private static Locale defaultLocale;
+	private static @Nullable Locale defaultLocale;
 
 	// Shared default time zone at the framework level
-	@Nullable
-	private static TimeZone defaultTimeZone;
+	private static @Nullable TimeZone defaultTimeZone;
 
 
 	private LocaleContextHolder() {
@@ -92,7 +105,9 @@ public final class LocaleContextHolder {
 	 * @param localeContext the current LocaleContext,
 	 * or {@code null} to reset the thread-bound context
 	 * @param inheritable whether to expose the LocaleContext as inheritable
-	 * for child threads (using an {@link InheritableThreadLocal})
+	 * for child threads (using an {@link InheritableThreadLocal}); note that
+	 * this only propagates to newly created threads, not to threads reused
+	 * in a thread pool (see the class-level note for details)
 	 * @see SimpleLocaleContext
 	 * @see SimpleTimeZoneAwareLocaleContext
 	 */
@@ -116,8 +131,7 @@ public final class LocaleContextHolder {
 	 * Return the LocaleContext associated with the current thread, if any.
 	 * @return the current LocaleContext, or {@code null} if none
 	 */
-	@Nullable
-	public static LocaleContext getLocaleContext() {
+	public static @Nullable LocaleContext getLocaleContext() {
 		LocaleContext localeContext = localeContextHolder.get();
 		if (localeContext == null) {
 			localeContext = inheritableLocaleContextHolder.get();

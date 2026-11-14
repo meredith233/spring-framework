@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -73,7 +73,7 @@ public interface SmartLifecycle extends Lifecycle, Phased {
 	 * {@code SmartLifecycle} beans into a later startup phase and an earlier
 	 * shutdown phase.
 	 * <p>Note that certain {@code SmartLifecycle} components come with a different
-	 * default phase: e.g. executors/schedulers with {@code Integer.MAX_VALUE / 2}.
+	 * default phase: for example, executors/schedulers with {@code Integer.MAX_VALUE / 2}.
 	 * @since 5.1
 	 * @see #getPhase()
 	 * @see org.springframework.scheduling.concurrent.ExecutorConfigurationSupport#DEFAULT_PHASE
@@ -83,9 +83,24 @@ public interface SmartLifecycle extends Lifecycle, Phased {
 
 
 	/**
+	 * Return the phase that this lifecycle object is supposed to run in.
+	 * <p>The default implementation returns {@link #DEFAULT_PHASE} in order to
+	 * let {@code stop()} callbacks execute before regular {@code Lifecycle}
+	 * implementations.
+	 * @see #isAutoStartup()
+	 * @see #start()
+	 * @see #stop(Runnable)
+	 * @see org.springframework.context.support.DefaultLifecycleProcessor#getPhase(Lifecycle)
+	 */
+	@Override
+	default int getPhase() {
+		return DEFAULT_PHASE;
+	}
+
+	/**
 	 * Returns {@code true} if this {@code Lifecycle} component should get
 	 * started automatically by the container at the time that the containing
-	 * {@link ApplicationContext} gets refreshed.
+	 * {@link ApplicationContext} gets refreshed or restarted.
 	 * <p>A value of {@code false} indicates that the component is intended to
 	 * be started through an explicit {@link #start()} call instead, analogous
 	 * to a plain {@link Lifecycle} implementation.
@@ -93,9 +108,32 @@ public interface SmartLifecycle extends Lifecycle, Phased {
 	 * @see #start()
 	 * @see #getPhase()
 	 * @see LifecycleProcessor#onRefresh()
+	 * @see LifecycleProcessor#onRestart()
 	 * @see ConfigurableApplicationContext#refresh()
+	 * @see ConfigurableApplicationContext#restart()
 	 */
 	default boolean isAutoStartup() {
+		return true;
+	}
+
+	/**
+	 * Returns {@code true} if this {@code Lifecycle} component is able to
+	 * participate in a restart sequence, receiving corresponding {@link #stop()}
+	 * and {@link #start()} calls with a potential pause in-between.
+	 * <p>A value of {@code false} indicates that the component prefers to
+	 * be skipped in a pause scenario, neither receiving a {@link #stop()}
+	 * call nor a subsequent {@link #start()} call, analogous to a plain
+	 * {@link Lifecycle} implementation. It will only receive a {@link #stop()}
+	 * call on close and on explicit context-wide stopping but not on pause.
+	 * <p>The default implementation returns {@code true}.
+	 * @since 7.0
+	 * @see #stop()
+	 * @see LifecycleProcessor#onPause()
+	 * @see LifecycleProcessor#onClose()
+	 * @see ConfigurableApplicationContext#pause()
+	 * @see ConfigurableApplicationContext#close()
+	 */
+	default boolean isPauseable() {
 		return true;
 	}
 
@@ -122,18 +160,31 @@ public interface SmartLifecycle extends Lifecycle, Phased {
 	}
 
 	/**
-	 * Return the phase that this lifecycle object is supposed to run in.
-	 * <p>The default implementation returns {@link #DEFAULT_PHASE} in order to
-	 * let {@code stop()} callbacks execute before regular {@code Lifecycle}
-	 * implementations.
-	 * @see #isAutoStartup()
-	 * @see #start()
+	 * Indicates that a Lifecycle component must pause if it is currently running.
+	 * <p>This is a variant of {@link #stop(Runnable)} with an explicit indication for
+	 * a pause step. The default implementation delegates to {@link #stop(Runnable)};
+	 * implementations may override this to specifically react to the pause indication.
+	 * @since 7.0.11
 	 * @see #stop(Runnable)
-	 * @see org.springframework.context.support.DefaultLifecycleProcessor#getPhase(Lifecycle)
+	 * @see #isPauseable()
+	 * @see ConfigurableApplicationContext#pause()
 	 */
-	@Override
-	default int getPhase() {
-		return DEFAULT_PHASE;
+	default void pause(Runnable callback) {
+		stop(callback);
+	}
+
+	/**
+	 * Indicates that a Lifecycle component must restart if it is currently paused.
+	 * <p>This is a variant of {@link #start()} with an explicit indication for a
+	 * restart after pause. The default implementation delegates to {@link #start()};
+	 * implementations may override this to specifically react to the paused state.
+	 * @since 7.0.11
+	 * @see #start()
+	 * @see #isPauseable()
+	 * @see ConfigurableApplicationContext#restart()
+	 */
+	default void restart() {
+		start();
 	}
 
 }

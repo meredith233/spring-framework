@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -27,7 +27,7 @@ import javax.management.remote.JMXConnectorServerFactory;
 import javax.management.remote.JMXServiceURL;
 
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.Assumptions;
+import org.opentest4j.TestAbortedException;
 
 import org.springframework.core.testfixture.net.TestSocketUtils;
 
@@ -58,8 +58,8 @@ class RemoteMBeanClientInterceptorTests extends MBeanClientInterceptorTests {
 		}
 		catch (BindException ex) {
 			runTests = false;
-			Assumptions.abort("Skipping remote JMX tests because binding to local port [" +
-					this.servicePort + "] failed: " + ex.getMessage());
+			throw new TestAbortedException("Skipping remote JMX tests because binding to local port [%s] failed: %s"
+					.formatted(this.servicePort, ex.getMessage()));
 		}
 	}
 

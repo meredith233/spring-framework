@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,14 +16,13 @@
 
 package org.springframework.beans.factory.config;
 
+import java.net.URI;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
-import org.assertj.core.api.InstanceOfAssertFactories;
 import org.junit.jupiter.api.Test;
 import org.yaml.snakeyaml.composer.ComposerException;
 import org.yaml.snakeyaml.parser.ParserException;
@@ -34,6 +33,7 @@ import org.springframework.core.io.ByteArrayResource;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 import static org.assertj.core.api.Assertions.entry;
+import static org.assertj.core.api.InstanceOfAssertFactories.set;
 
 /**
  * Tests for {@link YamlProcessor}.
@@ -45,8 +45,7 @@ import static org.assertj.core.api.Assertions.entry;
  */
 class YamlProcessorTests {
 
-	private final YamlProcessor processor = new YamlProcessor() {
-	};
+	private final TestYamlProcessor processor = new TestYamlProcessor();
 
 
 	@Test
@@ -142,19 +141,17 @@ class YamlProcessorTests {
 	}
 
 	@Test
-	@SuppressWarnings("unchecked")
 	void standardTypesSupportedByDefault() {
 		setYaml("value: !!set\n  ? first\n  ? second");
 		this.processor.process((properties, map) -> {
 			assertThat(properties).containsExactly(entry("value[0]", "first"), entry("value[1]", "second"));
-			assertThat(map.get("value")).asInstanceOf(InstanceOfAssertFactories.type(Set.class))
-					.satisfies(set -> assertThat(set).containsExactly("first", "second"));
+			assertThat(map.get("value")).asInstanceOf(set(String.class)).containsExactly("first", "second");
 		});
 	}
 
 	@Test
 	void customTypeNotSupportedByDefault() throws Exception {
-		URL url = new URL("https://localhost:9000/");
+		URL url = URI.create("https://localhost:9000/").toURL();
 		setYaml("value: !!java.net.URL [\"" + url + "\"]");
 		assertThatExceptionOfType(ComposerException.class)
 				.isThrownBy(() -> this.processor.process((properties, map) -> {}))
@@ -165,7 +162,7 @@ class YamlProcessorTests {
 	void customTypesSupportedDueToExplicitConfiguration() throws Exception {
 		this.processor.setSupportedTypes(URL.class, String.class);
 
-		URL url = new URL("https://localhost:9000/");
+		URL url = URI.create("https://localhost:9000/").toURL();
 		setYaml("value: !!java.net.URL [!!java.lang.String [\"" + url + "\"]]");
 
 		this.processor.process((properties, map) -> {
@@ -185,8 +182,58 @@ class YamlProcessorTests {
 				.withMessageContaining("Global tag is not allowed: tag:yaml.org,2002:java.net.URL");
 	}
 
+	@Test
+	void processAndFlattenWithoutIncludedNulls() {
+		setYaml("avalue: value\nanull: null\natilde: ~\nparent:\n  anempty: {}\n");
+		Map<String, Object> flattened = this.processor.processAndFlatten(false, null);
+		assertThat(flattened).containsOnly(
+				entry("avalue", "value"),
+				entry("anull", ""),
+				entry("atilde", ""));
+	}
+
+	@Test
+	void processAndFlattenWithIncludedNulls() {
+		setYaml("avalue: value\nanull: null\natilde: ~\nparent:\n  anempty: {}\n");
+		Map<String, Object> flattened = this.processor.processAndFlatten(true, null);
+		assertThat(flattened).containsOnly(
+				entry("avalue", "value"),
+				entry("anull", null),
+				entry("atilde", null),
+				entry("parent.anempty", null));
+	}
+
+	@Test
+	void processAndFlattenWithIncludedBlankString() {
+		setYaml("avalue: value\nanull: null\natilde: ~\nparent:\n  anempty: {}\n");
+		Map<String, Object> flattened = this.processor.processAndFlatten(true, "");
+		assertThat(flattened).containsOnly(
+				entry("avalue", "value"),
+				entry("anull", ""),
+				entry("atilde", ""),
+				entry("parent.anempty", ""));
+	}
+
+	@Test
+	void processAndFlattenWithIncludedEmptyRootMapping() {
+		setYaml("{}");
+		assertThat(this.processor.processAndFlatten(true, null)).isEmpty();
+		assertThat(this.processor.processAndFlatten(true, "")).isEmpty();
+	}
+
 	private void setYaml(String yaml) {
 		this.processor.setResources(new ByteArrayResource(yaml.getBytes()));
+	}
+
+	private static class TestYamlProcessor extends YamlProcessor {
+
+		Map<String, Object> processAndFlatten(boolean includeEmpty, Object emptyValue) {
+			Map<String, Object> flattened = new LinkedHashMap<>();
+			process((properties, map) -> flattened.putAll(getFlattenedMap(map, includeEmpty, emptyValue)));
+			return flattened;
+		}
+
+
 	}
 
 }

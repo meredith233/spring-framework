@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2023 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,6 +16,7 @@
 
 package org.springframework.scheduling.quartz;
 
+import org.jspecify.annotations.Nullable;
 import org.quartz.SchedulerContext;
 import org.quartz.spi.TriggerFiredBundle;
 
@@ -24,7 +25,6 @@ import org.springframework.beans.MutablePropertyValues;
 import org.springframework.beans.PropertyAccessorFactory;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.ApplicationContextAware;
-import org.springframework.lang.Nullable;
 
 /**
  * Subclass of {@link AdaptableJobFactory} that also supports Spring-style
@@ -36,7 +36,7 @@ import org.springframework.lang.Nullable;
  * as bean property values. If no matching bean property is found, the entry
  * is by default simply ignored. This is analogous to QuartzJobBean's behavior.
  *
- * <p>Compatible with Quartz 2.1.4 and higher, as of Spring 4.1.
+ * <p>Compatible with Quartz 2.1.4 and higher.
  *
  * @author Juergen Hoeller
  * @since 2.0
@@ -46,14 +46,11 @@ import org.springframework.lang.Nullable;
 public class SpringBeanJobFactory extends AdaptableJobFactory
 		implements ApplicationContextAware, SchedulerContextAware {
 
-	@Nullable
-	private String[] ignoredUnknownProperties;
+	private String @Nullable [] ignoredUnknownProperties;
 
-	@Nullable
-	private ApplicationContext applicationContext;
+	private @Nullable ApplicationContext applicationContext;
 
-	@Nullable
-	private SchedulerContext schedulerContext;
+	private @Nullable SchedulerContext schedulerContext;
 
 
 	/**

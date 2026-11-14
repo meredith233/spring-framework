@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2023 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -26,8 +26,9 @@ import java.util.Set;
 import java.util.SortedSet;
 import java.util.TreeSet;
 
+import org.jspecify.annotations.Nullable;
+
 import org.springframework.http.server.PathContainer;
-import org.springframework.lang.Nullable;
 import org.springframework.util.ObjectUtils;
 import org.springframework.web.server.ServerWebExchange;
 import org.springframework.web.util.pattern.PathPattern;
@@ -155,15 +156,16 @@ public final class PatternsRequestCondition extends AbstractRequestCondition<Pat
 	 * or {@code null} if no patterns match.
 	 */
 	@Override
-	@Nullable
-	public PatternsRequestCondition getMatchingCondition(ServerWebExchange exchange) {
-		SortedSet<PathPattern> matches = getMatchingPatterns(exchange);
+	public @Nullable PatternsRequestCondition getMatchingCondition(ServerWebExchange exchange) {
+		PathContainer lookupPath = exchange.getRequest().getPath().pathWithinApplication();
+		if (this.patterns.size() == 1) {
+			return (this.patterns.first().matches(lookupPath) ? this : null);
+		}
+		SortedSet<PathPattern> matches = getMatchingPatterns(lookupPath);
 		return (matches != null ? new PatternsRequestCondition(matches) : null);
 	}
 
-	@Nullable
-	private SortedSet<PathPattern> getMatchingPatterns(ServerWebExchange exchange) {
-		PathContainer lookupPath = exchange.getRequest().getPath().pathWithinApplication();
+	private @Nullable SortedSet<PathPattern> getMatchingPatterns(PathContainer lookupPath) {
 		TreeSet<PathPattern> result = null;
 		for (PathPattern pattern : this.patterns) {
 			if (pattern.matches(lookupPath)) {

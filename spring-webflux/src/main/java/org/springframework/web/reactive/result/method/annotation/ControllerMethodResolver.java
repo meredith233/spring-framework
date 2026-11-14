@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -28,6 +28,7 @@ import java.util.function.Predicate;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.jspecify.annotations.Nullable;
 import reactor.core.scheduler.Scheduler;
 
 import org.springframework.beans.factory.config.ConfigurableListableBeanFactory;
@@ -38,8 +39,8 @@ import org.springframework.core.MethodIntrospector;
 import org.springframework.core.MethodParameter;
 import org.springframework.core.ReactiveAdapterRegistry;
 import org.springframework.core.annotation.AnnotatedElementUtils;
+import org.springframework.http.MediaType;
 import org.springframework.http.codec.HttpMessageReader;
-import org.springframework.lang.Nullable;
 import org.springframework.util.Assert;
 import org.springframework.util.ClassUtils;
 import org.springframework.util.ReflectionUtils.MethodFilter;
@@ -50,12 +51,17 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.support.WebBindingInitializer;
 import org.springframework.web.method.ControllerAdviceBean;
 import org.springframework.web.method.HandlerMethod;
+import org.springframework.web.method.annotation.ExceptionHandlerMappingInfo;
 import org.springframework.web.method.annotation.ExceptionHandlerMethodResolver;
 import org.springframework.web.method.annotation.HandlerMethodValidator;
+import org.springframework.web.reactive.HandlerMapping;
+import org.springframework.web.reactive.accept.RequestedContentTypeResolver;
 import org.springframework.web.reactive.result.method.HandlerMethodArgumentResolver;
 import org.springframework.web.reactive.result.method.InvocableHandlerMethod;
 import org.springframework.web.reactive.result.method.SyncHandlerMethodArgumentResolver;
 import org.springframework.web.reactive.result.method.SyncInvocableHandlerMethod;
+import org.springframework.web.server.NotAcceptableStatusException;
+import org.springframework.web.server.ServerWebExchange;
 
 /**
  * Package-private class to assist {@link RequestMappingHandlerAdapter} with
@@ -104,14 +110,13 @@ class ControllerMethodResolver {
 
 	private final ReactiveAdapterRegistry reactiveAdapterRegistry;
 
-	@Nullable
-	private final Scheduler invocationScheduler;
+	private final RequestedContentTypeResolver contentTypeResolver;
 
-	@Nullable
-	private final Predicate<? super HandlerMethod> blockingMethodPredicate;
+	private final @Nullable Scheduler invocationScheduler;
 
-	@Nullable
-	private final MethodValidator methodValidator;
+	private final @Nullable Predicate<? super HandlerMethod> blockingMethodPredicate;
+
+	private final @Nullable MethodValidator methodValidator;
 
 	private final Map<Class<?>, Set<Method>> initBinderMethodCache = new ConcurrentHashMap<>(64);
 
@@ -129,16 +134,17 @@ class ControllerMethodResolver {
 	private final Map<Class<?>, SessionAttributesHandler> sessionAttributesHandlerCache = new ConcurrentHashMap<>(64);
 
 
+
 	ControllerMethodResolver(
 			ArgumentResolverConfigurer customResolvers, ReactiveAdapterRegistry adapterRegistry,
-			ConfigurableApplicationContext context, List<HttpMessageReader<?>> readers,
-			@Nullable WebBindingInitializer webBindingInitializer,
-			@Nullable Scheduler invocationScheduler,
-			@Nullable Predicate<? super HandlerMethod> blockingMethodPredicate) {
+			ConfigurableApplicationContext context, RequestedContentTypeResolver contentTypeResolver,
+			List<HttpMessageReader<?>> readers, @Nullable WebBindingInitializer webBindingInitializer,
+			@Nullable Scheduler invocationScheduler, @Nullable Predicate<? super HandlerMethod> blockingMethodPredicate) {
 
 		Assert.notNull(customResolvers, "ArgumentResolverConfigurer is required");
 		Assert.notNull(adapterRegistry, "ReactiveAdapterRegistry is required");
 		Assert.notNull(context, "ApplicationContext is required");
+		Assert.notNull(contentTypeResolver, "RequestedContentTypeResolver is required");
 		Assert.notNull(readers, "HttpMessageReader List is required");
 
 		this.initBinderResolvers = initBinderResolvers(customResolvers, adapterRegistry, context);
@@ -146,6 +152,7 @@ class ControllerMethodResolver {
 		this.requestMappingResolvers = requestMappingResolvers(customResolvers, adapterRegistry, context, readers);
 		this.exceptionHandlerResolvers = exceptionHandlerResolvers(customResolvers, adapterRegistry, context);
 		this.reactiveAdapterRegistry = adapterRegistry;
+		this.contentTypeResolver = contentTypeResolver;
 		this.invocationScheduler = invocationScheduler;
 		this.blockingMethodPredicate = blockingMethodPredicate;
 
@@ -235,6 +242,7 @@ class ControllerMethodResolver {
 			result.add(new SessionStatusMethodArgumentResolver());
 		}
 		result.add(new WebSessionMethodArgumentResolver(adapterRegistry));
+		result.add(new ApiVersionMethodArgumentResolver());
 		if (KotlinDetector.isKotlinPresent()) {
 			result.add(new ContinuationHandlerMethodArgumentResolver());
 		}
@@ -303,8 +311,7 @@ class ControllerMethodResolver {
 	 * blocking by the underlying blocking method predicate, or null if no
 	 * particular scheduler should be used for this method invocation.
 	 */
-	@Nullable
-	public Scheduler getSchedulerFor(HandlerMethod handlerMethod) {
+	public @Nullable Scheduler getSchedulerFor(HandlerMethod handlerMethod) {
 		if (this.invocationScheduler != null) {
 			Assert.state(this.blockingMethodPredicate != null, "Expected HandlerMethod Predicate");
 			if (this.blockingMethodPredicate.test(handlerMethod)) {
@@ -345,7 +352,7 @@ class ControllerMethodResolver {
 
 		this.initBinderMethodCache
 				.computeIfAbsent(handlerType,
-						clazz -> MethodIntrospector.selectMethods(handlerType, INIT_BINDER_METHODS))
+						key -> MethodIntrospector.selectMethods(key, INIT_BINDER_METHODS))
 				.forEach(method -> {
 					Object bean = handlerMethod.getBean();
 					result.add(getInitBinderMethod(bean, method));
@@ -378,7 +385,7 @@ class ControllerMethodResolver {
 
 		this.modelAttributeMethodCache
 				.computeIfAbsent(handlerType,
-						clazz -> MethodIntrospector.selectMethods(handlerType, MODEL_ATTRIBUTE_METHODS))
+						key -> MethodIntrospector.selectMethods(key, MODEL_ATTRIBUTE_METHODS))
 				.forEach(method -> {
 					Object bean = handlerMethod.getBean();
 					result.add(createAttributeMethod(bean, method));
@@ -398,44 +405,60 @@ class ControllerMethodResolver {
 	 * controller method, and also within {@code @ControllerAdvice} classes that
 	 * are applicable to the class of the given controller method.
 	 * @param ex the exception to find a handler for
-	 * @param handlerMethod the controller method that raised the exception, or
-	 * if {@code null}, check only {@code @ControllerAdvice} classes.
+	 * @param exchange the current HTTP exchange
+	 * @param handlerMethod the controller method that raised the exception,
+	 *        or if {@code null}, check only {@code @ControllerAdvice} classes.
 	 */
-	@Nullable
-	@SuppressWarnings("NullAway")
-	public InvocableHandlerMethod getExceptionHandlerMethod(Throwable ex, @Nullable HandlerMethod handlerMethod) {
+	@SuppressWarnings("NullAway") // Dataflow analysis limitation
+	public @Nullable InvocableHandlerMethod getExceptionHandlerMethod(Throwable ex, ServerWebExchange exchange, @Nullable HandlerMethod handlerMethod) {
 
 		Class<?> handlerType = (handlerMethod != null ? handlerMethod.getBeanType() : null);
-		Object exceptionHandlerObject = null;
-		Method exceptionHandlerMethod = null;
-
-		if (handlerType != null) {
-			// Controller-local first...
-			exceptionHandlerObject = handlerMethod.getBean();
-			exceptionHandlerMethod = this.exceptionHandlerCache
-					.computeIfAbsent(handlerType, ExceptionHandlerMethodResolver::new)
-					.resolveMethodByThrowable(ex);
+		List<MediaType> requestedMediaTypes = List.of(MediaType.ALL);
+		try {
+			requestedMediaTypes = this.contentTypeResolver.resolveMediaTypes(exchange);
+		}
+		catch (NotAcceptableStatusException exc) {
+			if (logger.isDebugEnabled()) {
+				logger.debug("Could not parse Accept header for requested media types", exc);
+			}
 		}
 
-		if (exceptionHandlerMethod == null) {
-			// Global exception handlers...
+		// Controller-local first
+		if (handlerType != null) {
+			for (MediaType mediaType : requestedMediaTypes) {
+				ExceptionHandlerMappingInfo mappingInfo = this.exceptionHandlerCache
+						.computeIfAbsent(handlerType, ExceptionHandlerMethodResolver::new)
+						.resolveExceptionMapping(ex, mediaType);
+				if (mappingInfo != null) {
+					if (!mappingInfo.getProducibleTypes().isEmpty()) {
+						exchange.getAttributes().put(HandlerMapping.PRODUCIBLE_MEDIA_TYPES_ATTRIBUTE, mappingInfo.getProducibleTypes());
+					}
+					return createInvocableHandlerMethod(handlerMethod.getBean(), mappingInfo.getHandlerMethod());
+				}
+			}
+		}
+
+		// Global exception handlers
+		for (MediaType mediaType : requestedMediaTypes) {
 			for (Map.Entry<ControllerAdviceBean, ExceptionHandlerMethodResolver> entry : this.exceptionHandlerAdviceCache.entrySet()) {
 				ControllerAdviceBean advice = entry.getKey();
 				if (advice.isApplicableToBeanType(handlerType)) {
-					exceptionHandlerMethod = entry.getValue().resolveMethodByThrowable(ex);
-					if (exceptionHandlerMethod != null) {
-						exceptionHandlerObject = advice.resolveBean();
-						break;
+					ExceptionHandlerMappingInfo mappingInfo = entry.getValue().resolveExceptionMapping(ex, mediaType);
+					if (mappingInfo != null) {
+						if (!mappingInfo.getProducibleTypes().isEmpty()) {
+							exchange.getAttributes().put(HandlerMapping.PRODUCIBLE_MEDIA_TYPES_ATTRIBUTE, mappingInfo.getProducibleTypes());
+						}
+						return createInvocableHandlerMethod(advice.resolveBean(), mappingInfo.getHandlerMethod());
 					}
 				}
 			}
 		}
 
-		if (exceptionHandlerObject == null || exceptionHandlerMethod == null) {
-			return null;
-		}
+		return null;
+	}
 
-		InvocableHandlerMethod invocable = new InvocableHandlerMethod(exceptionHandlerObject, exceptionHandlerMethod);
+	private InvocableHandlerMethod createInvocableHandlerMethod(Object bean, Method method) {
+		InvocableHandlerMethod invocable = new InvocableHandlerMethod(bean, method);
 		invocable.setArgumentResolvers(this.exceptionHandlerResolvers);
 		return invocable;
 	}

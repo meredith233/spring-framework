@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -50,13 +50,13 @@ class TransactionAspectTests {
 
 
 	@BeforeEach
-	public void initContext() {
+	void initContext() {
 		AnnotationTransactionAspect.aspectOf().setTransactionManager(txManager);
 	}
 
 
 	@Test
-	void testCommitOnAnnotatedClass() throws Throwable {
+	void commitOnAnnotatedClass() throws Throwable {
 		txManager.clear();
 		assertThat(txManager.begun).isEqualTo(0);
 		annotationOnlyOnClassWithNoInterface.echo(null);

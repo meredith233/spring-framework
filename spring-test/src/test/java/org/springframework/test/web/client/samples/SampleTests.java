@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2023 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,7 +17,6 @@
 package org.springframework.test.web.client.samples;
 
 import java.io.IOException;
-import java.util.Collections;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -33,7 +32,7 @@ import org.springframework.http.client.ClientHttpResponse;
 import org.springframework.test.web.Person;
 import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.util.FileCopyUtils;
-import org.springframework.web.client.RestTemplate;
+import org.springframework.web.client.RestClient;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
@@ -46,34 +45,36 @@ import static org.springframework.test.web.client.response.MockRestResponseCreat
 
 /**
  * Examples to demonstrate writing client-side REST tests with Spring MVC Test.
- * While the tests in this class invoke the RestTemplate directly, in actual
- * tests the RestTemplate may likely be invoked indirectly, i.e. through client
+ *
+ * <p>While the tests in this class invoke the RestClient directly, in actual
+ * tests the RestClient may likely be invoked indirectly, i.e. through client
  * code.
  *
  * @author Rossen Stoyanchev
  */
-public class SampleTests {
+class SampleTests {
+
+	private RestClient restClient;
 
 	private MockRestServiceServer mockServer;
 
-	private RestTemplate restTemplate;
-
 	@BeforeEach
-	public void setup() {
-		this.restTemplate = new RestTemplate();
-		this.mockServer = MockRestServiceServer.bindTo(this.restTemplate).ignoreExpectOrder(true).build();
+	void setup() {
+		RestClient.Builder clientBuilder = RestClient.builder();
+		this.mockServer = MockRestServiceServer.bindTo(clientBuilder).ignoreExpectOrder(true).build();
+		this.restClient = clientBuilder.build();
 	}
 
-	@Test
-	public void performGet() {
 
+	@Test
+	void performGet() {
 		String responseBody = "{\"name\" : \"Ludwig van Beethoven\", \"someDouble\" : \"1.6035\"}";
 
 		this.mockServer.expect(requestTo("/composers/42")).andExpect(method(HttpMethod.GET))
 			.andRespond(withSuccess(responseBody, MediaType.APPLICATION_JSON));
 
 		@SuppressWarnings("unused")
-		Person ludwig = this.restTemplate.getForObject("/composers/{id}", Person.class, 42);
+		Person ludwig = this.restClient.get().uri("/composers/{id}", 42).retrieve().body(Person.class);
 
 		// We are only validating the request. The response is mocked out.
 		// hotel.getId() == 42
@@ -83,30 +84,28 @@ public class SampleTests {
 	}
 
 	@Test
-	public void performGetManyTimes() {
-
+	void performGetManyTimes() {
 		String responseBody = "{\"name\" : \"Ludwig van Beethoven\", \"someDouble\" : \"1.6035\"}";
 
 		this.mockServer.expect(manyTimes(), requestTo("/composers/42")).andExpect(method(HttpMethod.GET))
 				.andRespond(withSuccess(responseBody, MediaType.APPLICATION_JSON));
 
 		@SuppressWarnings("unused")
-		Person ludwig = this.restTemplate.getForObject("/composers/{id}", Person.class, 42);
+		Person ludwig = this.restClient.get().uri("/composers/{id}", 42).retrieve().body(Person.class);
 
 		// We are only validating the request. The response is mocked out.
 		// hotel.getId() == 42
 		// hotel.getName().equals("Holiday Inn")
 
-		this.restTemplate.getForObject("/composers/{id}", Person.class, 42);
-		this.restTemplate.getForObject("/composers/{id}", Person.class, 42);
-		this.restTemplate.getForObject("/composers/{id}", Person.class, 42);
+		this.restClient.get().uri("/composers/{id}", 42).retrieve().body(Person.class);
+		this.restClient.get().uri("/composers/{id}", 42).retrieve().body(Person.class);
+		this.restClient.get().uri("/composers/{id}", 42).retrieve().body(Person.class);
 
 		this.mockServer.verify();
 	}
 
 	@Test
-	public void expectNever() {
-
+	void expectNever() {
 		String responseBody = "{\"name\" : \"Ludwig van Beethoven\", \"someDouble\" : \"1.6035\"}";
 
 		this.mockServer.expect(once(), requestTo("/composers/42")).andExpect(method(HttpMethod.GET))
@@ -114,14 +113,13 @@ public class SampleTests {
 		this.mockServer.expect(never(), requestTo("/composers/43")).andExpect(method(HttpMethod.GET))
 				.andRespond(withSuccess(responseBody, MediaType.APPLICATION_JSON));
 
-		this.restTemplate.getForObject("/composers/{id}", Person.class, 42);
+		this.restClient.get().uri("/composers/{id}", 42).retrieve().body(Person.class);
 
 		this.mockServer.verify();
 	}
 
 	@Test
-	public void expectNeverViolated() {
-
+	void expectNeverViolated() {
 		String responseBody = "{\"name\" : \"Ludwig van Beethoven\", \"someDouble\" : \"1.6035\"}";
 
 		this.mockServer.expect(once(), requestTo("/composers/42")).andExpect(method(HttpMethod.GET))
@@ -129,21 +127,20 @@ public class SampleTests {
 		this.mockServer.expect(never(), requestTo("/composers/43")).andExpect(method(HttpMethod.GET))
 				.andRespond(withSuccess(responseBody, MediaType.APPLICATION_JSON));
 
-		this.restTemplate.getForObject("/composers/{id}", Person.class, 42);
+		this.restClient.get().uri("/composers/{id}", 42).retrieve().body(Person.class);
 		assertThatExceptionOfType(AssertionError.class).isThrownBy(() ->
-				this.restTemplate.getForObject("/composers/{id}", Person.class, 43));
+				this.restClient.get().uri("/composers/{id}", 43).retrieve().body(Person.class));
 	}
 
 	@Test
-	public void performGetWithResponseBodyFromFile() {
-
-		Resource responseBody = new ClassPathResource("ludwig.json", this.getClass());
+	void performGetWithResponseBodyFromFile() {
+		Resource responseBody = new ClassPathResource("ludwig.json", getClass());
 
 		this.mockServer.expect(requestTo("/composers/42")).andExpect(method(HttpMethod.GET))
 			.andRespond(withSuccess(responseBody, MediaType.APPLICATION_JSON));
 
 		@SuppressWarnings("unused")
-		Person ludwig = this.restTemplate.getForObject("/composers/{id}", Person.class, 42);
+		Person ludwig = this.restClient.get().uri("/composers/{id}", 42).retrieve().body(Person.class);
 
 		// hotel.getId() == 42
 		// hotel.getName().equals("Holiday Inn")
@@ -152,8 +149,7 @@ public class SampleTests {
 	}
 
 	@Test
-	public void verify() {
-
+	void verify() {
 		this.mockServer.expect(requestTo("/number")).andExpect(method(HttpMethod.GET))
 			.andRespond(withSuccess("1", MediaType.TEXT_PLAIN));
 
@@ -167,11 +163,11 @@ public class SampleTests {
 			.andRespond(withSuccess("8", MediaType.TEXT_PLAIN));
 
 		@SuppressWarnings("unused")
-		String result1 = this.restTemplate.getForObject("/number", String.class);
+		String result1 = this.restClient.get().uri("/number").retrieve().body(String.class);
 		// result1 == "1"
 
 		@SuppressWarnings("unused")
-		String result2 = this.restTemplate.getForObject("/number", String.class);
+		String result2 = this.restClient.get().uri("/number").retrieve().body(String.class);
 		// result == "2"
 
 		try {
@@ -183,22 +179,20 @@ public class SampleTests {
 	}
 
 	@Test // SPR-14694
-	public void repeatedAccessToResponseViaResource() {
+	void repeatedAccessToResponseViaResource() {
+		Resource resource = new ClassPathResource("ludwig.json", getClass());
 
-		Resource resource = new ClassPathResource("ludwig.json", this.getClass());
-
-		RestTemplate restTemplate = new RestTemplate();
-		restTemplate.setInterceptors(Collections.singletonList(new ContentInterceptor(resource)));
-
-		MockRestServiceServer mockServer = MockRestServiceServer.bindTo(restTemplate)
+		RestClient.Builder clientBuilder = RestClient.builder().requestInterceptor(new ContentInterceptor(resource));
+		MockRestServiceServer mockServer = MockRestServiceServer.bindTo(clientBuilder)
 				.ignoreExpectOrder(true)
 				.bufferContent()  // enable repeated reads of response body
 				.build();
+		RestClient restClient = clientBuilder.build();
 
 		mockServer.expect(requestTo("/composers/42")).andExpect(method(HttpMethod.GET))
 				.andRespond(withSuccess(resource, MediaType.APPLICATION_JSON));
 
-		restTemplate.getForObject("/composers/{id}", Person.class, 42);
+		restClient.get().uri("/composers/{id}", 42).retrieve().body(Person.class);
 
 		mockServer.verify();
 	}

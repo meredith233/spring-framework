@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -39,6 +39,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * @author Alef Arendsen
  * @author Nicholas Williams
  */
+@SuppressWarnings("serial")
 class MessageTagTests extends AbstractTagTests {
 
 	@Test
@@ -237,7 +238,7 @@ class MessageTagTests extends AbstractTagTests {
 		tag.setText("testtext");
 		assertThat(tag.doStartTag()).as("Correct doStartTag return value").isEqualTo(Tag.EVAL_BODY_INCLUDE);
 		assertThat(tag.doEndTag()).as("Correct doEndTag return value").isEqualTo(Tag.EVAL_PAGE);
-		assertThat((message.toString())).as("Correct message").isEqualTo("test message");
+		assertThat(message.toString()).as("Correct message").isEqualTo("test message");
 	}
 
 	@Test

@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2022 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -52,7 +52,7 @@ class ArrayConstructorTests extends AbstractExpressionTests {
 		evaluateArrayBuildingExpression("new short[]{2,3,4,5,6}", "{2, 3, 4, 5, 6}");
 		evaluateArrayBuildingExpression("new double[]{1d,2d,3d,4d}", "{1.0, 2.0, 3.0, 4.0}");
 		evaluateArrayBuildingExpression("new float[]{1f,2f,3f,4f}", "{1.0, 2.0, 3.0, 4.0}");
-		evaluateArrayBuildingExpression("new byte[]{1,2,3,4}", "{1, 2, 3, 4}");
+		evaluateArrayBuildingExpression("new byte[]{1,2,3,4}", "{01020304}");
 
 		evaluate("new int[]{}.length", "0", Integer.class);
 	}
@@ -95,6 +95,12 @@ class ArrayConstructorTests extends AbstractExpressionTests {
 		int threshold = 256 * 1024; // ConstructorReference.MAX_ARRAY_ELEMENTS
 		evaluateAndCheckError("new int[T(java.lang.Integer).MAX_VALUE]", SpelMessage.MAX_ARRAY_ELEMENTS_THRESHOLD_EXCEEDED, 0, threshold);
 		evaluateAndCheckError("new int[1024 * 1024][1024 * 1024]", SpelMessage.MAX_ARRAY_ELEMENTS_THRESHOLD_EXCEEDED, 0, threshold);
+		// The product of all dimension sizes stays just under the threshold, but Java
+		// allocates an array object at every nesting level, so the total number of
+		// array objects created (1 root + 262143 sub-arrays) meets the threshold.
+		evaluateAndCheckError("new int[262143][1]", SpelMessage.MAX_ARRAY_ELEMENTS_THRESHOLD_EXCEEDED, 0, threshold);
+		evaluateAndCheckError("new int[262143][1][1][1][1][1][1][1][1][1][1]",
+				SpelMessage.MAX_ARRAY_ELEMENTS_THRESHOLD_EXCEEDED, 0, threshold);
 	}
 
 	@Test
@@ -116,6 +122,9 @@ class ArrayConstructorTests extends AbstractExpressionTests {
 		evaluate("new String[3][2][1]",
 				"[[Ljava.lang.String;[3]{[2]{[1]{null},[1]{null}},[2]{[1]{null},[1]{null}},[2]{[1]{null},[1]{null}}}",
 				String[][][].class);
+		// 1 root array + 262142 sub-arrays = 262143 array objects, just under the
+		// MAX_ARRAY_ELEMENTS threshold, so this must not be rejected.
+		evaluate("new int[262142][1].length", 262142, Integer.class);
 	}
 
 	@Test

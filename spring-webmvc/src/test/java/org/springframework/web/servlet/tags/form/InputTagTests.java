@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -96,9 +96,28 @@ class InputTagTests extends AbstractFormTagTests {
 
 	@Test
 	void simpleBindWithHtmlEscaping() throws Exception {
-		final String NAME = "Rob \"I Love Mangos\" Harrop";
-		final String HTML_ESCAPED_NAME = "Rob &quot;I Love Mangos&quot; Harrop";
+		final String NAME = "Rob \"I Love Cafés\" Harrop";
+		final String HTML_ESCAPED_NAME = "Rob &quot;I Love Caf&eacute;s&quot; Harrop";
 
+		this.tag.setPath("name");
+		this.rob.setName(NAME);
+
+		assertThat(this.tag.doStartTag()).isEqualTo(Tag.SKIP_BODY);
+
+		String output = getOutput();
+		assertTagOpened(output);
+		assertTagClosed(output);
+
+		assertContainsAttribute(output, "type", getType());
+		assertValueAttribute(output, HTML_ESCAPED_NAME);
+	}
+
+	@Test
+	void simpleBindWithHtmlEscapingAndCharacterEncoding() throws Exception {
+		final String NAME = "Rob \"I Love Cafés\" Harrop";
+		final String HTML_ESCAPED_NAME = "Rob &quot;I Love Cafés&quot; Harrop";
+
+		getPageContext().getResponse().setCharacterEncoding("UTF-8");
 		this.tag.setPath("name");
 		this.rob.setName(NAME);
 
@@ -296,6 +315,28 @@ class InputTagTests extends AbstractFormTagTests {
 	}
 
 	@Test
+	void withErrorsAndHtmlEscaping() throws Exception {
+		this.tag.setPath("name");
+		this.tag.setCssClass("\"good\"");
+		this.tag.setCssErrorClass("\"bad\"");
+
+		BeanPropertyBindingResult errors = new BeanPropertyBindingResult(this.rob, COMMAND_NAME);
+		errors.rejectValue("name", "some.code", "Default Message");
+		errors.rejectValue("name", "too.short", "Too Short");
+		exposeBindingResult(errors);
+
+		assertThat(this.tag.doStartTag()).isEqualTo(Tag.SKIP_BODY);
+
+		String output = getOutput();
+		assertTagOpened(output);
+		assertTagClosed(output);
+
+		assertContainsAttribute(output, "type", getType());
+		assertValueAttribute(output, "Rob");
+		assertContainsAttribute(output, "class", "&quot;bad&quot;");
+	}
+
+	@Test
 	void disabledFalse() throws Exception {
 		this.tag.setPath("name");
 		this.tag.setDisabled(false);
@@ -376,6 +417,7 @@ class InputTagTests extends AbstractFormTagTests {
 		assertThat(output).as("Tag not opened properly").startsWith("<input ");
 	}
 
+	@SuppressWarnings("serial")
 	protected InputTag createTag(final Writer writer) {
 		return new InputTag() {
 			@Override

@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2019 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -25,14 +25,13 @@ import org.apache.commons.logging.LogFactory;
 
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.AnnotatedElementUtils;
-import org.springframework.lang.Nullable;
 import org.springframework.test.context.SmartContextLoader;
 import org.springframework.util.Assert;
 import org.springframework.util.ClassUtils;
 
 /**
  * Utility methods for {@link SmartContextLoader SmartContextLoaders} that deal
- * with component classes (e.g., {@link Configuration @Configuration} classes).
+ * with component classes (for example, {@link Configuration @Configuration} classes).
  *
  * @author Sam Brannen
  * @since 3.2
@@ -103,13 +102,12 @@ public abstract class AnnotationConfigContextLoaderUtils {
 	 * @param clazz the class to check
 	 * @return {@code true} if the supplied class meets the candidate criteria
 	 */
-	private static boolean isDefaultConfigurationClassCandidate(@Nullable Class<?> clazz) {
-		return (clazz != null && isStaticNonPrivateAndNonFinal(clazz) &&
+	private static boolean isDefaultConfigurationClassCandidate(Class<?> clazz) {
+		return (isStaticNonPrivateAndNonFinal(clazz) &&
 				AnnotatedElementUtils.hasAnnotation(clazz, Configuration.class));
 	}
 
 	private static boolean isStaticNonPrivateAndNonFinal(Class<?> clazz) {
-		Assert.notNull(clazz, "Class must not be null");
 		int modifiers = clazz.getModifiers();
 		return (Modifier.isStatic(modifiers) && !Modifier.isPrivate(modifiers) && !Modifier.isFinal(modifiers));
 	}

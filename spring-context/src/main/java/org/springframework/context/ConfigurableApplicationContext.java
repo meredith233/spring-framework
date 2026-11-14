@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,16 +17,15 @@
 package org.springframework.context;
 
 import java.io.Closeable;
-import java.util.concurrent.Executor;
+
+import org.jspecify.annotations.Nullable;
 
 import org.springframework.beans.BeansException;
 import org.springframework.beans.factory.config.BeanFactoryPostProcessor;
 import org.springframework.beans.factory.config.ConfigurableListableBeanFactory;
 import org.springframework.core.env.ConfigurableEnvironment;
-import org.springframework.core.env.Environment;
 import org.springframework.core.io.ProtocolResolver;
 import org.springframework.core.metrics.ApplicationStartup;
-import org.springframework.lang.Nullable;
 
 /**
  * SPI interface to be implemented by most if not all application contexts.
@@ -46,8 +45,8 @@ import org.springframework.lang.Nullable;
 public interface ConfigurableApplicationContext extends ApplicationContext, Lifecycle, Closeable {
 
 	/**
-	 * Any number of these characters are considered delimiters between
-	 * multiple context config paths in a single String value.
+	 * Any number of these characters are considered delimiters between multiple
+	 * context config paths in a single {@code String} value: {@value}.
 	 * @see org.springframework.context.support.AbstractXmlApplicationContext#setConfigLocation
 	 * @see org.springframework.web.context.ContextLoader#CONFIG_LOCATION_PARAM
 	 * @see org.springframework.web.servlet.FrameworkServlet#setContextConfigLocation
@@ -55,8 +54,9 @@ public interface ConfigurableApplicationContext extends ApplicationContext, Life
 	String CONFIG_LOCATION_DELIMITERS = ",; \t\n";
 
 	/**
-	 * The name of the {@link Executor bootstrap executor} bean in the context.
-	 * If none is supplied, no background bootstrapping will be active.
+	 * The name of the {@linkplain java.util.concurrent.Executor bootstrap executor}
+	 * bean in the context: {@value}.
+	 * <p>If none is supplied, no background bootstrapping will be active.
 	 * @since 6.2
 	 * @see java.util.concurrent.Executor
 	 * @see org.springframework.core.task.TaskExecutor
@@ -65,48 +65,50 @@ public interface ConfigurableApplicationContext extends ApplicationContext, Life
 	String BOOTSTRAP_EXECUTOR_BEAN_NAME = "bootstrapExecutor";
 
 	/**
-	 * Name of the ConversionService bean in the factory.
-	 * If none is supplied, default conversion rules apply.
+	 * Name of the {@code ConversionService} bean in the factory: {@value}.
+	 * <p>If none is supplied, default conversion rules apply.
 	 * @since 3.0
 	 * @see org.springframework.core.convert.ConversionService
 	 */
 	String CONVERSION_SERVICE_BEAN_NAME = "conversionService";
 
 	/**
-	 * Name of the LoadTimeWeaver bean in the factory. If such a bean is supplied,
-	 * the context will use a temporary ClassLoader for type matching, in order
-	 * to allow the LoadTimeWeaver to process all actual bean classes.
+	 * Name of the {@code LoadTimeWeaver} bean in the factory: {@value}.
+	 * <p>If such a bean is supplied, the context will use a temporary {@link ClassLoader}
+	 * for type matching, in order to allow the {@code LoadTimeWeaver} to process
+	 * all actual bean classes.
 	 * @since 2.5
 	 * @see org.springframework.instrument.classloading.LoadTimeWeaver
 	 */
 	String LOAD_TIME_WEAVER_BEAN_NAME = "loadTimeWeaver";
 
 	/**
-	 * Name of the {@link Environment} bean in the factory.
+	 * Name of the {@link org.springframework.core.env.Environment Environment}
+	 * bean in the factory: {@value}.
 	 * @since 3.1
 	 */
 	String ENVIRONMENT_BEAN_NAME = "environment";
 
 	/**
-	 * Name of the System properties bean in the factory.
+	 * Name of the JVM System properties bean in the factory: {@value}.
 	 * @see java.lang.System#getProperties()
 	 */
 	String SYSTEM_PROPERTIES_BEAN_NAME = "systemProperties";
 
 	/**
-	 * Name of the System environment bean in the factory.
+	 * Name of the Operating System environment bean in the factory: {@value}.
 	 * @see java.lang.System#getenv()
 	 */
 	String SYSTEM_ENVIRONMENT_BEAN_NAME = "systemEnvironment";
 
 	/**
-	 * Name of the {@link ApplicationStartup} bean in the factory.
+	 * Name of the {@link ApplicationStartup} bean in the factory: {@value}.
 	 * @since 5.3
 	 */
 	String APPLICATION_STARTUP_BEAN_NAME = "applicationStartup";
 
 	/**
-	 * {@link Thread#getName() Name} of the {@linkplain #registerShutdownHook()
+	 * {@linkplain Thread#getName() Name} of the {@linkplain #registerShutdownHook()
 	 * shutdown hook} thread: {@value}.
 	 * @since 5.2
 	 * @see #registerShutdownHook()
@@ -115,7 +117,7 @@ public interface ConfigurableApplicationContext extends ApplicationContext, Life
 
 
 	/**
-	 * Set the unique id of this application context.
+	 * Set the unique ID of this application context.
 	 * @since 3.0
 	 */
 	void setId(String id);
@@ -220,12 +222,34 @@ public interface ConfigurableApplicationContext extends ApplicationContext, Life
 	void refresh() throws BeansException, IllegalStateException;
 
 	/**
+	 * Pause all beans in this application context if necessary, and subsequently
+	 * restart all auto-startup beans, effectively restoring the lifecycle state
+	 * after {@link #refresh()} (typically after a preceding {@link #pause()} call
+	 * when a full {@link #start()} of even lazy-starting beans is to be avoided).
+	 * @since 7.0
+	 * @see #pause()
+	 * @see #start()
+	 * @see SmartLifecycle#isAutoStartup()
+	 */
+	void restart();
+
+	/**
+	 * Stop all beans in this application context unless they explicitly opt out of
+	 * pausing through {@link SmartLifecycle#isPauseable()} returning {@code false}.
+	 * @since 7.0
+	 * @see #restart()
+	 * @see #stop()
+	 * @see SmartLifecycle#isPauseable()
+	 */
+	void pause();
+
+	/**
 	 * Register a shutdown hook with the JVM runtime, closing this context
 	 * on JVM shutdown unless it has already been closed at that time.
 	 * <p>This method can be called multiple times. Only one shutdown hook
 	 * (at max) will be registered for each context instance.
-	 * <p>As of Spring Framework 5.2, the {@linkplain Thread#getName() name} of
-	 * the shutdown hook thread should be {@link #SHUTDOWN_HOOK_THREAD_NAME}.
+	 * <p>The {@linkplain Thread#getName() name} of the shutdown hook thread
+	 * should be {@link #SHUTDOWN_HOOK_THREAD_NAME}.
 	 * @see java.lang.Runtime#addShutdownHook
 	 * @see #close()
 	 */
@@ -241,6 +265,18 @@ public interface ConfigurableApplicationContext extends ApplicationContext, Life
 	 */
 	@Override
 	void close();
+
+	/**
+	 * Return whether this context has been closed already, that is,
+	 * whether {@link #close()} has been called on an active context
+	 * in order to initiate its shutdown.
+	 * <p>Note: This does not indicate whether context shutdown has completed.
+	 * Use {@link #isActive()} for differentiating between those scenarios:
+	 * a context becomes inactive once it has been fully shut down and the
+	 * original {@code close()} call has returned.
+	 * @since 6.2
+	 */
+	boolean isClosed();
 
 	/**
 	 * Determine whether this application context is active, that is,

@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2021 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,9 +18,10 @@ package org.springframework.jdbc.support.incrementer;
 
 import javax.sql.DataSource;
 
+import org.jspecify.annotations.Nullable;
+
 import org.springframework.beans.factory.InitializingBean;
 import org.springframework.dao.DataAccessException;
-import org.springframework.lang.Nullable;
 import org.springframework.util.Assert;
 
 /**
@@ -35,14 +36,12 @@ import org.springframework.util.Assert;
  */
 public abstract class AbstractDataFieldMaxValueIncrementer implements DataFieldMaxValueIncrementer, InitializingBean {
 
-	@Nullable
-	private DataSource dataSource;
+	private @Nullable DataSource dataSource;
 
 	/** The name of the sequence/table containing the sequence. */
-	@Nullable
-	private String incrementerName;
+	private @Nullable String incrementerName;
 
-	/** The length to which a string result should be pre-pended with zeroes. */
+	/** The length to which a string result should be prepended with zeroes. */
 	protected int paddingLength = 0;
 
 
@@ -70,36 +69,46 @@ public abstract class AbstractDataFieldMaxValueIncrementer implements DataFieldM
 	/**
 	 * Set the data source to retrieve the value from.
 	 */
-	public void setDataSource(DataSource dataSource) {
+	public void setDataSource(@Nullable DataSource dataSource) {
 		this.dataSource = dataSource;
 	}
 
 	/**
 	 * Return the data source to retrieve the value from.
 	 */
-	@SuppressWarnings("NullAway")
-	public DataSource getDataSource() {
+	public @Nullable DataSource getDataSource() {
 		return this.dataSource;
+	}
+
+	/**
+	 * Obtain the {@code DataSource} for actual use.
+	 * @return the DataSource (never {@code null})
+	 * @throws IllegalStateException in case of no DataSource set
+	 * @since 7.1
+	 */
+	protected DataSource obtainDataSource() {
+		DataSource dataSource = getDataSource();
+		Assert.state(dataSource != null, "No DataSource set");
+		return dataSource;
 	}
 
 	/**
 	 * Set the name of the sequence/table.
 	 */
-	public void setIncrementerName(String incrementerName) {
+	public void setIncrementerName(@Nullable String incrementerName) {
 		this.incrementerName = incrementerName;
 	}
 
 	/**
 	 * Return the name of the sequence/table.
 	 */
-	@SuppressWarnings("NullAway")
-	public String getIncrementerName() {
+	public @Nullable String getIncrementerName() {
 		return this.incrementerName;
 	}
 
 	/**
 	 * Set the padding length, i.e. the length to which a string result
-	 * should be pre-pended with zeroes.
+	 * should be prepended with zeroes.
 	 */
 	public void setPaddingLength(int paddingLength) {
 		this.paddingLength = paddingLength;

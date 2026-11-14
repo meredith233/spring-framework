@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -74,7 +74,7 @@ class MapConnectionFactoryLookupTests {
 
 	@Test
 	@SuppressWarnings({"rawtypes", "unchecked"})
-	public void getConnectionFactoryWhereSuppliedMapHasNonConnectionFactoryTypeUnderSpecifiedKey() {
+	void getConnectionFactoryWhereSuppliedMapHasNonConnectionFactoryTypeUnderSpecifiedKey() {
 		Map connectionFactories = new HashMap<>();
 		connectionFactories.put(CONNECTION_FACTORY_NAME, new Object());
 		MapConnectionFactoryLookup lookup = new MapConnectionFactoryLookup(connectionFactories);

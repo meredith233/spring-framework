@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,11 +18,11 @@ package org.springframework.web.reactive.result.method.annotation;
 
 
 import java.util.HashSet;
+import java.util.Map;
 
 import org.junit.jupiter.api.Test;
 
 import org.springframework.beans.testfixture.beans.TestBean;
-import org.springframework.ui.ModelMap;
 import org.springframework.web.bind.annotation.SessionAttributes;
 import org.springframework.web.server.WebSession;
 import org.springframework.web.testfixture.server.MockWebSession;
@@ -31,7 +31,8 @@ import static java.util.Arrays.asList;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Test fixture with {@link SessionAttributesHandler}.
+ * Tests for {@link SessionAttributesHandler}.
+ *
  * @author Rossen Stoyanchev
  */
 class SessionAttributesHandlerTests {
@@ -86,19 +87,18 @@ class SessionAttributesHandlerTests {
 
 	@Test
 	void storeAttributes() {
-
-		ModelMap model = new ModelMap();
-		model.put("attr1", "value1");
-		model.put("attr2", "value2");
-		model.put("attr3", new TestBean());
+		Map<String, Object> model = Map.of(
+				"attr1", "value1",
+				"attr2", "value2",
+				"attr3", new TestBean()
+			);
 
 		WebSession session = new MockWebSession();
 		sessionAttributesHandler.storeAttributes(session, model);
 
 		assertThat(session.getAttributes().get("attr1")).isEqualTo("value1");
 		assertThat(session.getAttributes().get("attr2")).isEqualTo("value2");
-		boolean condition = session.getAttributes().get("attr3") instanceof TestBean;
-		assertThat(condition).isTrue();
+		assertThat(session.getAttributes().get("attr3")).isInstanceOf(TestBean.class);
 	}
 
 

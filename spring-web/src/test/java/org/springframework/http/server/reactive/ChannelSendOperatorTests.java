@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,6 +23,8 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 
 import org.junit.jupiter.api.Test;
 import org.reactivestreams.Publisher;
@@ -32,6 +34,7 @@ import reactor.core.publisher.BaseSubscriber;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.core.publisher.Signal;
+import reactor.core.publisher.SignalType;
 import reactor.test.StepVerifier;
 
 import org.springframework.core.io.buffer.DataBuffer;
@@ -179,7 +182,7 @@ class ChannelSendOperatorTests {
 
 		// 1. First item received
 		// 2. writeFunction applied and writeCompletionBarrier subscribed to it
-		// 3. writeFunction fails, e.g. to flush status and headers, before request(n) from server
+		// 3. writeFunction fails, for example, to flush status and headers, before request(n) from server
 
 		LeakAwareDataBufferFactory bufferFactory = new LeakAwareDataBufferFactory();
 
@@ -216,6 +219,70 @@ class ChannelSendOperatorTests {
 				.verify(Duration.ofMillis(5000));
 	}
 
+	@Test  // gh-37527
+	void sourceCancelledWhenWriteFunctionResultErrorsWhileItemCached() {
+		AtomicReference<SignalType> sourceSignal = new AtomicReference<>();
+		Flux<String> source = Flux.just("one").concatWith(Flux.never()).doFinally(sourceSignal::set);
+
+		ChannelSendOperator<String> operator = new ChannelSendOperator<>(source,
+				publisher -> Mono.error(new IllegalStateException("boom")));
+
+		StepVerifier.create(operator).expectErrorMessage("boom").verify(Duration.ofSeconds(5));
+		assertThat(sourceSignal.get()).isEqualTo(SignalType.CANCEL);
+	}
+
+	@Test  // gh-37527
+	void sourceCancelledWhenWriteFunctionThrowsWhileItemCached() {
+		AtomicReference<SignalType> sourceSignal = new AtomicReference<>();
+		Flux<String> source = Flux.just("one").concatWith(Flux.never()).doFinally(sourceSignal::set);
+
+		ChannelSendOperator<String> operator = new ChannelSendOperator<>(source, publisher -> {
+			throw new IllegalStateException("boom");
+		});
+
+		StepVerifier.create(operator).expectErrorMessage("boom").verify(Duration.ofSeconds(5));
+		assertThat(sourceSignal.get()).isEqualTo(SignalType.CANCEL);
+	}
+
+	@Test  // gh-37527
+	void sourceCancelledAndCachedItemReleasedWhenWriteFunctionResultErrors() {
+		LeakAwareDataBufferFactory bufferFactory = new LeakAwareDataBufferFactory();
+		AtomicReference<SignalType> sourceSignal = new AtomicReference<>();
+
+		ChannelSendOperator<DataBuffer> operator = new ChannelSendOperator<>(
+				Flux.<DataBuffer>create(sink -> {
+					DataBuffer dataBuffer = bufferFactory.allocateBuffer(256);
+					dataBuffer.write("foo", StandardCharsets.UTF_8);
+					sink.next(dataBuffer);
+				}).doFinally(sourceSignal::set),
+				publisher -> Mono.error(new IllegalStateException("boom")));
+
+		StepVerifier.create(operator).expectErrorMessage("boom").verify(Duration.ofSeconds(5));
+		assertThat(sourceSignal.get()).isEqualTo(SignalType.CANCEL);
+		bufferFactory.checkForLeaks();
+	}
+
+	@Test
+	void writeFunctionNotInvokedUnderLockOnFirstItem() {
+		verifyWriteFunctionNotInvokedUnderLock(Mono.just("one"));
+	}
+
+	@Test
+	void writeFunctionNotInvokedUnderLockOnEmptyCompletion() {
+		verifyWriteFunctionNotInvokedUnderLock(Mono.empty());
+	}
+
+	private void verifyWriteFunctionNotInvokedUnderLock(Publisher<String> source) {
+		AtomicBoolean holdsLock = new AtomicBoolean(true);
+		ChannelSendOperator<String> operator = new ChannelSendOperator<>(source,
+				publisher -> {
+					holdsLock.set(Thread.holdsLock(publisher));
+					return Mono.empty();
+				});
+
+		StepVerifier.create(operator).expectComplete().verify(Duration.ofSeconds(5));
+		assertThat(holdsLock).isFalse();
+	}
 
 	private Mono<Void> sendOperator(Publisher<String> source){
 		return new ChannelSendOperator<>(source, writer::send);

@@ -14,7 +14,7 @@ through configuration instead of having to bake in the scope of an object at the
 class level. Beans can be defined to be deployed in one of a number of scopes.
 The Spring Framework supports six scopes, four of which are available only if
 you use a web-aware `ApplicationContext`. You can also create
-xref:core/beans/factory-scopes.adoc#beans-factory-scopes-custom[a custom scope.]
+<<beans-factory-scopes-custom,a custom scope.>>
 
 The following table describes the supported scopes:
 
@@ -24,23 +24,23 @@ The following table describes the supported scopes:
 |===
 | Scope| Description
 
-| xref:core/beans/factory-scopes.adoc#beans-factory-scopes-singleton[singleton]
+| <<beans-factory-scopes-singleton,singleton>>
 | (Default) Scopes a single bean definition to a single object instance for each Spring IoC
   container.
 
-| xref:core/beans/factory-scopes.adoc#beans-factory-scopes-prototype[prototype]
+| <<beans-factory-scopes-prototype,prototype>>
 | Scopes a single bean definition to any number of object instances.
 
-| xref:core/beans/factory-scopes.adoc#beans-factory-scopes-request[request]
+| <<beans-factory-scopes-request,request>>
 | Scopes a single bean definition to the lifecycle of a single HTTP request. That is,
   each HTTP request has its own instance of a bean created off the back of a single bean
   definition. Only valid in the context of a web-aware Spring `ApplicationContext`.
 
-| xref:core/beans/factory-scopes.adoc#beans-factory-scopes-session[session]
+| <<beans-factory-scopes-session,session>>
 | Scopes a single bean definition to the lifecycle of an HTTP `Session`. Only valid in
   the context of a web-aware Spring `ApplicationContext`.
 
-| xref:core/beans/factory-scopes.adoc#beans-factory-scopes-application[application]
+| <<beans-factory-scopes-application,application>>
 | Scopes a single bean definition to the lifecycle of a `ServletContext`. Only valid in
   the context of a web-aware Spring `ApplicationContext`.
 
@@ -53,8 +53,7 @@ NOTE: A thread scope is available but is not registered by default. For more inf
 see the documentation for
 {spring-framework-api}/context/support/SimpleThreadScope.html[`SimpleThreadScope`].
 For instructions on how to register this or any other custom scope, see
-xref:core/beans/factory-scopes.adoc#beans-factory-scopes-custom-using[Using a Custom Scope].
-
+<<beans-factory-scopes-custom-using,Using a Custom Scope>>.
 
 
 [[beans-factory-scopes-singleton]]
@@ -89,7 +88,6 @@ following example:
 	<!-- the following is equivalent, though redundant (singleton scope is the default) -->
 	<bean id="accountService" class="com.something.DefaultAccountService" scope="singleton"/>
 ----
-
 
 
 [[beans-factory-scopes-prototype]]
@@ -134,7 +132,6 @@ be handled by the client. (For details on the lifecycle of a bean in the Spring
 container, see xref:core/beans/factory-nature.adoc#beans-factory-lifecycle[Lifecycle Callbacks].)
 
 
-
 [[beans-factory-scopes-sing-prot-interaction]]
 == Singleton Beans with Prototype-bean Dependencies
 
@@ -152,7 +149,6 @@ and injects its dependencies. If you need a new instance of a prototype bean at
 runtime more than once, see xref:core/beans/dependencies/factory-method-injection.adoc[Method Injection].
 
 
-
 [[beans-factory-scopes-other]]
 == Request, Session, Application, and WebSocket Scopes
 
@@ -161,8 +157,6 @@ if you use a web-aware Spring `ApplicationContext` implementation (such as
 `XmlWebApplicationContext`). If you use these scopes with regular Spring IoC containers,
 such as the `ClassPathXmlApplicationContext`, an `IllegalStateException` that complains
 about an unknown bean scope is thrown.
-
-
 
 [[beans-factory-scopes-other-web-configuration]]
 === Initial Web Configuration
@@ -223,8 +217,6 @@ the same thing, namely bind the HTTP request object to the `Thread` that is serv
 that request. This makes beans that are request- and session-scoped available further
 down the call chain.
 
-
-
 [[beans-factory-scopes-request]]
 === Request scope
 
@@ -251,7 +243,7 @@ to do so:
 ======
 Java::
 +
-[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+[source,java,indent=0,subs="verbatim,quotes"]
 ----
 	@RequestScope
 	@Component
@@ -262,7 +254,7 @@ Java::
 
 Kotlin::
 +
-[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+[source,kotlin,indent=0,subs="verbatim,quotes"]
 ----
 	@RequestScope
 	@Component
@@ -271,8 +263,6 @@ Kotlin::
 	}
 ----
 ======
-
-
 
 [[beans-factory-scopes-session]]
 === Session Scope
@@ -301,7 +291,7 @@ When using annotation-driven components or Java configuration, you can use the
 ======
 Java::
 +
-[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+[source,java,indent=0,subs="verbatim,quotes"]
 ----
 	@SessionScope
 	@Component
@@ -312,7 +302,7 @@ Java::
 
 Kotlin::
 +
-[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+[source,kotlin,indent=0,subs="verbatim,quotes"]
 ----
 	@SessionScope
 	@Component
@@ -321,8 +311,6 @@ Kotlin::
 	}
 ----
 ======
-
-
 
 [[beans-factory-scopes-application]]
 === Application Scope
@@ -350,7 +338,7 @@ following example shows how to do so:
 ======
 Java::
 +
-[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+[source,java,indent=0,subs="verbatim,quotes"]
 ----
 	@ApplicationScope
 	@Component
@@ -361,7 +349,7 @@ Java::
 
 Kotlin::
 +
-[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+[source,kotlin,indent=0,subs="verbatim,quotes"]
 ----
 	@ApplicationScope
 	@Component
@@ -371,16 +359,12 @@ Kotlin::
 ----
 ======
 
-
-
 [[beans-factory-scopes-websocket]]
 === WebSocket Scope
 
 WebSocket scope is associated with the lifecycle of a WebSocket session and applies to
 STOMP over WebSocket applications, see
 xref:web/websocket/stomp/scope.adoc[WebSocket scope] for more details.
-
-
 
 [[beans-factory-scopes-other-injection]]
 === Scoped Beans as Dependencies
@@ -448,7 +432,7 @@ understand the "`why`" as well as the "`how`" behind it:
 
 To create such a proxy, you insert a child `<aop:scoped-proxy/>` element into a
 scoped bean definition (see
-xref:core/beans/factory-scopes.adoc#beans-factory-scopes-other-injection-proxies[Choosing the Type of Proxy to Create]
+<<beans-factory-scopes-other-injection-proxies,Choosing the Type of Proxy to Create>>
 and xref:core/appendix/xsd-schemas.adoc[XML Schema-based configuration]).
 
 Why do definitions of beans scoped at the `request`, `session` and custom-scope
@@ -539,8 +523,6 @@ interfaces. The following example shows a proxy based on an interface:
 For more detailed information about choosing class-based or interface-based proxying,
 see xref:core/aop/proxying.adoc[Proxying Mechanisms].
 
-
-
 [[beans-factory-scopes-injection]]
 === Injecting Request/Session References Directly
 
@@ -553,14 +535,12 @@ objects which has the advantage of working in singleton beans and serializable b
 as well, similar to scoped proxies for factory-scoped beans.
 
 
-
 [[beans-factory-scopes-custom]]
 == Custom Scopes
 
 The bean scoping mechanism is extensible. You can define your own
 scopes or even redefine existing scopes, although the latter is considered bad practice
 and you cannot override the built-in `singleton` and `prototype` scopes.
-
 
 [[beans-factory-scopes-custom-creating]]
 === Creating a Custom Scope
@@ -584,14 +564,14 @@ underlying scope:
 ======
 Java::
 +
-[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+[source,java,indent=0,subs="verbatim,quotes"]
 ----
 	Object get(String name, ObjectFactory<?> objectFactory)
 ----
 
 Kotlin::
 +
-[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+[source,kotlin,indent=0,subs="verbatim,quotes"]
 ----
 	fun get(name: String, objectFactory: ObjectFactory<*>): Any
 ----
@@ -606,14 +586,14 @@ the underlying scope:
 ======
 Java::
 +
-[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+[source,java,indent=0,subs="verbatim,quotes"]
 ----
 	Object remove(String name)
 ----
 
 Kotlin::
 +
-[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+[source,kotlin,indent=0,subs="verbatim,quotes"]
 ----
 	fun remove(name: String): Any
 ----
@@ -626,14 +606,14 @@ destroyed or when the specified object in the scope is destroyed:
 ======
 Java::
 +
-[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+[source,java,indent=0,subs="verbatim,quotes"]
 ----
 	void registerDestructionCallback(String name, Runnable destructionCallback)
 ----
 
 Kotlin::
 +
-[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+[source,kotlin,indent=0,subs="verbatim,quotes"]
 ----
 	fun registerDestructionCallback(name: String, destructionCallback: Runnable)
 ----
@@ -648,14 +628,14 @@ The following method obtains the conversation identifier for the underlying scop
 ======
 Java::
 +
-[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+[source,java,indent=0,subs="verbatim,quotes"]
 ----
 	String getConversationId()
 ----
 
 Kotlin::
 +
-[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+[source,kotlin,indent=0,subs="verbatim,quotes"]
 ----
 	fun getConversationId(): String
 ----
@@ -663,8 +643,6 @@ Kotlin::
 
 This identifier is different for each scope. For a session scoped implementation, this
 identifier can be the session identifier.
-
-
 
 [[beans-factory-scopes-custom-using]]
 === Using a Custom Scope
@@ -677,14 +655,14 @@ method to register a new `Scope` with the Spring container:
 ======
 Java::
 +
-[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+[source,java,indent=0,subs="verbatim,quotes"]
 ----
 	void registerScope(String scopeName, Scope scope);
 ----
 
 Kotlin::
 +
-[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+[source,kotlin,indent=0,subs="verbatim,quotes"]
 ----
 	fun registerScope(scopeName: String, scope: Scope)
 ----
@@ -710,7 +688,7 @@ implementations.
 ======
 Java::
 +
-[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+[source,java,indent=0,subs="verbatim,quotes"]
 ----
 	Scope threadScope = new SimpleThreadScope();
 	beanFactory.registerScope("thread", threadScope);
@@ -718,7 +696,7 @@ Java::
 
 Kotlin::
 +
-[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+[source,kotlin,indent=0,subs="verbatim,quotes"]
 ----
 	val threadScope = SimpleThreadScope()
 	beanFactory.registerScope("thread", threadScope)
@@ -773,7 +751,3 @@ of the scope. You can also do the `Scope` registration declaratively, by using t
 NOTE: When you place `<aop:scoped-proxy/>` within a `<bean>` declaration for a
 `FactoryBean` implementation, it is the factory bean itself that is scoped, not the object
 returned from `getObject()`.
-
-
-
-

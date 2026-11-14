@@ -5,10 +5,10 @@ The `spring-web` module contains the following foundational support for reactive
 applications:
 
 * For server request processing there are two levels of support.
-** xref:web/webflux/reactive-spring.adoc#webflux-httphandler[HttpHandler]: Basic contract for HTTP request handling with
+** <<webflux-httphandler,HttpHandler>>: Basic contract for HTTP request handling with
 non-blocking I/O and Reactive Streams back pressure, along with adapters for Reactor Netty,
-Undertow, Tomcat, Jetty, and any Servlet container.
-** xref:web/webflux/reactive-spring.adoc#webflux-web-handler-api[`WebHandler` API]: Slightly higher level, general-purpose web API for
+Tomcat, Jetty, and any Servlet container.
+** <<webflux-web-handler-api,`WebHandler` API>>: Slightly higher level, general-purpose web API for
 request handling, on top of which concrete programming models such as annotated
 controllers and functional endpoints are built.
 * For the client side, there is a basic `ClientHttpConnector` contract to perform HTTP
@@ -18,9 +18,8 @@ https://github.com/jetty-project/jetty-reactive-httpclient[Jetty HttpClient]
 and https://hc.apache.org/[Apache HttpComponents].
 The higher level xref:web/webflux-webclient.adoc[WebClient] used in applications
 builds on this basic contract.
-* For client and server, xref:web/webflux/reactive-spring.adoc#webflux-codecs[codecs] for serialization and
+* For client and server, <<webflux-codecs,codecs>> for serialization and
 deserialization of HTTP request and response content.
-
 
 
 [[webflux-httphandler]]
@@ -40,10 +39,6 @@ The following table describes the supported server APIs:
 | Netty
 | Netty API
 | {reactor-github-org}/reactor-netty[Reactor Netty]
-
-| Undertow
-| Undertow API
-| spring-web: Undertow to Reactive Streams bridge
 
 | Tomcat
 | Servlet non-blocking I/O; Tomcat API to read and write ByteBuffers vs byte[]
@@ -68,10 +63,6 @@ The following table describes server dependencies (also see
 |io.projectreactor.netty
 |reactor-netty
 
-|Undertow
-|io.undertow
-|undertow-core
-
 |Tomcat
 |org.apache.tomcat.embed
 |tomcat-embed-core
@@ -81,14 +72,14 @@ The following table describes server dependencies (also see
 |jetty-server, jetty-servlet
 |===
 
-The code snippets below show using the `HttpHandler` adapters with each server API:
+The code snippets below show using the `HttpHandler` adapters with each server API.
 
 *Reactor Netty*
 [tabs]
 ======
 Java::
 +
-[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+[source,java,indent=0,subs="verbatim,quotes"]
 ----
 	HttpHandler handler = ...
 	ReactorHttpHandlerAdapter adapter = new ReactorHttpHandlerAdapter(handler);
@@ -97,35 +88,11 @@ Java::
 
 Kotlin::
 +
-[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+[source,kotlin,indent=0,subs="verbatim,quotes"]
 ----
 	val handler: HttpHandler = ...
 	val adapter = ReactorHttpHandlerAdapter(handler)
 	HttpServer.create().host(host).port(port).handle(adapter).bindNow()
-----
-======
-
-*Undertow*
-[tabs]
-======
-Java::
-+
-[source,java,indent=0,subs="verbatim,quotes",role="primary"]
-----
-	HttpHandler handler = ...
-	UndertowHttpHandlerAdapter adapter = new UndertowHttpHandlerAdapter(handler);
-	Undertow server = Undertow.builder().addHttpListener(port, host).setHandler(adapter).build();
-	server.start();
-----
-
-Kotlin::
-+
-[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
-----
-	val handler: HttpHandler = ...
-	val adapter = UndertowHttpHandlerAdapter(handler)
-	val server = Undertow.builder().addHttpListener(port, host).setHandler(adapter).build()
-	server.start()
 ----
 ======
 
@@ -134,7 +101,7 @@ Kotlin::
 ======
 Java::
 +
-[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+[source,java,indent=0,subs="verbatim,quotes"]
 ----
 	HttpHandler handler = ...
 	Servlet servlet = new TomcatHttpHandlerAdapter(handler);
@@ -151,7 +118,7 @@ Java::
 
 Kotlin::
 +
-[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+[source,kotlin,indent=0,subs="verbatim,quotes"]
 ----
 	val handler: HttpHandler = ...
 	val servlet = TomcatHttpHandlerAdapter(handler)
@@ -173,63 +140,62 @@ Kotlin::
 ======
 Java::
 +
-[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+[source,java,indent=0,subs="verbatim,quotes"]
 ----
 	HttpHandler handler = ...
-	Servlet servlet = new JettyHttpHandlerAdapter(handler);
+	JettyCoreHttpHandlerAdapter adapter = new JettyCoreHttpHandlerAdapter(handler);
 
 	Server server = new Server();
-	ServletContextHandler contextHandler = new ServletContextHandler(server, "");
-	contextHandler.addServlet(new ServletHolder(servlet), "/");
-	contextHandler.start();
+	server.setHandler(adapter);
 
 	ServerConnector connector = new ServerConnector(server);
 	connector.setHost(host);
 	connector.setPort(port);
 	server.addConnector(connector);
+
 	server.start();
 ----
 
 Kotlin::
 +
-[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+[source,kotlin,indent=0,subs="verbatim,quotes"]
 ----
 	val handler: HttpHandler = ...
-	val servlet = JettyHttpHandlerAdapter(handler)
+	val adapter = JettyCoreHttpHandlerAdapter(handler)
 
 	val server = Server()
-	val contextHandler = ServletContextHandler(server, "")
-	contextHandler.addServlet(ServletHolder(servlet), "/")
-	contextHandler.start();
+	server.setHandler(adapter)
 
 	val connector = ServerConnector(server)
 	connector.host = host
 	connector.port = port
 	server.addConnector(connector)
+
 	server.start()
 ----
 ======
 
-*Servlet Container*
+TIP: In Spring Framework 6.2, `JettyHttpHandlerAdapter` was deprecated in favor of
+`JettyCoreHttpHandlerAdapter`, which integrates directly with Jetty 12 APIs
+without a Servlet layer.
 
-To deploy as a WAR to any Servlet container, you can extend and include
-{spring-framework-api}/web/server/adapter/AbstractReactiveWebInitializer.html[`AbstractReactiveWebInitializer`]
-in the WAR. That class wraps an `HttpHandler` with `ServletHttpHandlerAdapter` and registers
-that as a `Servlet`.
-
+To deploy as a WAR to a Servlet container instead, use
+{spring-framework-api}/web/server/adapter/AbstractReactiveWebInitializer.html[`AbstractReactiveWebInitializer`],
+to adapt `HttpHandler` to a `Servlet` via `ServletHttpHandlerAdapter`.
 
 
 [[webflux-web-handler-api]]
 == `WebHandler` API
 
-The `org.springframework.web.server` package builds on the xref:web/webflux/reactive-spring.adoc#webflux-httphandler[`HttpHandler`] contract
+The `org.springframework.web.server` package builds on the
+<<webflux-httphandler,`HttpHandler`>> contract
 to provide a general-purpose web API for processing requests through a chain of multiple
 {spring-framework-api}/web/server/WebExceptionHandler.html[`WebExceptionHandler`], multiple
 {spring-framework-api}/web/server/WebFilter.html[`WebFilter`], and a single
 {spring-framework-api}/web/server/WebHandler.html[`WebHandler`] component. The chain can
 be put together with `WebHttpHandlerBuilder` by simply pointing to a Spring
 `ApplicationContext` where components are
-xref:web/webflux/reactive-spring.adoc#webflux-web-handler-api-special-beans[auto-detected], and/or by registering components
+<<webflux-web-handler-api-special-beans,auto-detected>>, and/or by registering components
 with the builder.
 
 While `HttpHandler` has a simple goal to abstract the use of different HTTP servers, the
@@ -257,13 +223,13 @@ Spring ApplicationContext, or that can be registered directly with it:
 | `WebExceptionHandler`
 | 0..N
 | Provide handling for exceptions from the chain of `WebFilter` instances and the target
-  `WebHandler`. For more details, see xref:web/webflux/reactive-spring.adoc#webflux-exception-handler[Exceptions].
+  `WebHandler`. For more details, see <<webflux-exception-handler,Exceptions>>.
 
 | <any>
 | `WebFilter`
 | 0..N
 | Apply interception style logic to before and after the rest of the filter chain and
-  the target `WebHandler`. For more details, see xref:web/webflux/reactive-spring.adoc#webflux-filters[Filters].
+  the target `WebHandler`. For more details, see <<webflux-filters,Filters>>.
 
 | `webHandler`
 | `WebHandler`
@@ -305,14 +271,14 @@ Spring ApplicationContext, or that can be registered directly with it:
 ======
 Java::
 +
-[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+[source,java,indent=0,subs="verbatim,quotes"]
 ----
 	Mono<MultiValueMap<String, String>> getFormData();
 ----
 
 Kotlin::
 +
-[source,Kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+[source,Kotlin,indent=0,subs="verbatim,quotes"]
 ----
 	suspend fun getFormData(): MultiValueMap<String, String>
 ----
@@ -321,7 +287,7 @@ Kotlin::
 The `DefaultServerWebExchange` uses the configured `HttpMessageReader` to parse form data
 (`application/x-www-form-urlencoded`) into a `MultiValueMap`. By default,
 `FormHttpMessageReader` is configured for use by the `ServerCodecConfigurer` bean
-(see the xref:web/webflux/reactive-spring.adoc#webflux-web-handler-api[Web Handler API]).
+(see the <<webflux-web-handler-api,Web Handler API>>).
 
 
 [[webflux-multipart]]
@@ -334,14 +300,14 @@ The `DefaultServerWebExchange` uses the configured `HttpMessageReader` to parse 
 ======
 Java::
 +
-[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+[source,java,indent=0,subs="verbatim,quotes"]
 ----
 	Mono<MultiValueMap<String, Part>> getMultipartData();
 ----
 
 Kotlin::
 +
-[source,Kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+[source,Kotlin,indent=0,subs="verbatim,quotes"]
 ----
 	suspend fun getMultipartData(): MultiValueMap<String, Part>
 ----
@@ -355,7 +321,7 @@ dependencies.
 Alternatively, the `SynchronossPartHttpMessageReader` can be used, which is based on the
 https://github.com/synchronoss/nio-multipart[Synchronoss NIO Multipart] library.
 Both are configured through the `ServerCodecConfigurer` bean
-(see the xref:web/webflux/reactive-spring.adoc#webflux-web-handler-api[Web Handler API]).
+(see the <<webflux-web-handler-api,Web Handler API>>).
 
 To parse multipart data in streaming fashion, you can use the `Flux<PartEvent>` returned from the
 `PartEventHttpMessageReader` instead of using `@RequestPart`, as that  implies `Map`-like access
@@ -363,51 +329,45 @@ to individual parts by name and, hence, requires parsing multipart data in full.
 By contrast, you can use `@RequestBody` to decode the content to `Flux<PartEvent>` without
 collecting to a `MultiValueMap`.
 
-
 [[webflux-forwarded-headers]]
 === Forwarded Headers
 [.small]#xref:web/webmvc/filters.adoc#filters-forwarded-headers[See equivalent in the Servlet stack]#
 
 include::partial$web/forwarded-headers.adoc[]
 
-
-
 [[webflux-forwarded-headers-transformer]]
 === ForwardedHeaderTransformer
 
-`ForwardedHeaderTransformer` is a component that modifies the host, port, and scheme of
-the request, based on forwarded headers, and then removes those headers. If you declare
-it as a bean with the name `forwardedHeaderTransformer`, it will be
-xref:web/webflux/reactive-spring.adoc#webflux-web-handler-api-special-beans[detected] and used.
-
-NOTE: In 5.1 `ForwardedHeaderFilter` was deprecated and superseded by
-`ForwardedHeaderTransformer` so forwarded headers can be processed earlier, before the
-exchange is created. If the filter is configured anyway, it is taken out of the list of
-filters, and `ForwardedHeaderTransformer` is used instead.
-
-
+`ForwardedHeaderTransformer` is a component that modifies the request to match information
+from the standard `"Forwarded"` or `"X-Forwarded"` headers, and also removes those headers
+to eliminate further impact. If you declare it as a bean with the name
+`forwardedHeaderTransformer`, it will be
+<<webflux-web-handler-api-special-beans,detected>> and used.
 
 [[webflux-forwarded-headers-security]]
 === Security Considerations
 
-There are security considerations for forwarded headers since an application cannot know
-if the headers were added by a proxy, as intended, or by a malicious client. This is why
-a proxy at the boundary of trust should be configured to remove untrusted forwarded traffic coming
-from the outside. You can also configure the `ForwardedHeaderTransformer` with
-`removeOnly=true`, in which case it removes but does not use the headers.
+Forwarded headers are intended to be set by trusted proxies and never allowed in from the
+outside. A proxy at the edge of trust must remove forwarded headers including both the
+standard `"Forwarded"` and `"X-Forwarded"` headers, regardless of which one they use,
+to protect applications which may check both.
 
+When creating `ForwardedHeaderTransformer` you need to specify whether it should use the
+standard `"Forwarded"` or `"X-Forwarded"` headers. If needed `"X-Forwarded-Prefix"`
+must be enabled separately through a property on the transformer.
 
+`ForwardedHeaderTransformer`  can be configured in `removeOnly` mode, in which case it removes
+forwarded headers from the request without using them.
 
 [[webflux-filters]]
 == Filters
 [.small]#xref:web/webmvc/filters.adoc[See equivalent in the Servlet stack]#
 
-In the xref:web/webflux/reactive-spring.adoc#webflux-web-handler-api[`WebHandler` API], you can use a `WebFilter` to apply interception-style
+In the <<webflux-web-handler-api,`WebHandler` API>>, you can use a `WebFilter` to apply interception-style
 logic before and after the rest of the processing chain of filters and the target
 `WebHandler`. When using the xref:web/webflux/dispatcher-handler.adoc#webflux-framework-config[WebFlux Config], registering a `WebFilter` is as simple
 as declaring it as a Spring bean and (optionally) expressing precedence by using `@Order` on
 the bean declaration or by implementing `Ordered`.
-
 
 [[webflux-filters-cors]]
 === CORS
@@ -419,12 +379,36 @@ controllers. However, when you use it with Spring Security, we advise relying on
 
 See the section on xref:web/webflux-cors.adoc[CORS] and the xref:web/webflux-cors.adoc#webflux-cors-webfilter[CORS `WebFilter`] for more details.
 
+[[filters.url-handler]]
+=== URL Handler
+[.small]#xref:web/webmvc/filters.adoc#filters.url-handler[See equivalent in the Servlet stack]#
+
+You may want your controller endpoints to match routes with or without a trailing slash in the URL path.
+For example, both "GET /home" and "GET /home/" should be handled by a controller method annotated with `@GetMapping("/home")`.
+
+Spring provides `UrlHandlerFilter` that removes the trailing slash from URL paths to ensure a consistent view of paths with or without a trailing slash.
+This is important to avoid a mismatch between URL-based authorization decisions and web framework request mappings.
+The filter can remove the trailing slash in one of a couple of ways:
+
+* respond with an HTTP redirect status that sends clients to the same path without a trailing slash.
+* mutate the request to remove the trailing slash.
+
+Here is how you can instantiate and configure a `UrlHandlerFilter` for a blog application:
+
+include-code::./UrlHandlerFilterConfiguration[tag=config,indent=0]
+
+Keep in mind the following:
+
+- the root path `"/"` is excluded from trailing slash handling.
+- `@RequestMapping("/")` adds a trailing slash to a type-level mapping, and therefore will
+not map when trailing slash handling applies; use `@RequestMapping` (no path attribute) instead.
+
 
 [[webflux-exception-handler]]
 == Exceptions
 [.small]#xref:web/webmvc/mvc-servlet/exceptionhandlers.adoc#mvc-ann-customer-servlet-container-error-page[See equivalent in the Servlet stack]#
 
-In the xref:web/webflux/reactive-spring.adoc#webflux-web-handler-api[`WebHandler` API], you can use a `WebExceptionHandler` to handle
+In the <<webflux-web-handler-api,`WebHandler` API>>, you can use a `WebExceptionHandler` to handle
 exceptions from the chain of `WebFilter` instances and the target `WebHandler`. When using the
 xref:web/webflux/dispatcher-handler.adoc#webflux-framework-config[WebFlux Config], registering a `WebExceptionHandler` is as simple as declaring it as a
 Spring bean and (optionally) expressing precedence by using `@Order` on the bean declaration or
@@ -450,10 +434,9 @@ The following table describes the available `WebExceptionHandler` implementation
 |===
 
 
-
 [[webflux-codecs]]
 == Codecs
-[.small]#xref:integration/rest-clients.adoc#rest-message-conversion[See equivalent in the Servlet stack]#
+[.small]#xref:web/webmvc/message-converters.adoc#message-converters[See equivalent in the Servlet stack]#
 
 The `spring-web` and `spring-core` modules provide support for serializing and
 deserializing byte content to and from higher level objects through non-blocking I/O with
@@ -468,7 +451,7 @@ to encode and decode HTTP message content.
 * An `Encoder` can be wrapped with `EncoderHttpMessageWriter` to adapt it for use in a web
 application, while a `Decoder` can be wrapped with `DecoderHttpMessageReader`.
 * {spring-framework-api}/core/io/buffer/DataBuffer.html[`DataBuffer`] abstracts different
-byte buffer representations (e.g. Netty `ByteBuf`, `java.nio.ByteBuffer`, etc.) and is
+byte buffer representations (for example, Netty `ByteBuf`, `java.nio.ByteBuffer`, etc.) and is
 what all codecs work on. See xref:core/databuffer-codec.adoc[Data Buffers and Codecs] in the
 "Spring Core" section for more on this topic.
 
@@ -488,35 +471,35 @@ xref:web/webflux/config.adoc#webflux-config-message-codecs[HTTP message codecs].
 JSON and binary JSON ({jackson-github-org}/smile-format-specification[Smile]) are
 both supported when the Jackson library is present.
 
-The `Jackson2Decoder` works as follows:
+The `JacksonJsonDecoder` works as follows:
 
 * Jackson's asynchronous, non-blocking parser is used to aggregate a stream of byte chunks
 into ``TokenBuffer``'s each representing a JSON object.
-* Each `TokenBuffer` is passed to Jackson's `ObjectMapper` to create a higher level object.
-* When decoding to a single-value publisher (e.g. `Mono`), there is one `TokenBuffer`.
-* When decoding to a multi-value publisher (e.g. `Flux`), each `TokenBuffer` is passed to
-the `ObjectMapper` as soon as enough bytes are received for a fully formed object. The
+* Each `TokenBuffer` is passed to Jackson's `JsonMapper` to create a higher level object.
+* When decoding to a single-value publisher (for example, `Mono`), there is one `TokenBuffer`.
+* When decoding to a multi-value publisher (for example, `Flux`), each `TokenBuffer` is passed to
+the `JsonMapper` as soon as enough bytes are received for a fully formed object. The
 input content can be a JSON array, or any
 https://en.wikipedia.org/wiki/JSON_streaming[line-delimited JSON] format such as NDJSON,
 JSON Lines, or JSON Text Sequences.
 
-The `Jackson2Encoder` works as follows:
+The `JacksonJsonEncoder` works as follows:
 
-* For a single value publisher (e.g. `Mono`), simply serialize it through the
-`ObjectMapper`.
+* For a single value publisher (for example, `Mono`), simply serialize it through the
+`JsonMapper`.
 * For a multi-value publisher with `application/json`, by default collect the values with
 `Flux#collectToList()` and then serialize the resulting collection.
 * For a multi-value publisher with a streaming media type such as
-`application/x-ndjson` or `application/stream+x-jackson-smile`, encode, write, and
-flush each value individually using a
+`application/jsonl`, `application/x-ndjson` or `application/stream+x-jackson-smile`,
+encode, write, and flush each value individually using a
 https://en.wikipedia.org/wiki/JSON_streaming[line-delimited JSON] format. Other
 streaming media types may be registered with the encoder.
-* For SSE the `Jackson2Encoder` is invoked per event and the output is flushed to ensure
+* For SSE the `JacksonJsonEncoder` is invoked per event and the output is flushed to ensure
 delivery without delay.
 
 [NOTE]
 ====
-By default both `Jackson2Encoder` and `Jackson2Decoder` do not support elements of type
+By default both `JacksonJsonEncoder` and `JacksonJsonDecoder` do not support elements of type
 `String`. Instead the default assumption is that a string or a sequence of strings
 represent serialized JSON content, to be rendered by the `CharSequenceEncoder`. If what
 you need is to render a JSON array from `Flux<String>`, use `Flux#collectToList()` and
@@ -532,12 +515,12 @@ encode a `Mono<List<String>>`.
 On the server side where form content often needs to be accessed from multiple places,
 `ServerWebExchange` provides a dedicated `getFormData()` method that parses the content
 through `FormHttpMessageReader` and then caches the result for repeated access.
-See xref:web/webflux/reactive-spring.adoc#webflux-form-data[Form Data] in the xref:web/webflux/reactive-spring.adoc#webflux-web-handler-api[`WebHandler` API] section.
+See <<webflux-form-data,Form Data>> in the
+<<webflux-web-handler-api,`WebHandler` API>> section.
 
 Once `getFormData()` is used, the original raw content can no longer be read from the
 request body. For this reason, applications are expected to go through `ServerWebExchange`
 consistently for access to the cached form data versus reading from the raw request body.
-
 
 [[webflux-codecs-multipart]]
 === Multipart
@@ -554,13 +537,39 @@ For more information about the `DefaultPartHttpMessageReader`, refer to the
 On the server side where multipart form content may need to be accessed from multiple
 places, `ServerWebExchange` provides a dedicated `getMultipartData()` method that parses
 the content through `MultipartHttpMessageReader` and then caches the result for repeated access.
-See xref:web/webflux/reactive-spring.adoc#webflux-multipart[Multipart Data] in the xref:web/webflux/reactive-spring.adoc#webflux-web-handler-api[`WebHandler` API] section.
+See <<webflux-multipart,Multipart Data>> in the
+<<webflux-web-handler-api,`WebHandler` API>> section.
 
 Once `getMultipartData()` is used, the original raw content can no longer be read from the
 request body. For this reason applications have to consistently use `getMultipartData()`
 for repeated, map-like access to parts, or otherwise rely on the
 `SynchronossPartHttpMessageReader` for a one-time access to `Flux<Part>`.
 
+[[webflux-codecs-protobuf]]
+=== Protocol Buffers
+
+`ProtobufEncoder` and `ProtobufDecoder` supporting decoding and encoding "application/x-protobuf", "application/octet-stream"
+and "application/vnd.google.protobuf" content for `com.google.protobuf.Message` types. They also support stream of values
+if content is received/sent with the "delimited" parameter along the content type (like "application/x-protobuf;delimited=true").
+This requires the "com.google.protobuf:protobuf-java" library, version 3.29 and higher.
+
+The `ProtobufJsonDecoder` and `ProtobufJsonEncoder` variants support reading and writing JSON documents to and from Protobuf messages.
+They require the "com.google.protobuf:protobuf-java-util" dependency. Note, the JSON variants do not support reading stream of messages,
+see the {spring-framework-api}/http/codec/protobuf/ProtobufJsonDecoder.html[javadoc of `ProtobufJsonDecoder`] for more details.
+
+[[webflux-codecs-gson]]
+=== Google Gson
+
+Applications can use the `GsonEncoder` and `GsonDecoder` to serialize and deserialize JSON documents thanks to the https://google.github.io/gson/[Google Gson] library .
+This codec supports both JSON media types and the NDJSON format for streaming.
+
+[NOTE]
+====
+`Gson` does not support non-blocking parsing, so the `GsonDecoder` does not support deserializing
+to `Flux<*>` types. For example, if this decoder is used for deserializing a JSON stream or even a list of elements
+as a `Flux<*>`, an `UnsupportedOperationException` will be thrown at runtime.
+Applications should instead focus on deserializing bounded collections and use `Mono<List<*>>` as target types.
+====
 
 [[webflux-codecs-limits]]
 === Limits
@@ -581,7 +590,7 @@ set all codecs, see xref:web/webflux/config.adoc#webflux-config-message-codecs[H
 all codecs can be changed in
 xref:web/webflux-webclient/client-builder.adoc#webflux-client-builder-maxinmemorysize[WebClient.Builder].
 
-For xref:web/webflux/reactive-spring.adoc#webflux-codecs-multipart[Multipart parsing] the `maxInMemorySize` property limits
+For <<webflux-codecs-multipart,Multipart parsing>> the `maxInMemorySize` property limits
 the size of non-file parts. For file parts, it determines the threshold at which the part
 is written to disk. For file parts written to disk, there is an additional
 `maxDiskUsagePerPart` property to limit the amount of disk space per part. There is also
@@ -589,18 +598,15 @@ a `maxParts` property to limit the overall number of parts in a multipart reques
 To configure all three in WebFlux, you'll need to supply a pre-configured instance of
 `MultipartHttpMessageReader` to `ServerCodecConfigurer`.
 
-
-
 [[webflux-codecs-streaming]]
 === Streaming
 [.small]#xref:web/webmvc/mvc-ann-async.adoc#mvc-ann-async-http-streaming[See equivalent in the Servlet stack]#
 
 When streaming to the HTTP response (for example, `text/event-stream`,
-`application/x-ndjson`), it is important to send data periodically, in order to
+`application/jsonl`, `application/x-ndjson`), it is important to send data periodically, in order to
 reliably detect a disconnected client sooner rather than later. Such a send could be a
 comment-only, empty SSE event or any other "no-op" data that would effectively serve as
 a heartbeat.
-
 
 [[webflux-codecs-buffers]]
 === `DataBuffer`
@@ -618,7 +624,6 @@ cases please review the information in xref:core/databuffer-codec.adoc[Data Buff
 especially the section on xref:core/databuffer-codec.adoc#databuffers-using[Using DataBuffer].
 
 
-
 [[webflux-logging]]
 == Logging
 [.small]#xref:web/webmvc/mvc-servlet/logging.adoc[See equivalent in the Servlet stack]#
@@ -633,7 +638,6 @@ messages may show a different level of detail at `TRACE` vs `DEBUG`.
 
 Good logging comes from the experience of using the logs. If you spot anything that does
 not meet the stated goals, please let us know.
-
 
 [[webflux-logging-id]]
 === Log Id
@@ -650,7 +654,6 @@ while a fully formatted prefix based on that ID is available from
 ({spring-framework-api}/web/reactive/function/client/ClientRequest.html#LOG_ID_ATTRIBUTE[`LOG_ID_ATTRIBUTE`])
 ,while a fully formatted prefix is available from `ClientRequest#logPrefix()`.
 
-
 [[webflux-logging-sensitive-data]]
 === Sensitive Data
 [.small]#xref:web/webmvc/mvc-servlet/logging.adoc#mvc-logging-sensitive-data[See equivalent in the Servlet stack]#
@@ -664,10 +667,9 @@ The following example shows how to do so for server-side requests:
 ======
 Java::
 +
-[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+[source,java,indent=0,subs="verbatim,quotes"]
 ----
 	@Configuration
-	@EnableWebFlux
 	class MyConfig implements WebFluxConfigurer {
 
 		@Override
@@ -679,10 +681,9 @@ Java::
 
 Kotlin::
 +
-[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+[source,kotlin,indent=0,subs="verbatim,quotes"]
 ----
 	@Configuration
-	@EnableWebFlux
 	class MyConfig : WebFluxConfigurer {
 
 		override fun configureHttpMessageCodecs(configurer: ServerCodecConfigurer) {
@@ -698,7 +699,7 @@ The following example shows how to do so for client-side requests:
 ======
 Java::
 +
-[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+[source,java,indent=0,subs="verbatim,quotes"]
 ----
 	Consumer<ClientCodecConfigurer> consumer = configurer ->
 			configurer.defaultCodecs().enableLoggingRequestDetails(true);
@@ -710,7 +711,7 @@ Java::
 
 Kotlin::
 +
-[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+[source,kotlin,indent=0,subs="verbatim,quotes"]
 ----
 	val consumer: (ClientCodecConfigurer) -> Unit  = { configurer -> configurer.defaultCodecs().enableLoggingRequestDetails(true) }
 
@@ -720,7 +721,6 @@ Kotlin::
 ----
 ======
 
-
 [[webflux-logging-appenders]]
 === Appenders
 
@@ -728,8 +728,6 @@ Logging libraries such as SLF4J and Log4J 2 provide asynchronous loggers that av
 blocking. While those have their own drawbacks such as potentially dropping messages
 that could not be queued for logging, they are the best available options currently
 for use in a reactive, non-blocking application.
-
-
 
 [[webflux-codecs-custom]]
 === Custom codecs
@@ -739,8 +737,8 @@ or specific behaviors that are not supported by the default codecs.
 
 Some configuration options expressed by developers are enforced on default codecs.
 Custom codecs might want to get a chance to align with those preferences,
-like xref:web/webflux/reactive-spring.adoc#webflux-codecs-limits[enforcing buffering limits]
-or xref:web/webflux/reactive-spring.adoc#webflux-logging-sensitive-data[logging sensitive data].
+like <<webflux-codecs-limits,enforcing buffering limits>>
+or <<webflux-logging-sensitive-data,logging sensitive data>>.
 
 The following example shows how to do so for client-side requests:
 
@@ -748,26 +746,25 @@ The following example shows how to do so for client-side requests:
 ======
 Java::
 +
-[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+[source,java,indent=0,subs="verbatim,quotes"]
 ----
 	WebClient webClient = WebClient.builder()
 			.codecs(configurer -> {
-					CustomDecoder decoder = new CustomDecoder();
-                    configurer.customCodecs().registerWithDefaultConfig(decoder);
+				CustomDecoder decoder = new CustomDecoder();
+				configurer.customCodecs().registerWithDefaultConfig(decoder);
 			})
 			.build();
 ----
 
 Kotlin::
 +
-[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+[source,kotlin,indent=0,subs="verbatim,quotes"]
 ----
 	val webClient = WebClient.builder()
 			.codecs({ configurer ->
-					val decoder = CustomDecoder()
-            		configurer.customCodecs().registerWithDefaultConfig(decoder)
+				val decoder = CustomDecoder()
+				configurer.customCodecs().registerWithDefaultConfig(decoder)
 			 })
 			.build()
 ----
 ======
-

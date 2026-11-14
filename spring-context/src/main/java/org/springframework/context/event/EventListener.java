@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -101,10 +101,9 @@ public @interface EventListener {
 
 	/**
 	 * The event classes that this listener handles.
-	 * <p>If this attribute is specified with a single value, the
-	 * annotated method may optionally accept a single parameter.
-	 * However, if this attribute is specified with multiple values,
-	 * the annotated method must <em>not</em> declare any parameters.
+	 * <p>The annotated method may optionally accept a single parameter
+	 * of the given event class, or of a common base class or interface
+	 * for all given event classes.
 	 */
 	@AliasFor("value")
 	Class<?>[] classes() default {};
@@ -142,7 +141,7 @@ public @interface EventListener {
 
 	/**
 	 * An optional identifier for the listener, defaulting to the fully-qualified
-	 * signature of the declaring method (e.g. "mypackage.MyClass.myMethod()").
+	 * signature of the declaring method (for example, "mypackage.MyClass.myMethod()").
 	 * @since 5.3.5
 	 * @see SmartApplicationListener#getListenerId()
 	 * @see ApplicationEventMulticaster#removeApplicationListeners(Predicate)

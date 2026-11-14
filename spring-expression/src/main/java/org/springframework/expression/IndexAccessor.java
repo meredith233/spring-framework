@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,46 +16,38 @@
 
 package org.springframework.expression;
 
-import org.springframework.lang.Nullable;
+import org.jspecify.annotations.Nullable;
 
 /**
- * An index accessor is able to read from (and possibly write to) an indexed
- * structure of an object.
+ * An index accessor is able to read from and possibly write to an indexed
+ * structure of a target object.
  *
  * <p>This interface places no restrictions on what constitutes an indexed
  * structure. Implementors are therefore free to access indexed values any way
  * they deem appropriate.
  *
- * <p>An index accessor can optionally specify an array of target classes for
- * which it should be called. However, if it returns {@code null} or an empty
- * array from {@link #getSpecificTargetClasses()}, it will be called for all
- * indexing operations and given a chance to determine if it can read from or
- * write to the indexed structure.
+ * <p>An index accessor can specify an array of
+ * {@linkplain #getSpecificTargetClasses() target classes} for which it should be
+ * called. See {@link TargetedAccessor} for details.
  *
- * <p>Index accessors are considered to be ordered, and each will be called in
- * turn. The only rule that affects the call order is that any index accessor
- * which specifies explicit support for the target class via
- * {@link #getSpecificTargetClasses()} will be called first, before other
- * generic index accessors.
+ * <p>SpEL infrastructure may cache an {@code IndexAccessor} instance on a per-node
+ * basis once it has successfully served a read or write for a given index and target
+ * type, in order to avoid repeatedly invoking {@link #canRead}/{@link #canWrite} on
+ * every registered accessor for subsequent evaluations of that node. Before reusing a
+ * cached instance, SpEL confirms that it is still registered with the current
+ * {@link EvaluationContext}. Consequently, {@link #canRead}, {@link #canWrite},
+ * {@link #read}, and {@link #write} should behave consistently for a given
+ * {@code (context, target type, index)} combination for as long as the accessor remains
+ * registered with a context, since a change in behavior may not be observed until the
+ * accessor is re-selected from scratch.
  *
  * @author Jackmiking Lee
  * @author Sam Brannen
  * @since 6.2
+ * @see TargetedAccessor
  * @see PropertyAccessor
  */
 public interface IndexAccessor extends TargetedAccessor {
-
-	/**
-	 * Get the set of classes for which this index accessor should be called.
-	 * <p>Returning {@code null} or an empty array indicates this is a generic
-	 * index accessor that can be called in an attempt to access an index on any
-	 * type.
-	 * @return an array of classes that this index accessor is suitable for
-	 * (or {@code null} or an empty array if a generic index accessor)
-	 */
-	@Override
-	@Nullable
-	Class<?>[] getSpecificTargetClasses();
 
 	/**
 	 * Determine if this index accessor is able to read a specified index on a

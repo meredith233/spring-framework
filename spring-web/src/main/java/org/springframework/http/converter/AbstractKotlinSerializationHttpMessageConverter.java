@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2023 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,27 +18,33 @@ package org.springframework.http.converter;
 
 import java.io.IOException;
 import java.lang.reflect.Type;
-import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
-import java.util.Set;
+import java.util.function.Predicate;
 
+import kotlin.reflect.KType;
 import kotlinx.serialization.KSerializer;
 import kotlinx.serialization.SerialFormat;
 import kotlinx.serialization.SerializersKt;
-import kotlinx.serialization.descriptors.PolymorphicKind;
-import kotlinx.serialization.descriptors.SerialDescriptor;
+import org.jspecify.annotations.Nullable;
 
-import org.springframework.core.GenericTypeResolver;
+import org.springframework.core.KotlinDetector;
+import org.springframework.core.ResolvableType;
 import org.springframework.http.HttpInputMessage;
 import org.springframework.http.HttpOutputMessage;
 import org.springframework.http.MediaType;
-import org.springframework.lang.Nullable;
 import org.springframework.util.ConcurrentReferenceHashMap;
 
 
 /**
  * Abstract base class for {@link HttpMessageConverter} implementations that
  * use Kotlin serialization.
+ *
+ * <p>As of Spring Framework 7.0, by default it only encodes types annotated with
+ * {@link kotlinx.serialization.Serializable @Serializable} at type or generics level
+ * since it allows combined usage with other general purpose converters without conflicts.
+ * Alternative constructors with a {@code Predicate<ResolvableType>} parameter can be used
+ * to customize this behavior.
  *
  * @author Andreas Ahlenstorf
  * @author Sebastien Deleuze
@@ -48,69 +54,84 @@ import org.springframework.util.ConcurrentReferenceHashMap;
  * @since 6.0
  * @param <T> the type of {@link SerialFormat}
  */
-public abstract class AbstractKotlinSerializationHttpMessageConverter<T extends SerialFormat> extends AbstractGenericHttpMessageConverter<Object> {
+public abstract class AbstractKotlinSerializationHttpMessageConverter<T extends SerialFormat> extends AbstractSmartHttpMessageConverter<Object> {
 
-	private final Map<Type, KSerializer<Object>> serializerCache = new ConcurrentReferenceHashMap<>();
+	private final Map<KType, KSerializer<Object>> kTypeSerializerCache = new ConcurrentReferenceHashMap<>();
+
+	private final Map<Type, KSerializer<Object>> typeSerializerCache = new ConcurrentReferenceHashMap<>();
 
 	private final T format;
 
+	private final Predicate<ResolvableType> typePredicate;
+
 
 	/**
-	 * Construct an {@code AbstractKotlinSerializationHttpMessageConverter} with multiple supported media type and
-	 * format.
-	 * @param format the format
-	 * @param supportedMediaTypes the supported media types
+	 * Creates a new instance with the given format and supported mime types
+	 * which only converters types annotated with
+	 * {@link kotlinx.serialization.Serializable @Serializable} at type or
+	 * generics level.
 	 */
 	protected AbstractKotlinSerializationHttpMessageConverter(T format, MediaType... supportedMediaTypes) {
 		super(supportedMediaTypes);
+		this.typePredicate = KotlinDetector::hasSerializableAnnotation;
 		this.format = format;
 	}
 
+	/**
+	 * Creates a new instance with the given format and supported mime types
+	 * which only converts types for which the specified predicate returns
+	 * {@code true}.
+	 * @since 7.0
+	 */
+	protected AbstractKotlinSerializationHttpMessageConverter(T format, Predicate<ResolvableType> typePredicate, MediaType... supportedMediaTypes) {
+		super(supportedMediaTypes);
+		this.typePredicate = typePredicate;
+		this.format = format;
+	}
+
+	@Override
+	public List<MediaType> getSupportedMediaTypes(Class<?> clazz) {
+		return getSupportedMediaTypes();
+	}
 
 	@Override
 	protected boolean supports(Class<?> clazz) {
-		return serializer(clazz) != null;
-	}
-
-	@Override
-	public boolean canRead(Type type, @Nullable Class<?> contextClass, @Nullable MediaType mediaType) {
-		if (serializer(GenericTypeResolver.resolveType(type, contextClass)) != null) {
-			return canRead(mediaType);
-		}
-		else {
+		ResolvableType type = ResolvableType.forClass(clazz);
+		if (!this.typePredicate.test(type)) {
 			return false;
 		}
+		return serializer(type, null) != null;
 	}
 
 	@Override
-	public boolean canWrite(@Nullable Type type, Class<?> clazz, @Nullable MediaType mediaType) {
-		if (serializer(type != null ? GenericTypeResolver.resolveType(type, clazz) : clazz) != null) {
-			return canWrite(mediaType);
-		}
-		else {
+	public boolean canRead(ResolvableType type, @Nullable MediaType mediaType) {
+		if (!this.typePredicate.test(type) || ResolvableType.NONE.equals(type)) {
 			return false;
 		}
+		return serializer(type, null) != null && canRead(mediaType);
 	}
 
 	@Override
-	public final Object read(Type type, @Nullable Class<?> contextClass, HttpInputMessage inputMessage)
-			throws IOException, HttpMessageNotReadableException {
-
-		Type resolvedType = GenericTypeResolver.resolveType(type, contextClass);
-		KSerializer<Object> serializer = serializer(resolvedType);
-		if (serializer == null) {
-			throw new HttpMessageNotReadableException("Could not find KSerializer for " + resolvedType, inputMessage);
+	public boolean canWrite(ResolvableType type, Class<?> valueClass, @Nullable MediaType mediaType) {
+		ResolvableType resolvableType = (ResolvableType.NONE.equals(type) ? ResolvableType.forClass(valueClass) : type);
+		if (!this.typePredicate.test(resolvableType)) {
+			return false;
 		}
-		return readInternal(serializer, this.format, inputMessage);
+		return serializer(resolvableType, null) != null && canWrite(mediaType);
 	}
 
 	@Override
-	protected final Object readInternal(Class<?> clazz, HttpInputMessage inputMessage)
+	public boolean canWriteRepeatedly(Object o, @Nullable MediaType contentType) {
+		return true;
+	}
+
+	@Override
+	public final Object read(ResolvableType type, HttpInputMessage inputMessage, @Nullable Map<String, Object> hints)
 			throws IOException, HttpMessageNotReadableException {
 
-		KSerializer<Object> serializer = serializer(clazz);
+		KSerializer<Object> serializer = serializer(type, hints);
 		if (serializer == null) {
-			throw new HttpMessageNotReadableException("Could not find KSerializer for " + clazz, inputMessage);
+			throw new HttpMessageNotReadableException("Could not find KSerializer for " + type, inputMessage);
 		}
 		return readInternal(serializer, this.format, inputMessage);
 	}
@@ -122,13 +143,13 @@ public abstract class AbstractKotlinSerializationHttpMessageConverter<T extends 
 			throws IOException, HttpMessageNotReadableException;
 
 	@Override
-	protected final void writeInternal(Object object, @Nullable Type type, HttpOutputMessage outputMessage)
-			throws IOException, HttpMessageNotWritableException {
+	protected final void writeInternal(Object object, ResolvableType type, HttpOutputMessage outputMessage,
+			@Nullable Map<String, Object> hints) throws IOException, HttpMessageNotWritableException {
 
-		Type resolvedType = type != null ? type : object.getClass();
-		KSerializer<Object> serializer = serializer(resolvedType);
+		ResolvableType resolvableType = (ResolvableType.NONE.equals(type) ? ResolvableType.forInstance(object) : type);
+		KSerializer<Object> serializer = serializer(resolvableType, hints);
 		if (serializer == null) {
-			throw new HttpMessageNotWritableException("Could not find KSerializer for " + resolvedType);
+			throw new HttpMessageNotWritableException("Could not find KSerializer for " + resolvableType);
 		}
 		writeInternal(object, serializer, this.format, outputMessage);
 	}
@@ -143,12 +164,27 @@ public abstract class AbstractKotlinSerializationHttpMessageConverter<T extends 
 	 * Tries to find a serializer that can marshall or unmarshall instances of the given type
 	 * using kotlinx.serialization. If no serializer can be found, {@code null} is returned.
 	 * <p>Resolved serializers are cached and cached results are returned on successive calls.
-	 * @param type the type to find a serializer for
+	 * @param resolvableType the type to find a serializer for
 	 * @return a resolved serializer for the given type, or {@code null}
 	 */
-	@Nullable
-	private KSerializer<Object> serializer(Type type) {
-		KSerializer<Object> serializer = this.serializerCache.get(type);
+	private @Nullable KSerializer<Object> serializer(ResolvableType resolvableType, @Nullable Map<String, Object> hints) {
+		if (hints != null && hints.containsKey(KType.class.getName())) {
+			KType type = (KType) hints.get(KType.class.getName());
+			KSerializer<Object> serializer = this.kTypeSerializerCache.get(type);
+			if (serializer == null) {
+				try {
+					serializer = SerializersKt.serializerOrNull(this.format.getSerializersModule(), type);
+				}
+				catch (IllegalArgumentException ignored) {
+				}
+				if (serializer != null) {
+					this.kTypeSerializerCache.put(type, serializer);
+				}
+			}
+			return serializer;
+		}
+		Type type = resolvableType.getType();
+		KSerializer<Object> serializer = this.typeSerializerCache.get(type);
 		if (serializer == null) {
 			try {
 				serializer = SerializersKt.serializerOrNull(this.format.getSerializersModule(), type);
@@ -156,31 +192,16 @@ public abstract class AbstractKotlinSerializationHttpMessageConverter<T extends 
 			catch (IllegalArgumentException ignored) {
 			}
 			if (serializer != null) {
-				if (hasPolymorphism(serializer.getDescriptor(), new HashSet<>())) {
-					return null;
-				}
-				this.serializerCache.put(type, serializer);
+				this.typeSerializerCache.put(type, serializer);
 			}
 		}
 		return serializer;
 	}
 
-	private boolean hasPolymorphism(SerialDescriptor descriptor, Set<String> alreadyProcessed) {
-		alreadyProcessed.add(descriptor.getSerialName());
-		if (descriptor.getKind().equals(PolymorphicKind.OPEN.INSTANCE)) {
-			return true;
-		}
-		for (int i = 0 ; i < descriptor.getElementsCount() ; i++) {
-			SerialDescriptor elementDescriptor = descriptor.getElementDescriptor(i);
-			if (!alreadyProcessed.contains(elementDescriptor.getSerialName()) && hasPolymorphism(elementDescriptor, alreadyProcessed)) {
-				return true;
-			}
-		}
-		return false;
-	}
-
 	@Override
+	@SuppressWarnings("removal")
 	protected boolean supportsRepeatableWrites(Object object) {
 		return true;
 	}
+
 }

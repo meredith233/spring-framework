@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2023 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -26,18 +26,19 @@ import java.util.stream.Stream;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.Named;
 import org.junit.jupiter.api.extension.RegisterExtension;
 import org.junit.jupiter.api.extension.TestExecutionExceptionHandler;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import reactor.core.publisher.Flux;
 
 import org.springframework.http.server.reactive.HttpHandler;
 import org.springframework.util.StringUtils;
 import org.springframework.web.client.HttpServerErrorException;
+import org.springframework.web.client.RestClient;
 
-import static org.junit.jupiter.api.Named.named;
+import static org.junit.jupiter.params.provider.Arguments.argumentSet;
 
 public abstract class AbstractHttpHandlerIntegrationTests {
 
@@ -75,6 +76,8 @@ public abstract class AbstractHttpHandlerIntegrationTests {
 
 	protected int port;
 
+	private RestClient restClient;
+
 
 	protected void startServer(HttpServer httpServer) throws Exception {
 		this.server = httpServer;
@@ -84,6 +87,7 @@ public abstract class AbstractHttpHandlerIntegrationTests {
 
 		// Set dynamically chosen port
 		this.port = this.server.getPort();
+		onServerStart(this.server.getPort());
 	}
 
 	@AfterEach
@@ -97,10 +101,22 @@ public abstract class AbstractHttpHandlerIntegrationTests {
 
 	protected abstract HttpHandler createHttpHandler();
 
+	protected void onServerStart(int port) {
+		this.restClient = initRestClient(RestClient.builder().baseUrl("http://localhost:" + this.port));
+	}
+
+	protected RestClient initRestClient(RestClient.Builder builder) {
+		return builder.build();
+	}
+
+	protected RestClient getRestClient() {
+		return this.restClient;
+	}
+
 
 	/**
 	 * Return an interval stream of N number of ticks and buffer the emissions
-	 * to avoid back pressure failures (e.g. on slow CI server).
+	 * to avoid back pressure failures (for example, on slow CI server).
 	 *
 	 * <p>Use this method as follows:
 	 * <ul>
@@ -117,18 +133,18 @@ public abstract class AbstractHttpHandlerIntegrationTests {
 
 	@Retention(RetentionPolicy.RUNTIME)
 	@Target(ElementType.METHOD)
-	@ParameterizedTest(name = "[{index}] {0}")
+	@ParameterizedTest
 	@MethodSource("org.springframework.web.testfixture.http.server.reactive.bootstrap.AbstractHttpHandlerIntegrationTests#httpServers()")
 	// public for Kotlin
 	public @interface ParameterizedHttpServerTest {
 	}
 
-	static Stream<Named<HttpServer>> httpServers() {
+	static Stream<Arguments> httpServers() {
 		return Stream.of(
-				named("Jetty", new JettyHttpServer()),
-				named("Reactor Netty", new ReactorHttpServer()),
-				named("Tomcat", new TomcatHttpServer()),
-				named("Undertow", new UndertowHttpServer())
+				argumentSet("Jetty", new JettyHttpServer()),
+				argumentSet("Jetty Core", new JettyCoreHttpServer()),
+				argumentSet("Reactor Netty", new ReactorHttpServer()),
+				argumentSet("Tomcat", new TomcatHttpServer())
 		);
 	}
 

@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -40,6 +40,7 @@ import org.springframework.core.io.Resource;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
+import static org.assertj.core.api.InstanceOfAssertFactories.LIST;
 
 /**
  * @author Keith Donald
@@ -161,32 +162,27 @@ class CollectionToCollectionConverterTests {
 
 	@Test
 	void convertEmptyVector_shouldReturnEmptyArrayList() {
-		Vector<String> vector = new Vector<>();
-		vector.add("Element");
-		testCollectionConversionToArrayList(vector);
+		Object convertedValue = convertVectorToArrayList(new Vector<>());
+		assertThat(convertedValue)
+				.isInstanceOf(ArrayList.class)
+				.asInstanceOf(LIST).isEmpty();
 	}
 
 	@Test
 	void convertNonEmptyVector_shouldReturnNonEmptyArrayList() {
 		Vector<String> vector = new Vector<>();
 		vector.add("Element");
-		testCollectionConversionToArrayList(vector);
+		Object convertedValue = convertVectorToArrayList(vector);
+		assertThat(convertedValue)
+				.isInstanceOf(ArrayList.class)
+				.asInstanceOf(LIST).containsOnly("Element");
 	}
 
 	@Test
 	void collectionsEmptyList() throws Exception {
 		CollectionToCollectionConverter converter = new CollectionToCollectionConverter(new GenericConversionService());
 		TypeDescriptor type = new TypeDescriptor(getClass().getField("list"));
-		converter.convert(list, type, TypeDescriptor.valueOf(Class.forName("java.util.Collections$EmptyList")));
-	}
-
-	@SuppressWarnings("rawtypes")
-	private void testCollectionConversionToArrayList(Collection<String> aSource) {
-		Object myConverted = (new CollectionToCollectionConverter(new GenericConversionService())).convert(
-				aSource, TypeDescriptor.forObject(aSource), TypeDescriptor.forObject(new ArrayList()));
-		boolean condition = myConverted instanceof ArrayList<?>;
-		assertThat(condition).isTrue();
-		assertThat(((ArrayList<?>) myConverted)).hasSameSizeAs(aSource);
+		assertThat(converter.convert(list, type, TypeDescriptor.valueOf(Class.forName("java.util.Collections$EmptyList")))).isSameAs(list);
 	}
 
 	@Test
@@ -253,6 +249,12 @@ class CollectionToCollectionConverterTests {
 		list.add("A");
 		list.add("C");
 		assertThat(conversionService.convert(list, new TypeDescriptor(getClass().getField("enumSet")))).isEqualTo(EnumSet.of(MyEnum.A, MyEnum.C));
+	}
+
+
+	private static Object convertVectorToArrayList(Vector<String> vector) {
+		CollectionToCollectionConverter converter = new CollectionToCollectionConverter(new GenericConversionService());
+		return converter.convert(vector, TypeDescriptor.forObject(vector), TypeDescriptor.valueOf(ArrayList.class));
 	}
 
 

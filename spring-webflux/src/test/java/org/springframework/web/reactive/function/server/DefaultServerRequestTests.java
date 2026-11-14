@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -35,6 +35,7 @@ import java.util.Map;
 import java.util.OptionalLong;
 import java.util.function.Consumer;
 
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -56,10 +57,9 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.codec.DecoderHttpMessageReader;
 import org.springframework.http.codec.HttpMessageReader;
-import org.springframework.http.codec.json.Jackson2JsonDecoder;
+import org.springframework.http.codec.json.JacksonJsonDecoder;
 import org.springframework.http.codec.multipart.FormFieldPart;
 import org.springframework.http.codec.multipart.Part;
-import org.springframework.lang.Nullable;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 import org.springframework.web.server.ServerWebInputException;
@@ -81,7 +81,7 @@ import static org.springframework.web.reactive.function.BodyExtractors.toMono;
 class DefaultServerRequestTests {
 
 	private final List<HttpMessageReader<?>> messageReaders = Arrays.asList(
-			new DecoderHttpMessageReader<>(new Jackson2JsonDecoder()),
+			new DecoderHttpMessageReader<>(new JacksonJsonDecoder()),
 			new DecoderHttpMessageReader<>(StringDecoder.allMimeTypes()));
 
 
@@ -247,7 +247,7 @@ class DefaultServerRequestTests {
 	class BodyTests {
 
 		@Test
-		public void body() {
+		void body() {
 			byte[] bytes = "foo".getBytes(StandardCharsets.UTF_8);
 			DefaultDataBuffer dataBuffer = DefaultDataBufferFactory.sharedInstance.wrap(ByteBuffer.wrap(bytes));
 			Flux<DataBuffer> body = Flux.just(dataBuffer);
@@ -266,7 +266,7 @@ class DefaultServerRequestTests {
 		}
 
 		@Test
-		public void bodyToMono() {
+		void bodyToMono() {
 			byte[] bytes = "foo".getBytes(StandardCharsets.UTF_8);
 			DefaultDataBuffer dataBuffer = DefaultDataBufferFactory.sharedInstance.wrap(ByteBuffer.wrap(bytes));
 			Flux<DataBuffer> body = Flux.just(dataBuffer);
@@ -284,7 +284,7 @@ class DefaultServerRequestTests {
 		}
 
 		@Test
-		public void bodyToMonoParameterizedTypeReference() {
+		void bodyToMonoParameterizedTypeReference() {
 			byte[] bytes = "foo".getBytes(StandardCharsets.UTF_8);
 			DefaultDataBuffer dataBuffer = DefaultDataBufferFactory.sharedInstance.wrap(ByteBuffer.wrap(bytes));
 			Flux<DataBuffer> body = Flux.just(dataBuffer);
@@ -304,7 +304,7 @@ class DefaultServerRequestTests {
 		}
 
 		@Test
-		public void bodyToMonoDecodingException() {
+		void bodyToMonoDecodingException() {
 			byte[] bytes = "{\"invalid\":\"json\" ".getBytes(StandardCharsets.UTF_8);
 			DefaultDataBuffer dataBuffer = DefaultDataBufferFactory.sharedInstance.wrap(ByteBuffer.wrap(bytes));
 			Flux<DataBuffer> body = Flux.just(dataBuffer);
@@ -325,7 +325,7 @@ class DefaultServerRequestTests {
 		}
 
 		@Test
-		public void bodyToFlux() {
+		void bodyToFlux() {
 			byte[] bytes = "foo".getBytes(StandardCharsets.UTF_8);
 			DefaultDataBuffer dataBuffer = DefaultDataBufferFactory.sharedInstance.wrap(ByteBuffer.wrap(bytes));
 			Flux<DataBuffer> body = Flux.just(dataBuffer);
@@ -343,7 +343,7 @@ class DefaultServerRequestTests {
 		}
 
 		@Test
-		public void bodyToFluxParameterizedTypeReference() {
+		void bodyToFluxParameterizedTypeReference() {
 			byte[] bytes = "foo".getBytes(StandardCharsets.UTF_8);
 			DefaultDataBuffer dataBuffer = DefaultDataBufferFactory.sharedInstance.wrap(ByteBuffer.wrap(bytes));
 			Flux<DataBuffer> body = Flux.just(dataBuffer);
@@ -363,7 +363,7 @@ class DefaultServerRequestTests {
 		}
 
 		@Test
-		public void bodyUnacceptable() {
+		void bodyUnacceptable() {
 			byte[] bytes = "foo".getBytes(StandardCharsets.UTF_8);
 			DefaultDataBuffer dataBuffer = DefaultDataBufferFactory.sharedInstance.wrap(ByteBuffer.wrap(bytes));
 			Flux<DataBuffer> body = Flux.just(dataBuffer);
@@ -480,7 +480,7 @@ class DefaultServerRequestTests {
 		@Test
 		void ifMatchValueShouldMatchWhenETagMatches() {
 			MockServerHttpRequest mockRequest = MockServerHttpRequest.put("/")
-					.ifMatch("\"first\"", "\"second\"").build();
+					.header(HttpHeaders.IF_MATCH, "\"first\"", "\"second\"").build();
 			DefaultServerRequest request = createRequest(mockRequest);
 			Mono<ServerResponse> result = request.checkNotModified("\"second\"");
 

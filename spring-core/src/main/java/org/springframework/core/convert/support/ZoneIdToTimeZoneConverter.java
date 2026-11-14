@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2016 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,7 +22,7 @@ import java.util.TimeZone;
 import org.springframework.core.convert.converter.Converter;
 
 /**
- * Simple converter from Java 8's {@link java.time.ZoneId} to {@link java.util.TimeZone}.
+ * Simple converter from Java's {@link java.time.ZoneId} to {@link java.util.TimeZone}.
  *
  * <p>Note that Spring's default ConversionService setup understands the 'from'/'to' convention
  * that the JSR-310 {@code java.time} package consistently uses. That convention is implemented

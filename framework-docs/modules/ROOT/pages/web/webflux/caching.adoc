@@ -14,7 +14,6 @@ the `Last-Modified` header.
 This section describes the HTTP caching related options available in Spring WebFlux.
 
 
-
 [[webflux-caching-cachecontrol]]
 == `CacheControl`
 [.small]#xref:web/webmvc/mvc-caching.adoc#mvc-caching-cachecontrol[See equivalent in the Servlet stack]#
@@ -23,8 +22,8 @@ This section describes the HTTP caching related options available in Spring WebF
 configuring settings related to the `Cache-Control` header and is accepted as an argument
 in a number of places:
 
-* xref:web/webflux/caching.adoc#webflux-caching-etag-lastmodified[Controllers]
-* xref:web/webflux/caching.adoc#webflux-caching-static-resources[Static Resources]
+* <<webflux-caching-etag-lastmodified,Controllers>>
+* <<webflux-caching-static-resources,Static Resources>>
 
 While {rfc-site}/rfc7234#section-5.2.2[RFC 7234] describes all possible
 directives for the `Cache-Control` response header, the `CacheControl` type takes a
@@ -34,7 +33,7 @@ use case-oriented approach that focuses on the common scenarios, as the followin
 ======
 Java::
 +
-[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+[source,java,indent=0,subs="verbatim,quotes"]
 ----
 	// Cache for an hour - "Cache-Control: max-age=3600"
 	CacheControl ccCacheOneHour = CacheControl.maxAge(1, TimeUnit.HOURS);
@@ -50,7 +49,7 @@ Java::
 
 Kotlin::
 +
-[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+[source,kotlin,indent=0,subs="verbatim,quotes"]
 ----
 	// Cache for an hour - "Cache-Control: max-age=3600"
 	val ccCacheOneHour = CacheControl.maxAge(1, TimeUnit.HOURS)
@@ -67,7 +66,6 @@ Kotlin::
 ======
 
 
-
 [[webflux-caching-etag-lastmodified]]
 == Controllers
 [.small]#xref:web/webmvc/mvc-caching.adoc#mvc-caching-etag-lastmodified[See equivalent in the Servlet stack]#
@@ -82,7 +80,7 @@ settings to a `ResponseEntity`, as the following example shows:
 ======
 Java::
 +
-[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+[source,java,indent=0,subs="verbatim,quotes"]
 ----
 	@GetMapping("/book/{id}")
 	public ResponseEntity<Book> showBook(@PathVariable Long id) {
@@ -100,7 +98,7 @@ Java::
 
 Kotlin::
 +
-[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+[source,kotlin,indent=0,subs="verbatim,quotes"]
 ----
 	@GetMapping("/book/{id}")
 	fun showBook(@PathVariable id: Long): ResponseEntity<Book> {
@@ -130,7 +128,7 @@ as the following example shows:
 ======
 Java::
 +
-[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+[source,java,indent=0,subs="verbatim,quotes"]
 ----
 	@RequestMapping
 	public String myHandleMethod(ServerWebExchange exchange, Model model) {
@@ -151,7 +149,7 @@ Java::
 
 Kotlin::
 +
-[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+[source,kotlin,indent=0,subs="verbatim,quotes"]
 ----
 	@RequestMapping
 	fun myHandleMethod(exchange: ServerWebExchange, model: Model): String? {
@@ -178,11 +176,10 @@ values, or both. For conditional `GET` and `HEAD` requests, you can set the resp
 to 412 (PRECONDITION_FAILED) to prevent concurrent modification.
 
 
-
 [[webflux-caching-static-resources]]
 == Static Resources
 [.small]#xref:web/webmvc/mvc-caching.adoc#mvc-caching-static-resources[See equivalent in the Servlet stack]#
 
 You should serve static resources with a `Cache-Control` and conditional response headers
-for optimal performance. See the section on configuring xref:web/webflux/config.adoc#webflux-config-static-resources[Static Resources].
-
+for optimal performance. See the section on configuring
+xref:web/webflux/config.adoc#webflux-config-static-resources[Static Resources].

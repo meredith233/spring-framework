@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -40,7 +40,7 @@ class AnnotationNamespaceDrivenTests extends AbstractCacheAnnotationTests {
 	}
 
 	@Test
-	void testKeyStrategy() {
+	void keyStrategy() {
 		CacheInterceptor ci = this.ctx.getBean(
 				"org.springframework.cache.interceptor.CacheInterceptor#0", CacheInterceptor.class);
 		assertThat(ci.getKeyGenerator()).isSameAs(this.ctx.getBean("keyGenerator"));
@@ -67,7 +67,7 @@ class AnnotationNamespaceDrivenTests extends AbstractCacheAnnotationTests {
 	}
 
 	@Test
-	void testCacheErrorHandler() {
+	void cacheErrorHandler() {
 		CacheInterceptor ci = this.ctx.getBean(
 				"org.springframework.cache.interceptor.CacheInterceptor#0", CacheInterceptor.class);
 		assertThat(ci.getErrorHandler()).isSameAs(this.ctx.getBean("errorHandler", CacheErrorHandler.class));

@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,6 +23,7 @@ import java.util.Map;
 import org.junit.jupiter.api.Test;
 
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -40,7 +41,7 @@ class DefaultRenderingBuilderTests {
 		assertThat(rendering.view()).isEqualTo("abc");
 		assertThat(rendering.modelAttributes()).isEqualTo(Collections.emptyMap());
 		assertThat(rendering.status()).isNull();
-		assertThat(rendering.headers()).isEmpty();
+		assertThat(rendering.headers().isEmpty()).isTrue();
 	}
 
 	@Test
@@ -48,16 +49,17 @@ class DefaultRenderingBuilderTests {
 		Rendering rendering = Rendering.redirectTo("abc").build();
 
 		Object view = rendering.view();
-		assertThat(view.getClass()).isEqualTo(RedirectView.class);
-		assertThat(((RedirectView) view).getUrl()).isEqualTo("abc");
-		assertThat(((RedirectView) view).isContextRelative()).isTrue();
-		assertThat(((RedirectView) view).isPropagateQuery()).isFalse();
+		assertThat(view).isExactlyInstanceOf(RedirectView.class);
+		RedirectView redirectView = (RedirectView) view;
+		assertThat(redirectView.getUrl()).isEqualTo("abc");
+		assertThat(redirectView.isContextRelative()).isTrue();
+		assertThat(redirectView.isPropagateQuery()).isFalse();
 	}
-
 
 	@Test
 	void viewName() {
 		Rendering rendering = Rendering.view("foo").build();
+
 		assertThat(rendering.view()).isEqualTo("foo");
 	}
 
@@ -95,7 +97,7 @@ class DefaultRenderingBuilderTests {
 	void header() {
 		Rendering rendering = Rendering.view("foo").header("foo", "bar").build();
 
-		assertThat(rendering.headers()).hasSize(1);
+		assertThat(rendering.headers().size()).isOne();
 		assertThat(rendering.headers().get("foo")).isEqualTo(Collections.singletonList("bar"));
 	}
 
@@ -113,7 +115,7 @@ class DefaultRenderingBuilderTests {
 		Rendering rendering = Rendering.redirectTo("foo").contextRelative(false).build();
 
 		Object view = rendering.view();
-		assertThat(view.getClass()).isEqualTo(RedirectView.class);
+		assertThat(view).isExactlyInstanceOf(RedirectView.class);
 		assertThat(((RedirectView) view).isContextRelative()).isFalse();
 	}
 
@@ -122,8 +124,18 @@ class DefaultRenderingBuilderTests {
 		Rendering rendering = Rendering.redirectTo("foo").propagateQuery(true).build();
 
 		Object view = rendering.view();
-		assertThat(view.getClass()).isEqualTo(RedirectView.class);
+		assertThat(view).isExactlyInstanceOf(RedirectView.class);
 		assertThat(((RedirectView) view).isPropagateQuery()).isTrue();
+	}
+
+	@Test  // gh-33498
+	void redirectWithCustomStatus() {
+		HttpStatus status = HttpStatus.MOVED_PERMANENTLY;
+		Rendering rendering = Rendering.redirectTo("foo").status(status).build();
+
+		Object view = rendering.view();
+		assertThat(view).isExactlyInstanceOf(RedirectView.class);
+		assertThat(((RedirectView) view).getStatusCode()).isEqualTo(status);
 	}
 
 

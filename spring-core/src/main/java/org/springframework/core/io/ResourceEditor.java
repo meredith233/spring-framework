@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2017 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,21 +19,22 @@ package org.springframework.core.io;
 import java.beans.PropertyEditorSupport;
 import java.io.IOException;
 
+import org.jspecify.annotations.Nullable;
+
 import org.springframework.core.env.PropertyResolver;
 import org.springframework.core.env.StandardEnvironment;
-import org.springframework.lang.Nullable;
 import org.springframework.util.Assert;
 import org.springframework.util.StringUtils;
 
 /**
  * {@link java.beans.PropertyEditor Editor} for {@link Resource}
  * descriptors, to automatically convert {@code String} locations
- * e.g. {@code file:C:/myfile.txt} or {@code classpath:myfile.txt} to
+ * for example, {@code file:C:/myfile.txt} or {@code classpath:myfile.txt} to
  * {@code Resource} properties instead of using a {@code String} location property.
  *
  * <p>The path may contain {@code ${...}} placeholders, to be
  * resolved as {@link org.springframework.core.env.Environment} properties:
- * e.g. {@code ${user.dir}}. Unresolvable placeholders are ignored by default.
+ * for example, {@code ${user.dir}}. Unresolvable placeholders are ignored by default.
  *
  * <p>Delegates to a {@link ResourceLoader} to do the heavy lifting,
  * by default using a {@link DefaultResourceLoader}.
@@ -51,8 +52,7 @@ public class ResourceEditor extends PropertyEditorSupport {
 
 	private final ResourceLoader resourceLoader;
 
-	@Nullable
-	private PropertyResolver propertyResolver;
+	private @Nullable PropertyResolver propertyResolver;
 
 	private final boolean ignoreUnresolvablePlaceholders;
 
@@ -122,8 +122,7 @@ public class ResourceEditor extends PropertyEditorSupport {
 
 
 	@Override
-	@Nullable
-	public String getAsText() {
+	public @Nullable String getAsText() {
 		Resource value = (Resource) getValue();
 		try {
 			// Try to determine URL for resource.

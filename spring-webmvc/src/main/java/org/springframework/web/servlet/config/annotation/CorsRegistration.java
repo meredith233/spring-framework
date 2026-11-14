@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -76,7 +76,7 @@ public class CorsRegistration {
 	}
 
 	/**
-	 * Set the HTTP methods to allow, e.g. {@code "GET"}, {@code "POST"}, etc.
+	 * Set the HTTP methods to allow, for example, {@code "GET"}, {@code "POST"}, etc.
 	 * The special value {@code "*"} allows all methods. By default,
 	 * "simple" methods {@code GET}, {@code HEAD}, and {@code POST}
 	 * are allowed.

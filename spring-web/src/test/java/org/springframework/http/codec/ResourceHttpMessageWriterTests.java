@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -63,7 +63,7 @@ class ResourceHttpMessageWriterTests {
 
 	@Test
 	@SuppressWarnings({ "unchecked", "rawtypes" })
-	public void getWritableMediaTypes() {
+	void getWritableMediaTypes() {
 		assertThat((List) this.writer.getWritableMediaTypes())
 				.containsExactlyInAnyOrder(MimeTypeUtils.APPLICATION_OCTET_STREAM, MimeTypeUtils.ALL);
 	}
@@ -109,6 +109,19 @@ class ResourceHttpMessageWriterTests {
 	}
 
 	@Test
+	void ignoreRangeWhenIfRangeETagDoesNotMatch() {
+		this.response.getHeaders().setETag("\"current\"");
+
+		testWrite(get("/").range(of(0, 5)).header(HttpHeaders.IF_RANGE, "\"stale\"").build());
+
+		assertThat(this.response.getHeaders().getFirst(HttpHeaders.CONTENT_RANGE)).isNull();
+		StepVerifier.create(this.response.getBodyAsString())
+				.expectNext("Spring Framework test resource content.")
+				.expectComplete()
+				.verify();
+	}
+
+	@Test
 	void writeMultipleRegions() {
 
 		testWrite(get("/").range(of(0,5), of(7,15), of(17,20), of(22,38)).build());
@@ -151,6 +164,15 @@ class ResourceHttpMessageWriterTests {
 	void invalidRange() {
 
 		testWrite(get("/").header(HttpHeaders.RANGE, "invalid").build());
+
+		assertThat(this.response.getHeaders().getFirst(HttpHeaders.ACCEPT_RANGES)).isEqualTo("bytes");
+		assertThat(this.response.getStatusCode()).isEqualTo(HttpStatus.REQUESTED_RANGE_NOT_SATISFIABLE);
+	}
+
+	@Test // gh-35536
+	void invalidRangePosition() {
+
+		testWrite(get("/").header(HttpHeaders.RANGE, "bytes=2000-5000").build());
 
 		assertThat(this.response.getHeaders().getFirst(HttpHeaders.ACCEPT_RANGES)).isEqualTo("bytes");
 		assertThat(this.response.getStatusCode()).isEqualTo(HttpStatus.REQUESTED_RANGE_NOT_SATISFIABLE);

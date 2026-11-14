@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2022 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,7 +22,7 @@ import java.util.Set;
 import java.util.function.Consumer;
 import java.util.stream.Stream;
 
-import org.springframework.lang.Nullable;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Gather the need for Java serialization at runtime.
@@ -30,7 +30,10 @@ import org.springframework.lang.Nullable;
  * @author Stephane Nicoll
  * @since 6.0
  * @see Serializable
+ * @deprecated in favor of {@link ReflectionHints}
  */
+@Deprecated(since = "7.0.6", forRemoval = true)
+@SuppressWarnings("removal")
 public class SerializationHints {
 
 	private final Set<JavaSerializationHint> javaSerializationHints;

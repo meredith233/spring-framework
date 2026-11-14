@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -74,7 +74,7 @@ class FreeMarkerConfigurerTests {
 
 	@Test
 	@SuppressWarnings("rawtypes")
-	public void freeMarkerConfigurerWithNonFileResourceLoaderPath() throws Exception {
+	void freeMarkerConfigurerWithNonFileResourceLoaderPath() throws Exception {
 		freeMarkerConfigurer.setTemplateLoaderPath("file:/mydir");
 		Properties settings = new Properties();
 		settings.setProperty("localized_lookup", "false");

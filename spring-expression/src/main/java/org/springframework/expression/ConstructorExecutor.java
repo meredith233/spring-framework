@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,6 +16,8 @@
 
 package org.springframework.expression;
 
+import org.jspecify.annotations.Nullable;
+
 /**
  * A {@code ConstructorExecutor} is built by a {@link ConstructorResolver} and
  * can be cached by the infrastructure to repeat an operation quickly without
@@ -30,6 +32,12 @@ package org.springframework.expression;
  * <p>If a {@code ConstructorExecutor} becomes stale, it should throw an
  * {@link AccessException} which signals to the infrastructure to go back to the
  * resolvers to ask for a new one.
+ *
+ * <p>A cached {@code ConstructorExecutor} is valid only for the
+ * {@link EvaluationContext} configuration &mdash; in particular, the registered
+ * {@link ConstructorResolver ConstructorResolvers} &mdash; under which it was resolved.
+ * See {@link Expression} for the resulting contract on reusing a parsed expression
+ * across different {@code EvaluationContext} instances.
  *
  * @author Andy Clement
  * @author Sam Brannen
@@ -49,6 +57,6 @@ public interface ConstructorExecutor {
 	 * @throws AccessException if there is a problem executing the constructor or
 	 * if this {@code ConstructorExecutor} has become stale
 	 */
-	TypedValue execute(EvaluationContext context, Object... arguments) throws AccessException;
+	TypedValue execute(EvaluationContext context, @Nullable Object... arguments) throws AccessException;
 
 }

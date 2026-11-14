@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2022 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -61,19 +61,19 @@ class GenericParameterMatchingTests {
 
 
 	@Test
-	void testGenericInterfaceGenericArgExecution() {
+	void genericInterfaceGenericArgExecution() {
 		testBean.save("");
 		assertThat(counterAspect.genericInterfaceGenericArgExecutionCount).isEqualTo(1);
 	}
 
 	@Test
-	void testGenericInterfaceGenericCollectionArgExecution() {
+	void genericInterfaceGenericCollectionArgExecution() {
 		testBean.saveAll(null);
 		assertThat(counterAspect.genericInterfaceGenericCollectionArgExecutionCount).isEqualTo(1);
 	}
 
 	@Test
-	void testGenericInterfaceSubtypeGenericCollectionArgExecution() {
+	void genericInterfaceSubtypeGenericCollectionArgExecution() {
 		testBean.saveAll(null);
 		assertThat(counterAspect.genericInterfaceSubtypeGenericCollectionArgExecutionCount).isEqualTo(1);
 	}

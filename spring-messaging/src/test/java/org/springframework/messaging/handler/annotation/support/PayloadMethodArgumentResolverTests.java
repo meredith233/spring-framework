@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -133,7 +133,7 @@ class PayloadMethodArgumentResolverTests {
 
 		Message<?> emptyStringMessage = MessageBuilder.withPayload(" 	").build();
 		assertThat(this.resolver.resolveArgument(this.paramAnnotatedNotRequired, emptyStringMessage)).isNull();
-		assertThat(((Optional<?>) this.resolver.resolveArgument(this.paramOptional, emptyStringMessage))).isEmpty();
+		assertThat((Optional<?>) this.resolver.resolveArgument(this.paramOptional, emptyStringMessage)).isEmpty();
 
 		Message<?> emptyOptionalMessage = MessageBuilder.withPayload(Optional.empty()).build();
 		assertThat(this.resolver.resolveArgument(this.paramAnnotatedNotRequired, emptyOptionalMessage)).isNull();

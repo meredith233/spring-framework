@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2017 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -49,15 +49,15 @@ import java.beans.PropertyDescriptor;
 public interface BeanWrapper extends ConfigurablePropertyAccessor {
 
 	/**
-	 * Specify a limit for array and collection auto-growing.
+	 * Specify a limit for array and collection/set/list auto-growing.
 	 * <p>Default is unlimited on a plain BeanWrapper.
-	 * @since 4.1
+	 * @since 3.1
 	 */
 	void setAutoGrowCollectionLimit(int autoGrowCollectionLimit);
 
 	/**
 	 * Return the limit for array and collection auto-growing.
-	 * @since 4.1
+	 * @since 3.1
 	 */
 	int getAutoGrowCollectionLimit();
 

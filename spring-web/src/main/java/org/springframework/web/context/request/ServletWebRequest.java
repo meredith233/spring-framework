@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -25,17 +25,16 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.TimeZone;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
+import org.jspecify.annotations.Nullable;
 
+import org.springframework.http.ETag;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
-import org.springframework.lang.Nullable;
 import org.springframework.util.CollectionUtils;
 import org.springframework.util.ObjectUtils;
 import org.springframework.util.StringUtils;
@@ -52,12 +51,6 @@ import org.springframework.web.util.WebUtils;
 public class ServletWebRequest extends ServletRequestAttributes implements NativeWebRequest {
 
 	private static final Set<String> SAFE_METHODS = Set.of("GET", "HEAD");
-
-	/**
-	 * Pattern matching ETag multiple field values in headers such as "If-Match", "If-None-Match".
-	 * @see <a href="https://tools.ietf.org/html/rfc7232#section-2.3">Section 2.3 of RFC 7232</a>
-	 */
-	private static final Pattern ETAG_HEADER_VALUE_PATTERN = Pattern.compile("\\*|\\s*((W\\/)?(\"[^\"]*\"))\\s*,?");
 
 	/**
 	 * Date formats as specified in the HTTP RFC.
@@ -98,20 +91,17 @@ public class ServletWebRequest extends ServletRequestAttributes implements Nativ
 	}
 
 	@Override
-	@Nullable
-	public Object getNativeResponse() {
+	public @Nullable Object getNativeResponse() {
 		return getResponse();
 	}
 
 	@Override
-	@Nullable
-	public <T> T getNativeRequest(@Nullable Class<T> requiredType) {
+	public <T> @Nullable T getNativeRequest(@Nullable Class<T> requiredType) {
 		return WebUtils.getNativeRequest(getRequest(), requiredType);
 	}
 
 	@Override
-	@Nullable
-	public <T> T getNativeResponse(@Nullable Class<T> requiredType) {
+	public <T> @Nullable T getNativeResponse(@Nullable Class<T> requiredType) {
 		HttpServletResponse response = getResponse();
 		return (response != null ? WebUtils.getNativeResponse(response, requiredType) : null);
 	}
@@ -125,14 +115,12 @@ public class ServletWebRequest extends ServletRequestAttributes implements Nativ
 	}
 
 	@Override
-	@Nullable
-	public String getHeader(String headerName) {
+	public @Nullable String getHeader(String headerName) {
 		return getRequest().getHeader(headerName);
 	}
 
 	@Override
-	@Nullable
-	public String[] getHeaderValues(String headerName) {
+	public String @Nullable [] getHeaderValues(String headerName) {
 		String[] headerValues = StringUtils.toStringArray(getRequest().getHeaders(headerName));
 		return (!ObjectUtils.isEmpty(headerValues) ? headerValues : null);
 	}
@@ -143,14 +131,12 @@ public class ServletWebRequest extends ServletRequestAttributes implements Nativ
 	}
 
 	@Override
-	@Nullable
-	public String getParameter(String paramName) {
+	public @Nullable String getParameter(String paramName) {
 		return getRequest().getParameter(paramName);
 	}
 
 	@Override
-	@Nullable
-	public String[] getParameterValues(String paramName) {
+	public String @Nullable [] getParameterValues(String paramName) {
 		return getRequest().getParameterValues(paramName);
 	}
 
@@ -175,14 +161,12 @@ public class ServletWebRequest extends ServletRequestAttributes implements Nativ
 	}
 
 	@Override
-	@Nullable
-	public String getRemoteUser() {
+	public @Nullable String getRemoteUser() {
 		return getRequest().getRemoteUser();
 	}
 
 	@Override
-	@Nullable
-	public Principal getUserPrincipal() {
+	public @Nullable Principal getUserPrincipal() {
 		return getRequest().getUserPrincipal();
 	}
 
@@ -209,10 +193,15 @@ public class ServletWebRequest extends ServletRequestAttributes implements Nativ
 
 	@Override
 	public boolean checkNotModified(@Nullable String etag, long lastModifiedTimestamp) {
-		HttpServletResponse response = getResponse();
-		if (this.notModified || (response != null && HttpStatus.OK.value() != response.getStatus())) {
-			return this.notModified;
+		if (this.notModified) {
+			return true;
 		}
+
+		HttpServletResponse response = getResponse();
+		if (response != null && HttpStatus.OK.value() != response.getStatus()) {
+			return false;
+		}
+
 		// Evaluate conditions in order of precedence.
 		// See https://datatracker.ietf.org/doc/html/rfc9110#section-13.2.2
 		if (validateIfMatch(etag)) {
@@ -220,7 +209,7 @@ public class ServletWebRequest extends ServletRequestAttributes implements Nativ
 			return this.notModified;
 		}
 		// 2) If-Unmodified-Since
-		else if (validateIfUnmodifiedSince(lastModifiedTimestamp)) {
+		if (validateIfUnmodifiedSince(lastModifiedTimestamp)) {
 			updateResponseStateChanging(etag, lastModifiedTimestamp);
 			return this.notModified;
 		}
@@ -254,61 +243,24 @@ public class ServletWebRequest extends ServletRequestAttributes implements Nativ
 		return true;
 	}
 
-	private boolean matchRequestedETags(Enumeration<String> requestedETags, @Nullable String etag, boolean weakCompare) {
-		etag = padEtagIfNecessary(etag);
-		while (requestedETags.hasMoreElements()) {
-			// Compare weak/strong ETags as per https://datatracker.ietf.org/doc/html/rfc9110#section-8.8.3
-			Matcher etagMatcher = ETAG_HEADER_VALUE_PATTERN.matcher(requestedETags.nextElement());
-			while (etagMatcher.find()) {
-				// only consider "lost updates" checks for unsafe HTTP methods
-				if ("*".equals(etagMatcher.group()) && StringUtils.hasLength(etag)
-						&& !SAFE_METHODS.contains(getRequest().getMethod())) {
-					return false;
-				}
-				if (weakCompare) {
-					if (etagWeakMatch(etag, etagMatcher.group(1))) {
+	private boolean matchRequestedETags(Enumeration<String> requestedETags, @Nullable String tag, boolean weakCompare) {
+		if (StringUtils.hasLength(tag)) {
+			ETag eTag = ETag.create(tag);
+			boolean isNotSafeMethod = !SAFE_METHODS.contains(getRequest().getMethod());
+			while (requestedETags.hasMoreElements()) {
+				// Compare weak/strong ETags as per https://datatracker.ietf.org/doc/html/rfc9110#section-8.8.3
+				for (ETag requestedETag : ETag.parse(requestedETags.nextElement())) {
+					// only consider "lost updates" checks for unsafe HTTP methods
+					if (requestedETag.isWildcard() && isNotSafeMethod) {
 						return false;
 					}
-				}
-				else {
-					if (etagStrongMatch(etag, etagMatcher.group(1))) {
+					if (requestedETag.compare(eTag, !weakCompare)) {
 						return false;
 					}
 				}
 			}
 		}
 		return true;
-	}
-
-	@Nullable
-	private String padEtagIfNecessary(@Nullable String etag) {
-		if (!StringUtils.hasLength(etag)) {
-			return etag;
-		}
-		if ((etag.startsWith("\"") || etag.startsWith("W/\"")) && etag.endsWith("\"")) {
-			return etag;
-		}
-		return "\"" + etag + "\"";
-	}
-
-	private boolean etagStrongMatch(@Nullable String first, @Nullable String second) {
-		if (!StringUtils.hasLength(first) || first.startsWith("W/")) {
-			return false;
-		}
-		return first.equals(second);
-	}
-
-	private boolean etagWeakMatch(@Nullable String first, @Nullable String second) {
-		if (!StringUtils.hasLength(first) || !StringUtils.hasLength(second)) {
-			return false;
-		}
-		if (first.startsWith("W/")) {
-			first = first.substring(2);
-		}
-		if (second.startsWith("W/")) {
-			second = second.substring(2);
-		}
-		return first.equals(second);
 	}
 
 	private void updateResponseStateChanging(@Nullable String etag, long lastModifiedTimestamp) {
@@ -354,13 +306,13 @@ public class ServletWebRequest extends ServletRequestAttributes implements Nativ
 		}
 	}
 
-	private void addCachingResponseHeaders(@Nullable String etag, long lastModifiedTimestamp) {
+	private void addCachingResponseHeaders(@Nullable String eTag, long lastModifiedTimestamp) {
 		if (getResponse() != null && SAFE_METHODS.contains(getRequest().getMethod())) {
 			if (lastModifiedTimestamp > 0 && parseDateValue(getResponse().getHeader(HttpHeaders.LAST_MODIFIED)) == -1) {
 				getResponse().setDateHeader(HttpHeaders.LAST_MODIFIED, lastModifiedTimestamp);
 			}
-			if (StringUtils.hasLength(etag) && getResponse().getHeader(HttpHeaders.ETAG) == null) {
-				getResponse().setHeader(HttpHeaders.ETAG, padEtagIfNecessary(etag));
+			if (StringUtils.hasLength(eTag) && getResponse().getHeader(HttpHeaders.ETAG) == null) {
+				getResponse().setHeader(HttpHeaders.ETAG, ETag.quoteETagIfNecessary(eTag));
 			}
 		}
 	}

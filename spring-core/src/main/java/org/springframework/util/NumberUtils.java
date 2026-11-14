@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2023 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,7 +23,7 @@ import java.text.NumberFormat;
 import java.text.ParseException;
 import java.util.Set;
 
-import org.springframework.lang.Nullable;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Miscellaneous utility methods for number conversion and parsing.
@@ -39,6 +39,12 @@ public abstract class NumberUtils {
 	private static final BigInteger LONG_MIN = BigInteger.valueOf(Long.MIN_VALUE);
 
 	private static final BigInteger LONG_MAX = BigInteger.valueOf(Long.MAX_VALUE);
+
+	// -2^63: exactly Long.MIN_VALUE, an inclusive lower bound
+	private static final double LONG_MIN_AS_DOUBLE = -0x1p63;
+
+	// 2^63: Long.MAX_VALUE + 1, an exclusive upper bound
+	private static final double LONG_MAX_PLUS_ONE_AS_DOUBLE = 0x1p63;
 
 	/**
 	 * Standard number types (all immutable):
@@ -60,7 +66,9 @@ public abstract class NumberUtils {
 	 * @param targetClass the target class to convert to
 	 * @return the converted number
 	 * @throws IllegalArgumentException if the target class is not supported
-	 * (i.e. not a standard Number subclass as included in the JDK)
+	 * (i.e. not a standard Number subclass as included in the JDK), or if the
+	 * number cannot be converted to an integral target class without overflow
+	 * (including {@code NaN} and infinite floating-point values)
 	 * @see java.lang.Byte
 	 * @see java.lang.Short
 	 * @see java.lang.Integer
@@ -110,10 +118,18 @@ public abstract class NumberUtils {
 				// do not lose precision - use BigDecimal's own conversion
 				return (T) bigDecimal.toBigInteger();
 			}
-			else {
-				// original value is not a Big* number - use standard long conversion
-				return (T) BigInteger.valueOf(number.longValue());
+			if (number instanceof Double || number instanceof Float) {
+				double value = number.doubleValue();
+				if (!Double.isFinite(value)) {
+					raiseOverflowException(number, targetClass);
+				}
+				// do not lose precision - use the exact BigDecimal representation; in contrast
+				// to the BigDecimal target below, BigDecimal(double) is safe here since the
+				// fractional part gets truncated anyway
+				return (T) new BigDecimal(value).toBigInteger();
 			}
+			// original value is not a Big* or floating-point number - use standard long conversion
+			return (T) BigInteger.valueOf(number.longValue());
 		}
 		else if (Float.class == targetClass) {
 			return (T) Float.valueOf(number.floatValue());
@@ -133,8 +149,8 @@ public abstract class NumberUtils {
 	}
 
 	/**
-	 * Check for a {@code BigInteger}/{@code BigDecimal} long overflow
-	 * before returning the given number as a long value.
+	 * Check for a {@code BigInteger}/{@code BigDecimal}/{@code Double}/{@code Float}
+	 * long overflow before returning the given number as a long value.
 	 * @param number the number to convert
 	 * @param targetClass the target class to convert to
 	 * @return the long value, if convertible without overflow
@@ -149,7 +165,14 @@ public abstract class NumberUtils {
 		else if (number instanceof BigDecimal bigDecimal) {
 			bigInt = bigDecimal.toBigInteger();
 		}
-		// Effectively analogous to JDK 8's BigInteger.longValueExact()
+		else if (number instanceof Double || number instanceof Float) {
+			double value = number.doubleValue();
+			// Also rejecting NaN and infinite values
+			if (!(value >= LONG_MIN_AS_DOUBLE && value < LONG_MAX_PLUS_ONE_AS_DOUBLE)) {
+				raiseOverflowException(number, targetClass);
+			}
+		}
+		// Effectively analogous to Java's BigInteger.longValueExact()
 		if (bigInt != null && (bigInt.compareTo(LONG_MIN) < 0 || bigInt.compareTo(LONG_MAX) > 0)) {
 			raiseOverflowException(number, targetClass);
 		}
@@ -172,7 +195,8 @@ public abstract class NumberUtils {
 	 * target class, using the corresponding {@code decode} / {@code valueOf} method.
 	 * <p>Trims all whitespace (leading, trailing, and in between characters) from
 	 * the input {@code String} before attempting to parse the number.
-	 * <p>Supports numbers in hex format (with leading "0x", "0X", or "#") as well.
+	 * <p>Supports numbers in hex format (with leading "0x", "0X", or "#",
+	 * optionally preceded by a "+" or "-" sign) as well.
 	 * @param text the text to convert
 	 * @param targetClass the target class to parse into
 	 * @return the parsed number
@@ -238,7 +262,7 @@ public abstract class NumberUtils {
 	 * @see #convertNumberToTargetClass
 	 * @see #parseNumber(String, Class)
 	 */
-	@SuppressWarnings("NullAway")
+	@SuppressWarnings("NullAway") // Dataflow analysis limitation
 	public static <T extends Number> T parseNumber(
 			String text, Class<T> targetClass, @Nullable NumberFormat numberFormat) {
 
@@ -278,7 +302,7 @@ public abstract class NumberUtils {
 	 * {@code Integer.valueOf}, etc.
 	 */
 	private static boolean isHexNumber(String value) {
-		int index = (value.startsWith("-") ? 1 : 0);
+		int index = (value.startsWith("-") || value.startsWith("+") ? 1 : 0);
 		return (value.startsWith("0x", index) || value.startsWith("0X", index) || value.startsWith("#", index));
 	}
 
@@ -292,9 +316,11 @@ public abstract class NumberUtils {
 		int index = 0;
 		boolean negative = false;
 
-		// Handle minus sign, if present.
-		if (value.startsWith("-")) {
-			negative = true;
+		// Handle sign, if present.
+		// Note: value is never empty here, since isHexNumber() has already matched it.
+		char firstChar = value.charAt(0);
+		if (firstChar == '-' || firstChar == '+') {
+			negative = (firstChar == '-');
 			index++;
 		}
 

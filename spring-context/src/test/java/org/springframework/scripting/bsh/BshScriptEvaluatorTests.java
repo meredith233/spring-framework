@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -31,24 +31,25 @@ import static org.assertj.core.api.Assertions.assertThat;
 /**
  * @author Juergen Hoeller
  */
+@SuppressWarnings("deprecation")
 class BshScriptEvaluatorTests {
 
 	@Test
-	void testBshScriptFromString() {
+	void bshScriptFromString() {
 		ScriptEvaluator evaluator = new BshScriptEvaluator();
 		Object result = evaluator.evaluate(new StaticScriptSource("return 3 * 2;"));
 		assertThat(result).isEqualTo(6);
 	}
 
 	@Test
-	void testBshScriptFromFile() {
+	void bshScriptFromFile() {
 		ScriptEvaluator evaluator = new BshScriptEvaluator();
 		Object result = evaluator.evaluate(new ResourceScriptSource(new ClassPathResource("simple.bsh", getClass())));
 		assertThat(result).isEqualTo(6);
 	}
 
 	@Test
-	void testGroovyScriptWithArguments() {
+	void groovyScriptWithArguments() {
 		ScriptEvaluator evaluator = new BshScriptEvaluator();
 		Map<String, Object> arguments = new HashMap<>();
 		arguments.put("a", 3);

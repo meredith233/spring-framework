@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2023 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,13 +21,13 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
 
+import org.jspecify.annotations.Nullable;
 import reactor.core.publisher.Mono;
 
 import org.springframework.beans.MutablePropertyValues;
 import org.springframework.core.MethodParameter;
 import org.springframework.http.codec.multipart.FormFieldPart;
 import org.springframework.http.codec.multipart.Part;
-import org.springframework.lang.Nullable;
 import org.springframework.util.CollectionUtils;
 import org.springframework.util.MultiValueMap;
 import org.springframework.web.bind.WebDataBinder;
@@ -42,8 +42,8 @@ import org.springframework.web.server.ServerWebExchange;
  * external clients. Therefore the design and use of data binding should be considered
  * carefully with regard to security. For more details, please refer to the dedicated
  * sections on data binding for
- * <a href="https://docs.spring.io/spring-framework/docs/current/reference/html/web.html#mvc-ann-initbinder-model-design">Spring Web MVC</a> and
- * <a href="https://docs.spring.io/spring-framework/docs/current/reference/html/web-reactive.html#webflux-ann-initbinder-model-design">Spring WebFlux</a>
+ * <a href="https://docs.spring.io/spring-framework/reference/web/webmvc/mvc-data-binding.html#mvc-data-binding-design">Spring Web MVC</a> and
+ * <a href="https://docs.spring.io/spring-framework/reference/web/webflux/data-binding.html#webflux-data-binding-design">Spring WebFlux</a>
  * in the reference manual.
  *
  * @author Rossen Stoyanchev
@@ -148,11 +148,17 @@ public class WebExchangeDataBinder extends WebDataBinder {
 
 	protected static void addBindValue(Map<String, Object> params, String key, List<?> values) {
 		if (!CollectionUtils.isEmpty(values)) {
-			values = values.stream()
-					.map(value -> value instanceof FormFieldPart formFieldPart ? formFieldPart.value() : value)
-					.toList();
-			params.put(key, values.size() == 1 ? values.get(0) : values);
+			if (values.size() == 1) {
+				params.put(key, adaptBindValue(values.get(0)));
+			}
+			else {
+				params.put(key, values.stream().map(WebExchangeDataBinder::adaptBindValue).toList());
+			}
 		}
+	}
+
+	private static Object adaptBindValue(Object value) {
+		return (value instanceof FormFieldPart part ? part.value() : value);
 	}
 
 
@@ -162,8 +168,7 @@ public class WebExchangeDataBinder extends WebDataBinder {
 	private record MapValueResolver(Map<String, Object> map) implements ValueResolver {
 
 		@Override
-		@Nullable
-		public Object resolveValue(String name, Class<?> type) {
+		public @Nullable Object resolveValue(String name, Class<?> type) {
 			return this.map.get(name);
 		}
 

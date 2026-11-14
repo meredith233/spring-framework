@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,6 +23,7 @@ import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.stream.Stream;
 
 import kotlin.Unit;
@@ -35,9 +36,13 @@ import kotlin.reflect.KType;
 import kotlin.reflect.full.KClasses;
 import kotlin.reflect.jvm.KCallablesJvm;
 import kotlin.reflect.jvm.ReflectJvmMapping;
+import org.jspecify.annotations.Nullable;
+import org.reactivestreams.Publisher;
 import reactor.core.publisher.Mono;
+import reactor.core.publisher.SynchronousSink;
 import reactor.core.scheduler.Scheduler;
 
+import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.core.CoroutinesUtils;
 import org.springframework.core.DefaultParameterNameDiscoverer;
 import org.springframework.core.KotlinDetector;
@@ -48,7 +53,6 @@ import org.springframework.core.ReactiveAdapterRegistry;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.server.reactive.ServerHttpResponse;
 import org.springframework.lang.Contract;
-import org.springframework.lang.Nullable;
 import org.springframework.util.CollectionUtils;
 import org.springframework.util.ObjectUtils;
 import org.springframework.validation.method.MethodValidator;
@@ -63,7 +67,7 @@ import org.springframework.web.server.ServerWebExchange;
  * {@link HandlerMethodArgumentResolver}.
  * <p>By default, the method invocation happens on the thread from which the
  * {@code Mono} was subscribed to, or in some cases the thread that emitted one
- * of the resolved arguments (e.g. when the request body needs to be decoded).
+ * of the resolved arguments (for example, when the request body needs to be decoded).
  * To ensure a predictable thread for the underlying method's invocation,
  * a {@link Scheduler} can optionally be provided via
  * {@link #setInvocationScheduler(Scheduler)}.
@@ -77,24 +81,20 @@ public class InvocableHandlerMethod extends HandlerMethod {
 
 	private static final Mono<Object[]> EMPTY_ARGS = Mono.just(new Object[0]);
 
-	private static final Class<?>[] EMPTY_GROUPS = new Class<?>[0];
-
 	private static final Object NO_ARG_VALUE = new Object();
+
+	private static final boolean KOTLIN_REFLECT_PRESENT = KotlinDetector.isKotlinReflectPresent();
 
 
 	private final HandlerMethodArgumentResolverComposite resolvers = new HandlerMethodArgumentResolverComposite();
 
-	private ParameterNameDiscoverer parameterNameDiscoverer = new DefaultParameterNameDiscoverer();
+	private ParameterNameDiscoverer parameterNameDiscoverer = DefaultParameterNameDiscoverer.getSharedInstance();
 
 	private ReactiveAdapterRegistry reactiveAdapterRegistry = ReactiveAdapterRegistry.getSharedInstance();
 
-	@Nullable
-	private MethodValidator methodValidator;
+	private @Nullable MethodValidator methodValidator;
 
-	private Class<?>[] validationGroups = EMPTY_GROUPS;
-
-	@Nullable
-	private Scheduler invocationScheduler;
+	private @Nullable Scheduler invocationScheduler;
 
 
 	/**
@@ -129,7 +129,7 @@ public class InvocableHandlerMethod extends HandlerMethod {
 
 	/**
 	 * Set the ParameterNameDiscoverer for resolving parameter names when needed
-	 * (e.g. default request attribute name).
+	 * (for example, default request attribute name).
 	 * <p>Default is a {@link DefaultParameterNameDiscoverer}.
 	 */
 	public void setParameterNameDiscoverer(ParameterNameDiscoverer nameDiscoverer) {
@@ -146,7 +146,7 @@ public class InvocableHandlerMethod extends HandlerMethod {
 	/**
 	 * Configure a reactive adapter registry. This is needed for cases where the response is
 	 * fully handled within the controller in combination with an async void return value.
-	 * <p>By default this is a {@link ReactiveAdapterRegistry} with default settings.
+	 * <p>By default, this is a {@link ReactiveAdapterRegistry} with default settings.
 	 */
 	public void setReactiveAdapterRegistry(ReactiveAdapterRegistry registry) {
 		this.reactiveAdapterRegistry = registry;
@@ -160,8 +160,6 @@ public class InvocableHandlerMethod extends HandlerMethod {
 	 */
 	public void setMethodValidator(@Nullable MethodValidator methodValidator) {
 		this.methodValidator = methodValidator;
-		this.validationGroups = (methodValidator != null ?
-				methodValidator.determineValidationGroups(getBean(), getBridgedMethod()) : EMPTY_GROUPS);
 	}
 
 	/**
@@ -181,21 +179,29 @@ public class InvocableHandlerMethod extends HandlerMethod {
 	 */
 	@SuppressWarnings({"unchecked", "NullAway"})
 	public Mono<HandlerResult> invoke(
-			ServerWebExchange exchange, BindingContext bindingContext, Object... providedArgs) {
+			ServerWebExchange exchange, BindingContext bindingContext, @Nullable Object... providedArgs) {
 
 		return getMethodArgumentValuesOnScheduler(exchange, bindingContext, providedArgs).flatMap(args -> {
 			if (shouldValidateArguments() && this.methodValidator != null) {
-				this.methodValidator.applyArgumentValidation(
-						getBean(), getBridgedMethod(), getMethodParameters(), args, this.validationGroups);
+				try {
+					LocaleContextHolder.setLocaleContext(exchange.getLocaleContext());
+					this.methodValidator.applyArgumentValidation(
+							getBean(), getBridgedMethod(), getMethodParameters(), args, getValidationGroups());
+				}
+				finally {
+					LocaleContextHolder.resetLocaleContext();
+				}
 			}
 			Object value;
+			boolean isSuspendingFunction;
 			Method method = getBridgedMethod();
-			boolean isSuspendingFunction = KotlinDetector.isSuspendingFunction(method);
 			try {
-				if (KotlinDetector.isKotlinReflectPresent() && KotlinDetector.isKotlinType(method.getDeclaringClass())) {
+				if (KOTLIN_REFLECT_PRESENT && KotlinDetector.isKotlinType(method.getDeclaringClass())) {
+					isSuspendingFunction = KotlinDetector.isSuspendingFunction(method);
 					value = KotlinDelegate.invokeFunction(method, getBean(), args, isSuspendingFunction, exchange);
 				}
 				else {
+					isSuspendingFunction = false;
 					value = method.invoke(getBean(), args);
 				}
 			}
@@ -236,13 +242,13 @@ public class InvocableHandlerMethod extends HandlerMethod {
 	}
 
 	private Mono<Object[]> getMethodArgumentValuesOnScheduler(
-			ServerWebExchange exchange, BindingContext bindingContext, Object... providedArgs) {
+			ServerWebExchange exchange, BindingContext bindingContext, @Nullable Object... providedArgs) {
 		Mono<Object[]> argumentValuesMono = getMethodArgumentValues(exchange, bindingContext, providedArgs);
 		return this.invocationScheduler != null ? argumentValuesMono.publishOn(this.invocationScheduler) : argumentValuesMono;
 	}
 
 	private Mono<Object[]> getMethodArgumentValues(
-			ServerWebExchange exchange, BindingContext bindingContext, Object... providedArgs) {
+			ServerWebExchange exchange, BindingContext bindingContext, @Nullable Object... providedArgs) {
 
 		MethodParameter[] parameters = getMethodParameters();
 		if (ObjectUtils.isEmpty(parameters)) {
@@ -313,6 +319,7 @@ public class InvocableHandlerMethod extends HandlerMethod {
 		return false;
 	}
 
+
 	/**
 	 * Inner class to avoid a hard dependency on Kotlin at runtime.
 	 */
@@ -321,19 +328,15 @@ public class InvocableHandlerMethod extends HandlerMethod {
 		// Copy of CoWebFilter.COROUTINE_CONTEXT_ATTRIBUTE value to avoid compilation errors in Eclipse
 		private static final String COROUTINE_CONTEXT_ATTRIBUTE = "org.springframework.web.server.CoWebFilter.context";
 
-		@Nullable
-		@SuppressWarnings({"deprecation", "DataFlowIssue"})
-		public static Object invokeFunction(Method method, Object target, Object[] args, boolean isSuspendingFunction,
-				ServerWebExchange exchange) throws InvocationTargetException, IllegalAccessException {
+		@SuppressWarnings("DataFlowIssue")
+		public static @Nullable Object invokeFunction(Method method, Object target, @Nullable Object[] args, boolean isSuspendingFunction,
+				ServerWebExchange exchange) throws InvocationTargetException, IllegalAccessException, NoSuchMethodException {
 
 			if (isSuspendingFunction) {
 				Object coroutineContext = exchange.getAttribute(COROUTINE_CONTEXT_ATTRIBUTE);
-				if (coroutineContext == null) {
-					return CoroutinesUtils.invokeSuspendingFunction(method, target, args);
-				}
-				else {
-					return CoroutinesUtils.invokeSuspendingFunction((CoroutineContext) coroutineContext, method, target, args);
-				}
+				Publisher<?> result = (coroutineContext == null ? CoroutinesUtils.invokeSuspendingFunction(method, target, args) :
+						CoroutinesUtils.invokeSuspendingFunction((CoroutineContext) coroutineContext, method, target, args));
+				return (result instanceof Mono<?> mono ? mono.handle(KotlinDelegate::handleResult) : result);
 			}
 			else {
 				KFunction<?> function = ReflectJvmMapping.getKotlinFunction(method);
@@ -353,13 +356,11 @@ public class InvocableHandlerMethod extends HandlerMethod {
 							Object arg = args[index];
 							if (!(parameter.isOptional() && arg == null)) {
 								KType type = parameter.getType();
-								if (!(type.isMarkedNullable() && arg == null) && type.getClassifier() instanceof KClass<?> kClass
-										&& KotlinDetector.isInlineClass(JvmClassMappingKt.getJavaClass(kClass))) {
-									KFunction<?> constructor = KClasses.getPrimaryConstructor(kClass);
-									if (!KCallablesJvm.isAccessible(constructor)) {
-										KCallablesJvm.setAccessible(constructor, true);
-									}
-									arg = constructor.call(arg);
+								if (!(type.isMarkedNullable() && arg == null) &&
+										type.getClassifier() instanceof KClass<?> kClass &&
+										KotlinDetector.isInlineClass(JvmClassMappingKt.getJavaClass(kClass)) &&
+										!JvmClassMappingKt.getJavaClass(kClass).isInstance(arg)) {
+									arg = box(kClass, arg);
 								}
 								argMap.put(parameter, arg);
 							}
@@ -368,8 +369,53 @@ public class InvocableHandlerMethod extends HandlerMethod {
 					}
 				}
 				Object result = function.callBy(argMap);
+				if (result != null && KotlinDetector.isInlineClass(result.getClass())) {
+					result = unbox(result);
+				}
 				return (result == Unit.INSTANCE ? null : result);
 			}
+		}
+
+		private static Object box(KClass<?> kClass, @Nullable Object arg) {
+			KFunction<?> constructor = Objects.requireNonNull(KClasses.getPrimaryConstructor(kClass));
+			KType type = constructor.getParameters().get(0).getType();
+			if (!(type.isMarkedNullable() && arg == null) &&
+					type.getClassifier() instanceof KClass<?> parameterClass &&
+					KotlinDetector.isInlineClass(JvmClassMappingKt.getJavaClass(parameterClass)) &&
+					!JvmClassMappingKt.getJavaClass(parameterClass).isInstance(arg)) {
+				arg = box(parameterClass, arg);
+			}
+			if (!KCallablesJvm.isAccessible(constructor)) {
+				KCallablesJvm.setAccessible(constructor, true);
+			}
+			return constructor.call(arg);
+		}
+
+		private static void handleResult(Object result, SynchronousSink<Object> sink) {
+			if (KotlinDetector.isInlineClass(result.getClass())) {
+				try {
+					Object unboxed = unbox(result);
+					if (unboxed != Unit.INSTANCE) {
+						sink.next(unboxed);
+					}
+					sink.complete();
+				}
+				catch (NoSuchMethodException | InvocationTargetException | IllegalAccessException ex) {
+					sink.error(ex);
+				}
+			}
+			else {
+				sink.next(result);
+				sink.complete();
+			}
+		}
+
+		private static Object unbox(Object result) throws InvocationTargetException, IllegalAccessException, NoSuchMethodException {
+			Object unboxed = result.getClass().getDeclaredMethod("unbox-impl").invoke(result);
+			if (KotlinDetector.isInlineClass(unboxed.getClass())) {
+				return unbox(unboxed);
+			}
+			return unboxed;
 		}
 
 	}

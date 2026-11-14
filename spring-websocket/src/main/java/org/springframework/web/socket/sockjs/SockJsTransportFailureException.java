@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2015 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,11 +16,11 @@
 
 package org.springframework.web.socket.sockjs;
 
-import org.springframework.lang.Nullable;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Indicates a serious failure that occurred in the SockJS implementation as opposed to
- * in user code (e.g. IOException while writing to the response). When this exception
+ * in user code (for example, IOException while writing to the response). When this exception
  * is raised, the SockJS session is typically closed.
  *
  * @author Rossen Stoyanchev

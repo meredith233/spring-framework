@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2023 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -52,6 +52,16 @@ class CompositePropertySourceTests {
 		composite.addPropertySource(new MapPropertySource("p2",
 				Map.of("p2.property1", "value", "p1.property", "value", "p2.property2", "value")));
 		assertThat(composite.getPropertyNames()).containsOnly("p1.property", "p2.property1", "p2.property2");
+	}
+
+	@Test  // gh-37540
+	void toStringUsesConciseFormatForNestedPropertySources() {
+		CompositePropertySource composite = new CompositePropertySource("c");
+		composite.addPropertySource(new MapPropertySource("p1", Map.of("p1.property", "value")));
+		composite.addPropertySource(new MapPropertySource("p2", Map.of("p2.property", "value")));
+
+		assertThat(composite).hasToString("CompositePropertySource {name='c', propertySources=" +
+				"[MapPropertySource {name='p1'}, MapPropertySource {name='p2'}]}");
 	}
 
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -242,7 +242,7 @@ class RequestHeaderMethodArgumentResolverTests {
 
 	@Test
 	@SuppressWarnings("deprecation")
-	public void dateConversion() {
+	void dateConversion() {
 		String rfc1123val = "Thu, 21 Apr 2016 17:11:08 +0100";
 		MockServerHttpRequest request = MockServerHttpRequest.get("/").header("name", rfc1123val).build();
 		ServerWebExchange exchange = MockServerWebExchange.from(request);

@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -128,9 +128,10 @@ class GsonFactoryBeanTests {
 		cal.set(Calendar.DATE, 1);
 		Date date = cal.getTime();
 		bean.setDate(date);
+		// \p{Zs} matches any Unicode space character
 		assertThat(gson.toJson(bean))
 				.startsWith("{\"date\":\"Jan 1, 2014")
-				.endsWith("12:00:00 AM\"}");
+				.matches(".+?12:00:00\\p{Zs}AM\"}");
 	}
 
 	@Test

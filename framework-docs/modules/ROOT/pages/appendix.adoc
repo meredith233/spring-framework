@@ -23,6 +23,12 @@ The following table lists all currently supported Spring properties.
 |===
 | Name | Description
 
+| `spring.aop.ajc.ignore`
+| Instructs Spring to ignore ajc-compiled aspects for Spring AOP proxying, restoring traditional
+Spring behavior for scenarios where both weaving and AspectJ auto-proxying are enabled. See
+{spring-framework-api}++/aop/aspectj/annotation/AbstractAspectJAdvisorFactory.html#IGNORE_AJC_PROPERTY_NAME++[`AbstractAspectJAdvisorFactory`]
+for details.
+
 | `spring.aot.enabled`
 | Indicates the application should run with AOT generated artifacts. See
 xref:core/aot.adoc[Ahead of Time Optimizations] and 
@@ -32,7 +38,7 @@ for details.
 | `spring.beaninfo.ignore`
 | Instructs Spring to use the `Introspector.IGNORE_ALL_BEANINFO` mode when calling the
 JavaBeans `Introspector`. See
-{spring-framework-api}++/beans/StandardBeanInfoFactory.html#IGNORE_BEANINFO_PROPERTY_NAME++[`CachedIntrospectionResults`]
+{spring-framework-api}++/beans/StandardBeanInfoFactory.html#IGNORE_BEANINFO_PROPERTY_NAME++[`StandardBeanInfoFactory`]
 for details.
 
 | `spring.cache.reactivestreams.ignore`
@@ -49,15 +55,13 @@ for details.
 
 | `spring.context.checkpoint`
 | Property that specifies a common context checkpoint. See
-xref:integration/checkpoint-restore.adoc#_automatic_checkpointrestore_at_startup[Automatic
-checkpoint/restore at startup] and
+xref:integration/checkpoint-restore.adoc#_automatic_checkpointrestore_at_startup[Automatic checkpoint/restore at startup] and
 {spring-framework-api}++/context/support/DefaultLifecycleProcessor.html#CHECKPOINT_PROPERTY_NAME++[`DefaultLifecycleProcessor`]
 for details.
 
 | `spring.context.exit`
 | Property for terminating the JVM when the context reaches a specific phase. See
-xref:integration/checkpoint-restore.adoc#_automatic_checkpointrestore_at_startup[Automatic
-checkpoint/restore at startup] and
+xref:integration/checkpoint-restore.adoc#_automatic_checkpointrestore_at_startup[Automatic checkpoint/restore at startup] and
 {spring-framework-api}++/context/support/DefaultLifecycleProcessor.html#EXIT_PROPERTY_NAME++[`DefaultLifecycleProcessor`]
 for details.
 
@@ -70,12 +74,28 @@ expressions used in XML bean definitions, `@Value`, etc.
 | The mode to use when compiling expressions for the
 xref:core/expressions/evaluation.adoc#expressions-compiler-configuration[Spring Expression Language].
 
+| `spring.expression.maxBigPowerBits`
+| The default maximum number of bits permitted in the result of a `BigDecimal` or
+`BigInteger` power operation within a
+xref:core/expressions/evaluation.adoc#expressions-parser-configuration[Spring Expression Language]
+expression.
+
+| `spring.expression.maxOperations`
+| The default maximum number of operations permitted during
+xref:core/expressions/evaluation.adoc#expressions-parser-configuration[Spring Expression Language]
+expression evaluation.
+
 | `spring.getenv.ignore`
 | Instructs Spring to ignore operating system environment variables if a Spring
 `Environment` property -- for example, a placeholder in a configuration String -- isn't
 resolvable otherwise. See
 {spring-framework-api}++/core/env/AbstractEnvironment.html#IGNORE_GETENV_PROPERTY_NAME++[`AbstractEnvironment`]
 for details.
+
+| `spring.http.response.flush.enabled`
+| Configures the Spring MVC `ServletServerHttpResponse` to allow flushing on the `OutputStream`
+returned by `ServletServerHttpResponse#getBody()`. By default, such flush calls are ignored and
+only `ServletServerHttpResponse#flush()` will actually flush the response to the network.
 
 | `spring.jdbc.getParameterType.ignore`
 | Instructs Spring to ignore `java.sql.ParameterMetaData.getParameterType` completely.
@@ -88,9 +108,23 @@ the repeated JNDI lookup overhead. See
 {spring-framework-api}++/jndi/JndiLocatorDelegate.html#IGNORE_JNDI_PROPERTY_NAME++[`JndiLocatorDelegate`]
 for details.
 
+| `spring.locking.strict`
+| Instructs Spring to enforce strict locking during bean creation, rather than the mix of
+strict and lenient locking that 6.2 applies by default. See
+{spring-framework-api}++/beans/factory/support/DefaultListableBeanFactory.html#STRICT_LOCKING_PROPERTY_NAME++[`DefaultListableBeanFactory`]
+for details.
+
 | `spring.objenesis.ignore`
 | Instructs Spring to ignore Objenesis, not even attempting to use it. See
 {spring-framework-api}++/objenesis/SpringObjenesis.html#IGNORE_OBJENESIS_PROPERTY_NAME++[`SpringObjenesis`]
+for details.
+
+| `spring.placeholder.escapeCharacter.default`
+| The default escape character for property placeholder support. If not set, `'\'` will
+be used. Can be set to a custom escape character or an empty string to disable support
+for an escape character. The default escape character be explicitly overridden in
+`PropertySourcesPlaceholderConfigurer` and subclasses of `AbstractPropertyResolver`. See
+{spring-framework-api}++/core/env/AbstractPropertyResolver.html#DEFAULT_PLACEHOLDER_ESCAPE_CHARACTER_PROPERTY_NAME++[`AbstractPropertyResolver`]
 for details.
 
 | `spring.test.aot.processing.failOnError`
@@ -106,10 +140,19 @@ on a test class. See xref:testing/annotations/integration-junit-jupiter.adoc#int
 | The maximum size of the context cache in the _Spring TestContext Framework_. See
 xref:testing/testcontext-framework/ctx-management/caching.adoc[Context Caching].
 
+| `spring.test.context.cache.pause`
+| The pause mode for the context cache in the _Spring TestContext Framework_. See
+xref:testing/testcontext-framework/ctx-management/context-pausing.adoc[Context Pausing].
+
 | `spring.test.context.failure.threshold`
 | The failure threshold for errors encountered while attempting to load an `ApplicationContext`
 in the _Spring TestContext Framework_. See
 xref:testing/testcontext-framework/ctx-management/failure-threshold.adoc[Context Failure Threshold].
+
+| `spring.test.extension.context.scope`
+| The default _extension context scope_ used by the `SpringExtension` in `@Nested` test
+class hierarchies. See
+xref:testing/annotations/integration-junit-jupiter.adoc#integration-testing-annotations-springextensionconfig[`@SpringExtensionConfig`].
 
 | `spring.test.enclosing.configuration`
 | The default _enclosing configuration inheritance mode_ to use if

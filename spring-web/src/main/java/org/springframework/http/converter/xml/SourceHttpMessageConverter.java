@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -42,6 +42,7 @@ import javax.xml.transform.stax.StAXSource;
 import javax.xml.transform.stream.StreamResult;
 import javax.xml.transform.stream.StreamSource;
 
+import org.jspecify.annotations.Nullable;
 import org.w3c.dom.Document;
 import org.xml.sax.EntityResolver;
 import org.xml.sax.InputSource;
@@ -54,15 +55,35 @@ import org.springframework.http.MediaType;
 import org.springframework.http.converter.AbstractHttpMessageConverter;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.http.converter.HttpMessageNotWritableException;
-import org.springframework.lang.Nullable;
 import org.springframework.util.StreamUtils;
 
 /**
  * Implementation of {@link org.springframework.http.converter.HttpMessageConverter}
  * that can read and write {@link Source} objects.
  *
+ * <p>Security considerations: {@link #setSupportDtd supportDtd}
+ * and {@link #setProcessExternalEntities processExternalEntities} only apply
+ * when <em>reading</em> a request body into a {@code DOMSource},
+ * {@code SAXSource} or {@code StAXSource}. They do not apply to <em>writing</em>.
+ * Spring Framework trusts the application and its data sources, so the XML being written
+ * is assumed to be application-controlled. Only reading untrusted XML is
+ * protected against XXE.
+ *
+ * <p>When a handler declares a {@code StreamSource} (or a plain {@code Source},
+ * which resolves to it), the application opts in to receiving the raw,
+ * <em>unparsed</em> request body. That body is not processed by this converter
+ * and the application is responsible for any later processing of it, including
+ * writing it back out in a response. Echoing untrusted XML back to the client
+ * is an application-level decision; the application must parse or sanitize
+ * that XML safely first (for example by declaring a {@code DOMSource}).
+ *
+ * <p>This behavior is by design and is not considered a vulnerability in
+ * Spring Framework. Reports of XXE on the <em>write</em> path, or from raw
+ * {@code StreamSource} pass-through, will be closed as such.
+ *
  * @author Arjen Poutsma
  * @author Rossen Stoyanchev
+ * @author Juergen Hoeller
  * @since 3.0
  * @param <T> the converted object type
  */
@@ -75,11 +96,7 @@ public class SourceHttpMessageConverter<T extends Source> extends AbstractHttpMe
 			(publicID, systemID, base, ns) -> InputStream.nullInputStream();
 
 	private static final Set<Class<?>> SUPPORTED_CLASSES = Set.of(
-			DOMSource.class,
-			SAXSource.class,
-			StAXSource.class,
-			StreamSource.class,
-			Source.class);
+			DOMSource.class, SAXSource.class, StAXSource.class, StreamSource.class, Source.class);
 
 
 	private final TransformerFactory transformerFactory = TransformerFactory.newInstance();
@@ -87,6 +104,12 @@ public class SourceHttpMessageConverter<T extends Source> extends AbstractHttpMe
 	private boolean supportDtd = false;
 
 	private boolean processExternalEntities = false;
+
+	private volatile @Nullable DocumentBuilderFactory documentBuilderFactory;
+
+	private volatile @Nullable SAXParserFactory saxParserFactory;
+
+	private volatile @Nullable XMLInputFactory xmlInputFactory;
 
 
 	/**
@@ -99,11 +122,17 @@ public class SourceHttpMessageConverter<T extends Source> extends AbstractHttpMe
 
 
 	/**
-	 * Indicate whether DTD parsing should be supported.
+	 * Indicate whether DTD parsing should be supported when reading
+	 * {@code DOMSource}, {@code SAXSource} and {@code StAXSource} request content.
 	 * <p>Default is {@code false} meaning that DTD is disabled.
+	 * <p>This setting does not apply to raw {@code StreamSource} content or to
+	 * writing {@code Source} instances; see the class-level documentation.
 	 */
 	public void setSupportDtd(boolean supportDtd) {
 		this.supportDtd = supportDtd;
+		this.documentBuilderFactory = null;
+		this.saxParserFactory = null;
+		this.xmlInputFactory = null;
 	}
 
 	/**
@@ -116,6 +145,8 @@ public class SourceHttpMessageConverter<T extends Source> extends AbstractHttpMe
 	/**
 	 * Indicate whether external XML entities are processed when converting to a Source.
 	 * <p>Default is {@code false}, meaning that external entities are not resolved.
+	 * <p>This setting does not apply to raw {@code StreamSource} content or to
+	 * writing {@code Source} instances; see the class-level documentation.
 	 * <p><strong>Note:</strong> setting this option to {@code true} also
 	 * automatically sets {@link #setSupportDtd} to {@code true}.
 	 */
@@ -124,6 +155,9 @@ public class SourceHttpMessageConverter<T extends Source> extends AbstractHttpMe
 		if (processExternalEntities) {
 			this.supportDtd = true;
 		}
+		this.documentBuilderFactory = null;
+		this.saxParserFactory = null;
+		this.xmlInputFactory = null;
 	}
 
 	/**
@@ -165,17 +199,35 @@ public class SourceHttpMessageConverter<T extends Source> extends AbstractHttpMe
 
 	private DOMSource readDOMSource(InputStream body, HttpInputMessage inputMessage) throws IOException {
 		try {
-			DocumentBuilderFactory documentBuilderFactory = DocumentBuilderFactory.newInstance();
-			documentBuilderFactory.setNamespaceAware(true);
-			documentBuilderFactory.setFeature(
-					"http://apache.org/xml/features/disallow-doctype-decl", !isSupportDtd());
-			documentBuilderFactory.setFeature(
-					"http://xml.org/sax/features/external-general-entities", isProcessExternalEntities());
-			DocumentBuilder documentBuilder = documentBuilderFactory.newDocumentBuilder();
-			if (!isProcessExternalEntities()) {
-				documentBuilder.setEntityResolver(NO_OP_ENTITY_RESOLVER);
+			// By default, Spring will prevent the processing of external entities.
+			// This is a mitigation against XXE attacks.
+			DocumentBuilderFactory factory = this.documentBuilderFactory;
+			if (factory == null) {
+				factory = DocumentBuilderFactory.newInstance();
+				factory.setNamespaceAware(true);
+				try {
+					factory.setFeature(
+							"http://apache.org/xml/features/disallow-doctype-decl", !isSupportDtd());
+				}
+				catch (Exception ex) {
+					// Xerces properties not recognized/supported - ignore
+				}
+				try {
+					factory.setFeature(
+							"http://xml.org/sax/features/external-general-entities", isProcessExternalEntities());
+					factory.setFeature(
+							"http://xml.org/sax/features/external-parameter-entities", isProcessExternalEntities());
+				}
+				catch (Exception ex) {
+					// SAX properties not recognized/supported - ignore
+				}
+				this.documentBuilderFactory = factory;
 			}
-			Document document = documentBuilder.parse(body);
+			DocumentBuilder builder = factory.newDocumentBuilder();
+			if (!isProcessExternalEntities()) {
+				builder.setEntityResolver(NO_OP_ENTITY_RESOLVER);
+			}
+			Document document = builder.parse(body);
 			return new DOMSource(document);
 		}
 		catch (NullPointerException ex) {
@@ -197,11 +249,29 @@ public class SourceHttpMessageConverter<T extends Source> extends AbstractHttpMe
 
 	private SAXSource readSAXSource(InputStream body, HttpInputMessage inputMessage) throws IOException {
 		try {
-			SAXParserFactory saxParserFactory = SAXParserFactory.newInstance();
-			saxParserFactory.setNamespaceAware(true);
-			saxParserFactory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", !isSupportDtd());
-			saxParserFactory.setFeature("http://xml.org/sax/features/external-general-entities", isProcessExternalEntities());
-			SAXParser saxParser = saxParserFactory.newSAXParser();
+			SAXParserFactory factory = this.saxParserFactory;
+			if (factory == null) {
+				factory = SAXParserFactory.newInstance();
+				factory.setNamespaceAware(true);
+				try {
+					factory.setFeature(
+							"http://apache.org/xml/features/disallow-doctype-decl", !isSupportDtd());
+				}
+				catch (Exception ex) {
+					// Xerces properties not recognized/supported - ignore
+				}
+				try {
+					factory.setFeature(
+							"http://xml.org/sax/features/external-general-entities", isProcessExternalEntities());
+					factory.setFeature(
+							"http://xml.org/sax/features/external-parameter-entities", isProcessExternalEntities());
+				}
+				catch (Exception ex) {
+					// SAX properties not recognized/supported - ignore
+				}
+				this.saxParserFactory = factory;
+			}
+			SAXParser saxParser = factory.newSAXParser();
 			XMLReader xmlReader = saxParser.getXMLReader();
 			if (!isProcessExternalEntities()) {
 				xmlReader.setEntityResolver(NO_OP_ENTITY_RESOLVER);
@@ -209,7 +279,11 @@ public class SourceHttpMessageConverter<T extends Source> extends AbstractHttpMe
 			byte[] bytes = StreamUtils.copyToByteArray(body);
 			return new SAXSource(xmlReader, new InputSource(new ByteArrayInputStream(bytes)));
 		}
-		catch (SAXException | ParserConfigurationException ex) {
+		catch (ParserConfigurationException ex) {
+			throw new HttpMessageNotReadableException(
+					"Could not set feature: " + ex.getMessage(), ex, inputMessage);
+		}
+		catch (SAXException ex) {
 			throw new HttpMessageNotReadableException(
 					"Could not parse document: " + ex.getMessage(), ex, inputMessage);
 		}
@@ -217,11 +291,15 @@ public class SourceHttpMessageConverter<T extends Source> extends AbstractHttpMe
 
 	private Source readStAXSource(InputStream body, HttpInputMessage inputMessage) {
 		try {
-			XMLInputFactory inputFactory = XMLInputFactory.newInstance();
-			inputFactory.setProperty(XMLInputFactory.SUPPORT_DTD, isSupportDtd());
-			inputFactory.setProperty(XMLInputFactory.IS_SUPPORTING_EXTERNAL_ENTITIES, isProcessExternalEntities());
-			if (!isProcessExternalEntities()) {
-				inputFactory.setXMLResolver(NO_OP_XML_RESOLVER);
+			XMLInputFactory inputFactory = this.xmlInputFactory;
+			if (inputFactory == null) {
+				inputFactory = XMLInputFactory.newInstance();
+				inputFactory.setProperty(XMLInputFactory.SUPPORT_DTD, isSupportDtd());
+				inputFactory.setProperty(XMLInputFactory.IS_SUPPORTING_EXTERNAL_ENTITIES, isProcessExternalEntities());
+				if (!isProcessExternalEntities()) {
+					inputFactory.setXMLResolver(NO_OP_XML_RESOLVER);
+				}
+				this.xmlInputFactory = inputFactory;
 			}
 			XMLStreamReader streamReader = inputFactory.createXMLStreamReader(body);
 			return new StAXSource(streamReader);
@@ -238,16 +316,14 @@ public class SourceHttpMessageConverter<T extends Source> extends AbstractHttpMe
 	}
 
 	@Override
-	@Nullable
-	protected Long getContentLength(T t, @Nullable MediaType contentType) {
+	protected @Nullable Long getContentLength(T t, @Nullable MediaType contentType) {
 		if (t instanceof DOMSource) {
 			try {
 				CountingOutputStream os = new CountingOutputStream();
 				transform(t, new StreamResult(os));
 				return os.count;
 			}
-			catch (TransformerException ex) {
-				// ignore
+			catch (TransformerException ignored) {
 			}
 		}
 		return null;
@@ -270,8 +346,14 @@ public class SourceHttpMessageConverter<T extends Source> extends AbstractHttpMe
 	}
 
 	@Override
+	public boolean canWriteRepeatedly(T t, @Nullable MediaType contentType) {
+		return (t instanceof DOMSource);
+	}
+
+	@Override
+	@SuppressWarnings("removal")
 	protected boolean supportsRepeatableWrites(T t) {
-		return t instanceof DOMSource;
+		return canWriteRepeatedly(t, null);
 	}
 
 

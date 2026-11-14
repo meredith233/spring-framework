@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2023 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -24,7 +24,7 @@ import reactor.netty.http.server.HttpServerRequest;
 import org.springframework.util.Assert;
 
 /**
- * Helper class for creating a {@link URI} from a reactor {@link HttpServerRequest}.
+ * Helper class to create {@link URI} from a Reactor Netty request.
  *
  * @author Arjen Poutsma
  * @since 6.0.8
@@ -46,6 +46,14 @@ abstract class ReactorUriHelper {
 				(scheme.equals("https") || scheme.equals("wss")) && port != 443) {
 			builder.append(':');
 			builder.append(port);
+		}
+
+		// Reactor Netty has config whether to extract and apply forwarded headers.
+		// We apply the prefix manually as it affects the contextPath too.
+
+		String prefix = request.forwardedPrefix();
+		if (prefix != null && !prefix.isEmpty()) {
+			builder.append(prefix);
 		}
 
 		appendRequestUri(request, builder);
@@ -127,19 +135,25 @@ abstract class ReactorUriHelper {
 			if (c == '/' || c == '?' || c == '#') {
 				break;
 			}
-			if (c == ':' && (i + 2 < length)) {
-				if (uri.charAt(i + 1) == '/' && uri.charAt(i + 2) == '/') {
-					for (int j = i + 3; j < length; j++) {
-						c = uri.charAt(j);
-						if (c == '/' || c == '?' || c == '#') {
-							builder.append(uri, j, length);
-							return;
-						}
+			if (hasAuthority(uri, c, i, length)) {
+				for (i = i + 3; i < length; i++) {
+					c = uri.charAt(i);
+					if (c == '/' || c == '?' || c == '#') {
+						builder.append(uri, i, length);
+						return;
 					}
-					return;
 				}
+				return;
 			}
+		}
+		if (length > 0 && uri.charAt(0) != '/') {
+			builder.append('/');
 		}
 		builder.append(uri);
 	}
+
+	private static boolean hasAuthority(String uri, char c, int i, int length) {
+		return (c == ':' && (i + 2 < length) && (uri.charAt(i + 1) == '/' && uri.charAt(i + 2) == '/'));
+	}
+
 }

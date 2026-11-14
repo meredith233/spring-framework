@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,11 +18,11 @@ package org.springframework.web.reactive.resource;
 
 import java.util.List;
 
+import org.jspecify.annotations.Nullable;
 import org.webjars.WebJarVersionLocator;
 import reactor.core.publisher.Mono;
 
 import org.springframework.core.io.Resource;
-import org.springframework.lang.Nullable;
 import org.springframework.web.server.ServerWebExchange;
 
 /**
@@ -49,6 +49,7 @@ public class LiteWebJarsResourceResolver extends AbstractResourceResolver {
 
 	private final WebJarVersionLocator webJarVersionLocator;
 
+
 	/**
 	 * Create a {@code LiteWebJarsResourceResolver} with a default {@code WebJarVersionLocator} instance.
 	 */
@@ -58,11 +59,12 @@ public class LiteWebJarsResourceResolver extends AbstractResourceResolver {
 
 	/**
 	 * Create a {@code LiteWebJarsResourceResolver} with a custom {@code WebJarVersionLocator} instance,
-	 * e.g. with a custom cache implementation.
+	 * for example, with a custom cache implementation.
 	 */
 	public LiteWebJarsResourceResolver(WebJarVersionLocator webJarVersionLocator) {
 		this.webJarVersionLocator = webJarVersionLocator;
 	}
+
 
 	@Override
 	protected Mono<Resource> resolveResourceInternal(@Nullable ServerWebExchange exchange,
@@ -88,7 +90,8 @@ public class LiteWebJarsResourceResolver extends AbstractResourceResolver {
 				.switchIfEmpty(Mono.defer(() -> {
 					String webJarResourcePath = findWebJarResourcePath(resourceUrlPath);
 					if (webJarResourcePath != null) {
-						return chain.resolveUrlPath(webJarResourcePath, locations);
+						Mono<String> fallback = (webJarResourcePath.endsWith("/")) ? Mono.just(webJarResourcePath) : Mono.empty();
+						return chain.resolveUrlPath(webJarResourcePath, locations).switchIfEmpty(fallback);
 					}
 					else {
 						return Mono.empty();
@@ -96,8 +99,7 @@ public class LiteWebJarsResourceResolver extends AbstractResourceResolver {
 				}));
 	}
 
-	@Nullable
-	protected String findWebJarResourcePath(String path) {
+	protected @Nullable String findWebJarResourcePath(String path) {
 		int endOffset = path.indexOf('/', 1);
 		if (endOffset != -1) {
 			int startOffset = (path.startsWith("/") ? 1 : 0);

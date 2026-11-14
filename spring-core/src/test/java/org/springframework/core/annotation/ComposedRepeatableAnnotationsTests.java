@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2022 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -183,32 +183,32 @@ class ComposedRepeatableAnnotationsTests {
 		assertThatIllegalArgumentException().isThrownBy(throwingCallable)
 			.withMessageStartingWith("Annotation type must be a repeatable annotation")
 			.withMessageContaining("failed to resolve container type for")
-			.withMessageContaining(NonRepeatable.class.getName());
+			.withMessageContaining(NonRepeatable.class.getCanonicalName());
 	}
 
 	private void expectContainerMissingValueAttribute(ThrowingCallable throwingCallable) {
 		assertThatExceptionOfType(AnnotationConfigurationException.class).isThrownBy(throwingCallable)
 			.withMessageStartingWith("Invalid declaration of container type")
-			.withMessageContaining(ContainerMissingValueAttribute.class.getName())
+			.withMessageContaining(ContainerMissingValueAttribute.class.getCanonicalName())
 			.withMessageContaining("for repeatable annotation")
-			.withMessageContaining(InvalidRepeatable.class.getName())
+			.withMessageContaining(InvalidRepeatable.class.getCanonicalName())
 			.withCauseExactlyInstanceOf(NoSuchMethodException.class);
 	}
 
 	private void expectContainerWithNonArrayValueAttribute(ThrowingCallable throwingCallable) {
 		assertThatExceptionOfType(AnnotationConfigurationException.class).isThrownBy(throwingCallable)
 			.withMessageStartingWith("Container type")
-			.withMessageContaining(ContainerWithNonArrayValueAttribute.class.getName())
+			.withMessageContaining(ContainerWithNonArrayValueAttribute.class.getCanonicalName())
 			.withMessageContaining("must declare a 'value' attribute for an array of type")
-			.withMessageContaining(InvalidRepeatable.class.getName());
+			.withMessageContaining(InvalidRepeatable.class.getCanonicalName());
 	}
 
 	private void expectContainerWithArrayValueAttributeButWrongComponentType(ThrowingCallable throwingCallable) {
 		assertThatExceptionOfType(AnnotationConfigurationException.class).isThrownBy(throwingCallable)
 			.withMessageStartingWith("Container type")
-			.withMessageContaining(ContainerWithArrayValueAttributeButWrongComponentType.class.getName())
+			.withMessageContaining(ContainerWithArrayValueAttributeButWrongComponentType.class.getCanonicalName())
 			.withMessageContaining("must declare a 'value' attribute for an array of type")
-			.withMessageContaining(InvalidRepeatable.class.getName());
+			.withMessageContaining(InvalidRepeatable.class.getCanonicalName());
 	}
 
 	private void assertGetRepeatableAnnotations(AnnotatedElement element) {

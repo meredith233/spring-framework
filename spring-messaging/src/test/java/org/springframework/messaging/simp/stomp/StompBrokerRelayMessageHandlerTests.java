@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -96,6 +96,27 @@ class StompBrokerRelayMessageHandlerTests {
 		assertThat(headers2.getCommand()).isEqualTo(StompCommand.CONNECT);
 		assertThat(headers2.getSessionId()).isEqualTo("sess1");
 		assertThat(headers2.getHost()).isEqualTo("ABC");
+	}
+
+	@Test
+	void virtualHostDefault() {
+		Message<byte[]> connectMessage = connectMessage("sess1", "joe");
+		MessageHeaderAccessor.getAccessor(connectMessage, StompHeaderAccessor.class).setHost("ABC");
+
+		this.brokerRelay.start();
+		this.brokerRelay.handleMessage(connectMessage("sess1", "joe"));
+
+		assertThat(this.tcpClient.getSentMessages()).hasSize(2);
+
+		StompHeaderAccessor headers1 = this.tcpClient.getSentHeaders(0);
+		assertThat(headers1.getCommand()).isEqualTo(StompCommand.CONNECT);
+		assertThat(headers1.getSessionId()).isEqualTo(StompBrokerRelayMessageHandler.SYSTEM_SESSION_ID);
+		assertThat(headers1.getHost()).isNull();
+
+		StompHeaderAccessor headers2 = this.tcpClient.getSentHeaders(1);
+		assertThat(headers2.getCommand()).isEqualTo(StompCommand.CONNECT);
+		assertThat(headers2.getSessionId()).isEqualTo("sess1");
+		assertThat(headers2.getHost()).isNull();
 	}
 
 	@Test
@@ -245,7 +266,12 @@ class StompBrokerRelayMessageHandlerTests {
 
 		ArgumentCaptor<Message> captor = ArgumentCaptor.forClass(Message.class);
 		verify(handler).handleMessage(captor.capture());
-		assertThat(captor.getValue()).isSameAs(message);
+
+		Message actual = captor.getValue();
+		assertThat(actual).isSameAs(message);
+
+		accessor = StompHeaderAccessor.getAccessor(actual, StompHeaderAccessor.class);
+		assertThat(accessor.getSessionId()).isEqualTo(StompBrokerRelayMessageHandler.SYSTEM_SESSION_ID);
 	}
 
 	@Test

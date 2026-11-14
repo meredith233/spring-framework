@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2023 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,7 +18,9 @@ package org.springframework.aot.agent;
 
 import java.util.Objects;
 
-import org.springframework.lang.Nullable;
+import org.jspecify.annotations.Nullable;
+
+import org.springframework.util.ClassUtils;
 
 /**
  * Reference to a Java method, identified by its owner class and the method name.
@@ -43,7 +45,7 @@ public final class MethodReference {
 	}
 
 	public static MethodReference of(Class<?> klass, String methodName) {
-		return new MethodReference(klass.getCanonicalName(), methodName);
+		return new MethodReference(ClassUtils.getCanonicalName(klass), methodName);
 	}
 
 	/**

@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -36,7 +36,7 @@ class NullPrimitiveTests {
 	}
 
 	@Test
-	void testNullPrimitiveWithJdkProxy() {
+	void nullPrimitiveWithJdkProxy() {
 
 		class SimpleFoo implements Foo {
 			@Override
@@ -62,7 +62,7 @@ class NullPrimitiveTests {
 	}
 
 	@Test
-	void testNullPrimitiveWithCglibProxy() {
+	void nullPrimitiveWithCglibProxy() {
 
 		Bar target = new Bar();
 		ProxyFactory factory = new ProxyFactory(target);

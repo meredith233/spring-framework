@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2023 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,10 +22,10 @@ import java.util.stream.IntStream;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.jspecify.annotations.Nullable;
 
 import org.springframework.beans.factory.BeanFactory;
 import org.springframework.core.annotation.AnnotatedMethod;
-import org.springframework.lang.Nullable;
 import org.springframework.util.Assert;
 import org.springframework.util.ClassUtils;
 
@@ -36,7 +36,7 @@ import org.springframework.util.ClassUtils;
  * method annotations, etc.
  *
  * <p>The class may be created with a bean instance or with a bean name
- * (e.g. lazy-init bean, prototype bean). Use {@link #createWithResolvedBean()}
+ * (for example, lazy-init bean, prototype bean). Use {@link #createWithResolvedBean()}
  * to obtain a {@code HandlerMethod} instance with a bean instance resolved
  * through the associated {@link BeanFactory}.
  *
@@ -53,13 +53,11 @@ public class HandlerMethod extends AnnotatedMethod {
 
 	private final Object bean;
 
-	@Nullable
-	private final BeanFactory beanFactory;
+	private final @Nullable BeanFactory beanFactory;
 
 	private final Class<?> beanType;
 
-	@Nullable
-	private HandlerMethod resolvedFromHandlerMethod;
+	private @Nullable HandlerMethod resolvedFromHandlerMethod;
 
 	protected Log logger = defaultLogger;
 
@@ -167,8 +165,7 @@ public class HandlerMethod extends AnnotatedMethod {
 	 * resolved via {@link #createWithResolvedBean()}.
 	 * @since 4.3
 	 */
-	@Nullable
-	public HandlerMethod getResolvedFromHandlerMethod() {
+	public @Nullable HandlerMethod getResolvedFromHandlerMethod() {
 		return this.resolvedFromHandlerMethod;
 	}
 
@@ -196,8 +193,8 @@ public class HandlerMethod extends AnnotatedMethod {
 
 	@Override
 	public boolean equals(@Nullable Object other) {
-		return (this == other || (super.equals(other) && other instanceof HandlerMethod otherMethod
-				&& this.bean.equals(otherMethod.bean)));
+		return (this == other || (super.equals(other) && other instanceof HandlerMethod otherMethod &&
+				this.bean.equals(otherMethod.bean)));
 	}
 
 	@Override
@@ -215,19 +212,19 @@ public class HandlerMethod extends AnnotatedMethod {
 	 * beans, and others). Endpoint classes that require proxying should prefer
 	 * class-based proxy mechanisms.
 	 */
-	protected void assertTargetBean(Method method, Object targetBean, Object[] args) {
+	protected void assertTargetBean(Method method, Object targetBean, @Nullable Object[] args) {
 		Class<?> methodDeclaringClass = method.getDeclaringClass();
 		Class<?> targetBeanClass = targetBean.getClass();
 		if (!methodDeclaringClass.isAssignableFrom(targetBeanClass)) {
 			String text = "The mapped handler method class '" + methodDeclaringClass.getName() +
 					"' is not an instance of the actual endpoint bean class '" +
 					targetBeanClass.getName() + "'. If the endpoint requires proxying " +
-					"(e.g. due to @Transactional), please use class-based proxying.";
+					"(for example, due to @Transactional), please use class-based proxying.";
 			throw new IllegalStateException(formatInvokeError(text, args));
 		}
 	}
 
-	protected String formatInvokeError(String text, Object[] args) {
+	protected String formatInvokeError(String text, @Nullable Object[] args) {
 		String formattedArgs = IntStream.range(0, args.length)
 				.mapToObj(i -> (args[i] != null ?
 						"[" + i + "] [type=" + args[i].getClass().getName() + "] [value=" + args[i] + "]" :

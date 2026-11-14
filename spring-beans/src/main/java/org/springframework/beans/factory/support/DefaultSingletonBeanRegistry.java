@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,6 +17,7 @@
 package org.springframework.beans.factory.support;
 
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
@@ -24,9 +25,12 @@ import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Consumer;
+
+import org.jspecify.annotations.Nullable;
 
 import org.springframework.beans.factory.BeanCreationException;
 import org.springframework.beans.factory.BeanCreationNotAllowedException;
@@ -35,7 +39,6 @@ import org.springframework.beans.factory.DisposableBean;
 import org.springframework.beans.factory.ObjectFactory;
 import org.springframework.beans.factory.config.SingletonBeanRegistry;
 import org.springframework.core.SimpleAliasRegistry;
-import org.springframework.lang.Nullable;
 import org.springframework.util.Assert;
 import org.springframework.util.StringUtils;
 
@@ -76,6 +79,9 @@ public class DefaultSingletonBeanRegistry extends SimpleAliasRegistry implements
 	private static final int SUPPRESSED_EXCEPTIONS_LIMIT = 100;
 
 
+	/** Common lock for singleton creation. */
+	final Lock singletonLock = new ReentrantLock();
+
 	/** Cache of singleton objects: bean name to bean instance. */
 	private final Map<String, Object> singletonObjects = new ConcurrentHashMap<>(256);
 
@@ -91,23 +97,32 @@ public class DefaultSingletonBeanRegistry extends SimpleAliasRegistry implements
 	/** Set of registered singletons, containing the bean names in registration order. */
 	private final Set<String> registeredSingletons = Collections.synchronizedSet(new LinkedHashSet<>(256));
 
-	private final Lock singletonLock = new ReentrantLock();
-
 	/** Names of beans that are currently in creation. */
 	private final Set<String> singletonsCurrentlyInCreation = ConcurrentHashMap.newKeySet(16);
 
 	/** Names of beans currently excluded from in creation checks. */
 	private final Set<String> inCreationCheckExclusions = ConcurrentHashMap.newKeySet(16);
 
-	@Nullable
-	private volatile Thread singletonCreationThread;
+	/** Specific lock for lenient creation tracking. */
+	private final Lock lenientCreationLock = new ReentrantLock();
+
+	/** Specific lock condition for lenient creation tracking. */
+	private final Condition lenientCreationFinished = this.lenientCreationLock.newCondition();
+
+	/** Names of beans that are currently in lenient creation. */
+	private final Set<String> singletonsInLenientCreation = new HashSet<>();
+
+	/** Map from one creation thread waiting on a lenient creation thread. */
+	private final Map<Thread, Thread> lenientWaitingThreads = new HashMap<>();
+
+	/** Map from bean name to actual creation thread for currently created beans. */
+	private final Map<String, Thread> currentCreationThreads = new ConcurrentHashMap<>();
 
 	/** Flag that indicates whether we're currently within destroySingletons. */
 	private volatile boolean singletonsCurrentlyInDestruction = false;
 
 	/** Collection of suppressed Exceptions, available for associating related causes. */
-	@Nullable
-	private Set<Exception> suppressedExceptions;
+	private @Nullable Set<Exception> suppressedExceptions;
 
 	/** Disposable bean instances: bean name to disposable instance. */
 	private final Map<String, DisposableBean> disposableBeans = new LinkedHashMap<>();
@@ -160,7 +175,7 @@ public class DefaultSingletonBeanRegistry extends SimpleAliasRegistry implements
 	/**
 	 * Add the given singleton factory for building the specified singleton
 	 * if necessary.
-	 * <p>To be called for early exposure purposes, e.g. to be able to
+	 * <p>To be called for early exposure purposes, for example, to be able to
 	 * resolve circular references.
 	 * @param beanName the name of the bean
 	 * @param singletonFactory the factory for the singleton object
@@ -178,8 +193,7 @@ public class DefaultSingletonBeanRegistry extends SimpleAliasRegistry implements
 	}
 
 	@Override
-	@Nullable
-	public Object getSingleton(String beanName) {
+	public @Nullable Object getSingleton(String beanName) {
 		return getSingleton(beanName, true);
 	}
 
@@ -191,8 +205,7 @@ public class DefaultSingletonBeanRegistry extends SimpleAliasRegistry implements
 	 * @param allowEarlyReference whether early references should be created or not
 	 * @return the registered singleton object, or {@code null} if none found
 	 */
-	@Nullable
-	protected Object getSingleton(String beanName, boolean allowEarlyReference) {
+	protected @Nullable Object getSingleton(String beanName, boolean allowEarlyReference) {
 		// Quick check for existing instance without full singleton lock.
 		Object singletonObject = this.singletonObjects.get(beanName);
 		if (singletonObject == null && isSingletonCurrentlyInCreation(beanName)) {
@@ -238,41 +251,48 @@ public class DefaultSingletonBeanRegistry extends SimpleAliasRegistry implements
 	 * with, if necessary
 	 * @return the registered singleton object
 	 */
-	@SuppressWarnings("NullAway")
+	@SuppressWarnings("NullAway") // Dataflow analysis limitation
 	public Object getSingleton(String beanName, ObjectFactory<?> singletonFactory) {
 		Assert.notNull(beanName, "Bean name must not be null");
 
-		boolean acquireLock = isCurrentThreadAllowedToHoldSingletonLock();
+		Thread currentThread = Thread.currentThread();
+		Boolean lockFlag = isCurrentThreadAllowedToHoldSingletonLock();
+		boolean acquireLock = !Boolean.FALSE.equals(lockFlag);
 		boolean locked = (acquireLock && this.singletonLock.tryLock());
+
 		try {
 			Object singletonObject = this.singletonObjects.get(beanName);
 			if (singletonObject == null) {
-				if (acquireLock) {
-					if (locked) {
-						this.singletonCreationThread = Thread.currentThread();
+				if (acquireLock && !locked) {
+					if (Boolean.TRUE.equals(lockFlag)) {
+						// Another thread is busy in a singleton factory callback, potentially blocked.
+						// Fallback as of 6.2: process given singleton bean outside of singleton lock.
+						// Thread-safe exposure is still guaranteed, there is just a risk of collisions
+						// when triggering creation of other beans as dependencies of the current bean.
+						this.lenientCreationLock.lock();
+						try {
+							if (logger.isInfoEnabled()) {
+								Set<String> lockedBeans = new HashSet<>(this.singletonsCurrentlyInCreation);
+								lockedBeans.removeAll(this.singletonsInLenientCreation);
+								logger.info("Obtaining singleton bean '" + beanName + "' in thread \"" +
+										currentThread.getName() + "\" while other thread holds singleton " +
+										"lock for other beans " + lockedBeans);
+							}
+							this.singletonsInLenientCreation.add(beanName);
+						}
+						finally {
+							this.lenientCreationLock.unlock();
+						}
 					}
 					else {
-						Thread threadWithLock = this.singletonCreationThread;
-						if (threadWithLock != null) {
-							// Another thread is busy in a singleton factory callback, potentially blocked.
-							// Fallback as of 6.2: process given singleton bean outside of singleton lock.
-							// Thread-safe exposure is still guaranteed, there is just a risk of collisions
-							// when triggering creation of other beans as dependencies of the current bean.
-							if (logger.isInfoEnabled()) {
-								logger.info("Creating singleton bean '" + beanName + "' in thread \"" +
-										Thread.currentThread().getName() + "\" while thread \"" + threadWithLock.getName() +
-										"\" holds singleton lock for other beans " + this.singletonsCurrentlyInCreation);
-							}
-						}
-						else {
-							// Singleton lock currently held by some other registration method -> wait.
-							this.singletonLock.lock();
-							locked = true;
-							// Singleton object might have possibly appeared in the meantime.
-							singletonObject = this.singletonObjects.get(beanName);
-							if (singletonObject != null) {
-								return singletonObject;
-							}
+						// No specific locking indication (outside a coordinated bootstrap) and
+						// singleton lock currently held by some other creation method -> wait.
+						this.singletonLock.lock();
+						locked = true;
+						// Singleton object might have possibly appeared in the meantime.
+						singletonObject = this.singletonObjects.get(beanName);
+						if (singletonObject != null) {
+							return singletonObject;
 						}
 					}
 				}
@@ -285,16 +305,76 @@ public class DefaultSingletonBeanRegistry extends SimpleAliasRegistry implements
 				if (logger.isDebugEnabled()) {
 					logger.debug("Creating shared instance of singleton bean '" + beanName + "'");
 				}
-				beforeSingletonCreation(beanName);
+
+				try {
+					beforeSingletonCreation(beanName);
+				}
+				catch (BeanCurrentlyInCreationException ex) {
+					this.lenientCreationLock.lock();
+					try {
+						while ((singletonObject = this.singletonObjects.get(beanName)) == null) {
+							Thread otherThread = this.currentCreationThreads.get(beanName);
+							if (otherThread != null && (otherThread == currentThread ||
+									checkDependentWaitingThreads(otherThread, currentThread))) {
+								throw ex;
+							}
+							if (!this.singletonsInLenientCreation.contains(beanName)) {
+								break;
+							}
+							if (otherThread != null) {
+								this.lenientWaitingThreads.put(currentThread, otherThread);
+							}
+							try {
+								this.lenientCreationFinished.await();
+							}
+							catch (InterruptedException ie) {
+								currentThread.interrupt();
+							}
+							finally {
+								if (otherThread != null) {
+									this.lenientWaitingThreads.remove(currentThread);
+								}
+							}
+						}
+					}
+					finally {
+						this.lenientCreationLock.unlock();
+					}
+					if (singletonObject != null) {
+						return singletonObject;
+					}
+					if (locked) {
+						throw ex;
+					}
+					// Try late locking for waiting on specific bean to be finished.
+					this.singletonLock.lock();
+					locked = true;
+					// Lock-created singleton object should have appeared in the meantime.
+					singletonObject = this.singletonObjects.get(beanName);
+					if (singletonObject != null) {
+						return singletonObject;
+					}
+					beforeSingletonCreation(beanName);
+				}
+
 				boolean newSingleton = false;
 				boolean recordSuppressedExceptions = (locked && this.suppressedExceptions == null);
 				if (recordSuppressedExceptions) {
 					this.suppressedExceptions = new LinkedHashSet<>();
 				}
-				this.singletonCreationThread = Thread.currentThread();
 				try {
-					singletonObject = singletonFactory.getObject();
-					newSingleton = true;
+					// Leniently created singleton object could have appeared in the meantime.
+					singletonObject = this.singletonObjects.get(beanName);
+					if (singletonObject == null) {
+						this.currentCreationThreads.put(beanName, currentThread);
+						try {
+							singletonObject = singletonFactory.getObject();
+						}
+						finally {
+							this.currentCreationThreads.remove(beanName);
+						}
+						newSingleton = true;
+					}
 				}
 				catch (IllegalStateException ex) {
 					// Has the singleton object implicitly appeared in the meantime ->
@@ -313,14 +393,23 @@ public class DefaultSingletonBeanRegistry extends SimpleAliasRegistry implements
 					throw ex;
 				}
 				finally {
-					this.singletonCreationThread = null;
 					if (recordSuppressedExceptions) {
 						this.suppressedExceptions = null;
 					}
 					afterSingletonCreation(beanName);
 				}
+
 				if (newSingleton) {
-					addSingleton(beanName, singletonObject);
+					try {
+						addSingleton(beanName, singletonObject);
+					}
+					catch (IllegalStateException ex) {
+						// Leniently accept same instance if implicitly appeared.
+						Object object = this.singletonObjects.get(beanName);
+						if (singletonObject != object) {
+							throw ex;
+						}
+					}
 				}
 			}
 			return singletonObject;
@@ -329,22 +418,50 @@ public class DefaultSingletonBeanRegistry extends SimpleAliasRegistry implements
 			if (locked) {
 				this.singletonLock.unlock();
 			}
+			this.lenientCreationLock.lock();
+			try {
+				this.singletonsInLenientCreation.remove(beanName);
+				this.lenientWaitingThreads.entrySet().removeIf(
+						entry -> entry.getValue() == currentThread);
+				this.lenientCreationFinished.signalAll();
+			}
+			finally {
+				this.lenientCreationLock.unlock();
+			}
 		}
+	}
+
+	private boolean checkDependentWaitingThreads(Thread waitingThread, Thread candidateThread) {
+		Thread threadToCheck = waitingThread;
+		while ((threadToCheck = this.lenientWaitingThreads.get(threadToCheck)) != null) {
+			if (threadToCheck == candidateThread) {
+				return true;
+			}
+		}
+		return false;
 	}
 
 	/**
 	 * Determine whether the current thread is allowed to hold the singleton lock.
-	 * <p>By default, any thread may acquire and hold the singleton lock, except
-	 * background threads from {@link DefaultListableBeanFactory#setBootstrapExecutor}.
+	 * <p>By default, all threads are forced to hold a full lock through {@code null}.
+	 * {@link DefaultListableBeanFactory} overrides this to specifically handle its
+	 * threads during the pre-instantiation phase: {@code true} for the main thread,
+	 * {@code false} for managed background threads, and configuration-dependent
+	 * behavior for unmanaged threads.
+	 * @return {@code true} if the current thread is explicitly allowed to hold the
+	 * lock but also accepts lenient fallback behavior, {@code false} if it is
+	 * explicitly not allowed to hold the lock and therefore forced to use lenient
+	 * fallback behavior, or {@code null} if there is no specific indication
+	 * (traditional behavior: forced to always hold a full lock)
 	 * @since 6.2
 	 */
-	protected boolean isCurrentThreadAllowedToHoldSingletonLock() {
-		return true;
+	protected @Nullable Boolean isCurrentThreadAllowedToHoldSingletonLock() {
+		return null;
 	}
 
 	/**
 	 * Register an exception that happened to get suppressed during the creation of a
-	 * singleton bean instance, e.g. a temporary circular reference resolution problem.
+	 * singleton bean instance, for example, a temporary circular reference resolution problem.
 	 * <p>The default implementation preserves any given exception in this registry's
 	 * collection of suppressed exceptions, up to a limit of 100 exceptions, adding
 	 * them as related causes to an eventual top-level {@link BeanCreationException}.
@@ -415,7 +532,7 @@ public class DefaultSingletonBeanRegistry extends SimpleAliasRegistry implements
 
 	/**
 	 * Callback before singleton creation.
-	 * <p>The default implementation register the singleton as currently in creation.
+	 * <p>The default implementation registers the singleton as currently in creation.
 	 * @param beanName the name of the singleton about to be created
 	 * @see #isSingletonCurrentlyInCreation
 	 */
@@ -455,7 +572,7 @@ public class DefaultSingletonBeanRegistry extends SimpleAliasRegistry implements
 
 	/**
 	 * Register a containment relationship between two beans,
-	 * e.g. between an inner bean and its containing outer bean.
+	 * for example, between an inner bean and its containing outer bean.
 	 * <p>Also registers the containing bean as dependent on the contained bean
 	 * in terms of destruction order.
 	 * @param containedBeanName the name of the contained (inner) bean
@@ -465,7 +582,7 @@ public class DefaultSingletonBeanRegistry extends SimpleAliasRegistry implements
 	public void registerContainedBean(String containedBeanName, String containingBeanName) {
 		synchronized (this.containedBeanMap) {
 			Set<String> containedBeans =
-					this.containedBeanMap.computeIfAbsent(containingBeanName, k -> new LinkedHashSet<>(8));
+					this.containedBeanMap.computeIfAbsent(containingBeanName, key -> new LinkedHashSet<>(8));
 			if (!containedBeans.add(containedBeanName)) {
 				return;
 			}
@@ -484,7 +601,7 @@ public class DefaultSingletonBeanRegistry extends SimpleAliasRegistry implements
 
 		synchronized (this.dependentBeanMap) {
 			Set<String> dependentBeans =
-					this.dependentBeanMap.computeIfAbsent(canonicalName, k -> new LinkedHashSet<>(8));
+					this.dependentBeanMap.computeIfAbsent(canonicalName, key -> new LinkedHashSet<>(8));
 			if (!dependentBeans.add(dependentBeanName)) {
 				return;
 			}
@@ -492,7 +609,7 @@ public class DefaultSingletonBeanRegistry extends SimpleAliasRegistry implements
 
 		synchronized (this.dependenciesForBeanMap) {
 			Set<String> dependenciesForBean =
-					this.dependenciesForBeanMap.computeIfAbsent(dependentBeanName, k -> new LinkedHashSet<>(8));
+					this.dependenciesForBeanMap.computeIfAbsent(dependentBeanName, key -> new LinkedHashSet<>(8));
 			dependenciesForBean.add(canonicalName);
 		}
 	}
@@ -633,12 +750,19 @@ public class DefaultSingletonBeanRegistry extends SimpleAliasRegistry implements
 			// For an individual destruction, remove the registered instance now.
 			// As of 6.2, this happens after the current bean's destruction step,
 			// allowing for late bean retrieval by on-demand suppliers etc.
-			this.singletonLock.lock();
-			try {
+			if (this.currentCreationThreads.get(beanName) == Thread.currentThread()) {
+				// Local remove after failed creation step -> without singleton lock
+				// since bean creation may have happened leniently without any lock.
 				removeSingleton(beanName);
 			}
-			finally {
-				this.singletonLock.unlock();
+			else {
+				this.singletonLock.lock();
+				try {
+					removeSingleton(beanName);
+				}
+				finally {
+					this.singletonLock.unlock();
+				}
 			}
 		}
 	}

@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,24 +17,30 @@
 package org.springframework.validation;
 
 import java.beans.ConstructorProperties;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import jakarta.validation.constraints.NotNull;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 
+import org.springframework.beans.BeanInstantiationException;
+import org.springframework.beans.ConfigurablePropertyAccessor;
 import org.springframework.core.ResolvableType;
 import org.springframework.format.support.DefaultFormattingConversionService;
-import org.springframework.lang.Nullable;
 import org.springframework.util.Assert;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 
 /**
  * Tests for {@link DataBinder} with constructor binding.
  *
  * @author Rossen Stoyanchev
+ * @author Sam Brannen
  */
 class DataBinderConstructTests {
 
@@ -101,6 +107,351 @@ class DataBinderConstructTests {
 		assertThat(bindingResult.getFieldValue("param3")).isNull();
 	}
 
+	@Test
+	void dataClassWithListBinding() {
+		MapValueResolver valueResolver = new MapValueResolver(Map.of(
+				"dataClassList[0].param1", "value1", "dataClassList[0].param2", "true",
+				"dataClassList[1].param1", "value2", "dataClassList[1].param2", "true",
+				"dataClassList[2].param1", "value3", "dataClassList[2].param2", "true"));
+
+		DataBinder binder = initDataBinder(DataClassListRecord.class);
+		binder.construct(valueResolver);
+
+		DataClassListRecord target = getTarget(binder);
+		List<DataClass> list = target.dataClassList();
+
+		assertThat(list).hasSize(3);
+		assertThat(list.get(0).param1()).isEqualTo("value1");
+		assertThat(list.get(1).param1()).isEqualTo("value2");
+		assertThat(list.get(2).param1()).isEqualTo("value3");
+	}
+
+	@Test // gh-34145
+	void dataClassWithListBindingWithNonconsecutiveIndices() {
+		MapValueResolver valueResolver = new MapValueResolver(Map.of(
+				"dataClassList[0].param1", "value1", "dataClassList[0].param2", "true",
+				"dataClassList[1].param1", "value2", "dataClassList[1].param2", "true",
+				"dataClassList[3].param1", "value3", "dataClassList[3].param2", "true"));
+
+		DataBinder binder = initDataBinder(DataClassListRecord.class);
+		binder.construct(valueResolver);
+
+		DataClassListRecord target = getTarget(binder);
+		List<DataClass> list = target.dataClassList();
+
+		assertThat(list.get(0).param1()).isEqualTo("value1");
+		assertThat(list.get(1).param1()).isEqualTo("value2");
+		assertThat(list.get(3).param1()).isEqualTo("value3");
+	}
+
+	@Test
+	void dataClassWithMapBinding() {
+		MapValueResolver valueResolver = new MapValueResolver(Map.of(
+				"dataClassMap[a].param1", "value1", "dataClassMap[a].param2", "true",
+				"dataClassMap[b].param1", "value2", "dataClassMap[b].param2", "true",
+				"dataClassMap['c'].param1", "value3", "dataClassMap['c'].param2", "true"));
+
+		DataBinder binder = initDataBinder(DataClassMapRecord.class);
+		binder.construct(valueResolver);
+
+		DataClassMapRecord target = getTarget(binder);
+		Map<String, DataClass> map = target.dataClassMap();
+
+		assertThat(map).hasSize(3);
+		assertThat(map.get("a").param1()).isEqualTo("value1");
+		assertThat(map.get("b").param1()).isEqualTo("value2");
+		assertThat(map.get("c").param1()).isEqualTo("value3");
+	}
+
+	@Test  // gh-37019
+	void dataClassWithMapBindingConstructsValueOncePerKey() {
+		CountingRecord.constructorCallCount.set(0);
+		MapValueResolver valueResolver = new MapValueResolver(Map.of(
+				"countingMap[a].param1", "value1", "countingMap[a].param2", "value2",
+				"countingMap[b].param1", "value3", "countingMap[b].param2", "value4"));
+
+		DataBinder binder = initDataBinder(CountingMapRecord.class);
+		binder.construct(valueResolver);
+
+		CountingMapRecord target = getTarget(binder);
+		Map<String, CountingRecord> map = target.countingMap();
+
+		assertThat(map).hasSize(2);
+		assertThat(map.get("a").param1()).isEqualTo("value1");
+		assertThat(map.get("a").param2()).isEqualTo("value2");
+		assertThat(map.get("b").param1()).isEqualTo("value3");
+		assertThat(map.get("b").param2()).isEqualTo("value4");
+		assertThat(CountingRecord.constructorCallCount).hasValue(2);
+	}
+
+	@Test
+	void dataClassWithArrayBinding() {
+		MapValueResolver valueResolver = new MapValueResolver(Map.of(
+				"dataClassArray[0].param1", "value1", "dataClassArray[0].param2", "true",
+				"dataClassArray[1].param1", "value2", "dataClassArray[1].param2", "true",
+				"dataClassArray[2].param1", "value3", "dataClassArray[2].param2", "true"));
+
+		DataBinder binder = initDataBinder(DataClassArrayRecord.class);
+		binder.construct(valueResolver);
+
+		DataClassArrayRecord target = getTarget(binder);
+		DataClass[] array = target.dataClassArray();
+
+		assertThat(array).hasSize(3);
+		assertThat(array[0].param1()).isEqualTo("value1");
+		assertThat(array[1].param1()).isEqualTo("value2");
+		assertThat(array[2].param1()).isEqualTo("value3");
+	}
+
+	@Test
+	void simpleListBinding() {
+		MapValueResolver valueResolver = new MapValueResolver(Map.of("integerList[0]", "1", "integerList[1]", "2"));
+
+		DataBinder binder = initDataBinder(IntegerListRecord.class);
+		binder.construct(valueResolver);
+
+		IntegerListRecord target = getTarget(binder);
+		assertThat(target.integerList()).containsExactly(1, 2);
+	}
+
+	@Test
+	void simpleListBindingEmptyBrackets() {
+		MapValueResolver valueResolver = new MapValueResolver(Map.of("integerList[]", "1"));
+
+		DataBinder binder = initDataBinder(IntegerListRecord.class);
+		binder.construct(valueResolver);
+
+		IntegerListRecord target = getTarget(binder);
+		assertThat(target.integerList()).containsExactly(1);
+	}
+
+	@Test
+	void simpleMapBinding() {
+		MapValueResolver valueResolver = new MapValueResolver(Map.of("integerMap[a]", "1", "integerMap[b]", "2"));
+
+		DataBinder binder = initDataBinder(IntegerMapRecord.class);
+		binder.construct(valueResolver);
+
+		IntegerMapRecord target = getTarget(binder);
+		assertThat(target.integerMap()).hasSize(2).containsEntry("a", 1).containsEntry("b", 2);
+	}
+
+	@Test
+	void simpleArrayBinding() {
+		MapValueResolver valueResolver = new MapValueResolver(Map.of("integerArray[0]", "1", "integerArray[1]", "2"));
+
+		DataBinder binder = initDataBinder(IntegerArrayRecord.class);
+		binder.construct(valueResolver);
+
+		IntegerArrayRecord target = getTarget(binder);
+		assertThat(target.integerArray()).containsExactly(1, 2);
+	}
+
+	@Test
+	void nestedListWithinMap() {
+		MapValueResolver valueResolver = new MapValueResolver(Map.of(
+				"integerListMap[a][0]", "1", "integerListMap[a][1]", "2",
+				"integerListMap[b][0]", "3", "integerListMap[b][1]", "4"));
+
+		DataBinder binder = initDataBinder(IntegerListMapRecord.class);
+		binder.construct(valueResolver);
+
+		IntegerListMapRecord target = getTarget(binder);
+		assertThat(target.integerListMap().get("a")).containsExactly(1, 2);
+		assertThat(target.integerListMap().get("b")).containsExactly(3, 4);
+	}
+
+	@Test
+	void nestedMapWithinList() {
+		MapValueResolver valueResolver = new MapValueResolver(Map.of(
+				"integerMapList[0][a]", "1", "integerMapList[0][b]", "2",
+				"integerMapList[1][a]", "3", "integerMapList[1][b]", "4"));
+
+		DataBinder binder = initDataBinder(IntegerMapListRecord.class);
+		binder.construct(valueResolver);
+
+		IntegerMapListRecord target = getTarget(binder);
+		assertThat(target.integerMapList().get(0)).containsOnly(Map.entry("a", 1), Map.entry("b", 2));
+		assertThat(target.integerMapList().get(1)).containsOnly(Map.entry("a", 3), Map.entry("b", 4));
+	}
+
+	@Test  // gh-37252
+	void maxNestedPathDepth() {
+		DataBinder binder = initDataBinder(NodeRecord.class);
+		binder.setMaxNestedPathDepth(2);
+
+		// depth == max
+		binder.construct(new MapValueResolver(Map.of("next.next.value", "enigma")));
+		NodeRecord target = getTarget(binder);
+		assertThat(target.next().next().value()).isEqualTo("enigma");
+
+		// depth > max
+		DataBinder tooDeep = initDataBinder(NodeRecord.class);
+		tooDeep.setMaxNestedPathDepth(2);
+		assertThatExceptionOfType(BeanInstantiationException.class)
+				.isThrownBy(() -> tooDeep.construct(new MapValueResolver(Map.of("next.next.next.value", "enigma"))))
+				.withMessage("Failed to instantiate [%s]: Nesting depth of property path '%s' " +
+						"exceeds the maximum of %d", NodeRecord.class.getName(), "next.next.next", 2);
+	}
+
+	@Test  // gh-37252
+	void maxNestedPathDepthProtectsAgainstStackOverflow() {
+		DataBinder binder = initDataBinder(NodeRecord.class);
+
+		String propertyPath = "next.".repeat(100_000) + "value";
+		int maxDepth = ConfigurablePropertyAccessor.DEFAULT_MAX_NESTED_PATH_DEPTH;
+		String tooDeepPath = "next.".repeat(maxDepth) + "next";
+		assertThatExceptionOfType(BeanInstantiationException.class)
+				.isThrownBy(() -> binder.construct(new MapValueResolver(Map.of(propertyPath, "enigma"))))
+				.withMessage("Failed to instantiate [%s]: Nesting depth of property path '%s' " +
+						"exceeds the maximum of %d", NodeRecord.class.getName(), tooDeepPath, maxDepth);
+	}
+
+	@Test  // gh-37640
+	void listBindingWithinDefaultAutoGrowCollectionLimit() {
+		MapValueResolver valueResolver = new MapValueResolver(Map.of("integerList[255]", "1"));
+
+		DataBinder binder = initDataBinder(IntegerListRecord.class);
+		binder.construct(valueResolver);
+
+		IntegerListRecord target = getTarget(binder);
+		assertThat(target.integerList()).hasSize(256).element(255).isEqualTo(1);
+	}
+
+	@Test  // gh-37640
+	void listBindingBeyondDefaultAutoGrowCollectionLimit() {
+		MapValueResolver valueResolver = new MapValueResolver(Map.of("integerList[256]", "1"));
+
+		DataBinder binder = initDataBinder(IntegerListRecord.class);
+
+		assertThatExceptionOfType(BeanInstantiationException.class)
+				.isThrownBy(() -> binder.construct(valueResolver))
+				.withMessage("Failed to instantiate [%s]: Invalid list index in property path '%s'",
+						IntegerListRecord.class.getName(), "integerList[256]")
+				.havingCause()
+				.isExactlyInstanceOf(IndexOutOfBoundsException.class)
+				.withMessage("Index 256 out of bounds for auto-grow collection limit of 256");
+	}
+
+	@Test  // gh-37654
+	void listBindingWithMultipleIndexesBeyondDefaultAutoGrowCollectionLimit() {
+		MapValueResolver valueResolver =
+				new MapValueResolver(Map.of("integerList[0]", "1", "integerList[256]", "2"));
+
+		DataBinder binder = initDataBinder(IntegerListRecord.class);
+
+		assertThatExceptionOfType(BeanInstantiationException.class)
+				.isThrownBy(() -> binder.construct(valueResolver))
+				.withMessage("Failed to instantiate [%s]: Invalid list index in property path '%s'",
+						IntegerListRecord.class.getName(), "integerList[256]")
+				.havingCause()
+				.isExactlyInstanceOf(IndexOutOfBoundsException.class)
+				.withMessage("Index 256 out of bounds for auto-grow collection limit of 256");
+	}
+
+	@Test  // gh-37640
+	void listBindingWithinCustomAutoGrowCollectionLimit() {
+		MapValueResolver valueResolver = new MapValueResolver(Map.of("integerList[299]", "1"));
+
+		DataBinder binder = initDataBinder(IntegerListRecord.class);
+		binder.setAutoGrowCollectionLimit(300);
+		binder.construct(valueResolver);
+
+		IntegerListRecord target = getTarget(binder);
+		assertThat(target.integerList()).hasSize(300).element(299).isEqualTo(1);
+	}
+
+	@Test  // gh-37640
+	void listBindingBeyondCustomAutoGrowCollectionLimit() {
+		MapValueResolver valueResolver = new MapValueResolver(Map.of("integerList[10]", "1"));
+
+		DataBinder binder = initDataBinder(IntegerListRecord.class);
+		binder.setAutoGrowCollectionLimit(10);
+
+		assertThatExceptionOfType(BeanInstantiationException.class)
+				.isThrownBy(() -> binder.construct(valueResolver))
+				.withMessage("Failed to instantiate [%s]: Invalid list index in property path '%s'",
+						IntegerListRecord.class.getName(), "integerList[10]")
+				.havingCause()
+				.isExactlyInstanceOf(IndexOutOfBoundsException.class)
+				.withMessage("Index 10 out of bounds for auto-grow collection limit of 10");
+	}
+
+	@Test  // gh-37640
+	void arrayBindingWithinDefaultAutoGrowCollectionLimit() {
+		MapValueResolver valueResolver = new MapValueResolver(Map.of("integerArray[255]", "1"));
+
+		DataBinder binder = initDataBinder(IntegerArrayRecord.class);
+		binder.construct(valueResolver);
+
+		IntegerArrayRecord target = getTarget(binder);
+		assertThat(target.integerArray()).hasSize(256);
+		assertThat(target.integerArray()[255]).isEqualTo(1);
+	}
+
+	@Test  // gh-37640
+	void arrayBindingBeyondDefaultAutoGrowCollectionLimit() {
+		MapValueResolver valueResolver = new MapValueResolver(Map.of("integerArray[256]", "1"));
+
+		DataBinder binder = initDataBinder(IntegerArrayRecord.class);
+
+		assertThatExceptionOfType(BeanInstantiationException.class)
+				.isThrownBy(() -> binder.construct(valueResolver))
+				.withMessage("Failed to instantiate [%s]: Invalid array index in property path '%s'",
+						IntegerArrayRecord.class.getName(), "integerArray[256]")
+				.havingCause()
+				.isExactlyInstanceOf(ArrayIndexOutOfBoundsException.class)
+				.withMessage("Index 256 out of bounds for auto-grow collection limit of 256");
+	}
+
+	@Test  // gh-37640
+	void nestedListBindingBeyondDefaultAutoGrowCollectionLimit() {
+		MapValueResolver valueResolver = new MapValueResolver(Map.of("integerListMap[a][256]", "1"));
+
+		DataBinder binder = initDataBinder(IntegerListMapRecord.class);
+
+		assertThatExceptionOfType(BeanInstantiationException.class)
+				.isThrownBy(() -> binder.construct(valueResolver))
+				.withMessage("Failed to instantiate [%s]: Invalid list index in property path '%s'",
+						IntegerListMapRecord.class.getName(), "integerListMap[a][256]")
+				.havingCause()
+				.isExactlyInstanceOf(IndexOutOfBoundsException.class)
+				.withMessage("Index 256 out of bounds for auto-grow collection limit of 256");
+	}
+
+	@Test  // gh-37654
+	void nestedObjectListBindingBeyondDefaultAutoGrowCollectionLimit() {
+		MapValueResolver valueResolver = new MapValueResolver(Map.of("nested.integerList[256]", "1"));
+
+		DataBinder binder = initDataBinder(NestedIntegerListRecord.class);
+
+		assertThatExceptionOfType(BeanInstantiationException.class)
+				.isThrownBy(() -> binder.construct(valueResolver))
+				.withMessage("Failed to instantiate [%s]: Invalid list index in property path '%s'",
+						IntegerListRecord.class.getName(), "nested.integerList[256]")
+				.havingCause()
+				.isExactlyInstanceOf(IndexOutOfBoundsException.class)
+				.withMessage("Index 256 out of bounds for auto-grow collection limit of 256");
+	}
+
+	@Test  // gh-37640
+	void autoGrowCollectionLimitAppliesRegardlessOfAutoGrowNestedPaths() {
+		MapValueResolver valueResolver = new MapValueResolver(Map.of("integerList[10]", "1"));
+
+		DataBinder binder = initDataBinder(IntegerListRecord.class);
+		binder.setAutoGrowNestedPaths(false);
+		binder.setAutoGrowCollectionLimit(10);
+
+		assertThatExceptionOfType(BeanInstantiationException.class)
+				.isThrownBy(() -> binder.construct(valueResolver))
+				.withMessage("Failed to instantiate [%s]: Invalid list index in property path '%s'",
+						IntegerListRecord.class.getName(), "integerList[10]")
+				.havingCause()
+				.isExactlyInstanceOf(IndexOutOfBoundsException.class)
+				.withMessage("Index 10 out of bounds for auto-grow collection limit of 10");
+	}
+
+
 	@SuppressWarnings("SameParameterValue")
 	private static DataBinder initDataBinder(Class<?> targetType) {
 		DataBinder binder = new DataBinder(null);
@@ -149,12 +500,11 @@ class DataBinderConstructTests {
 	}
 
 
-	private static class NestedDataClass {
+	static class NestedDataClass {
 
 		private final String param1;
 
-		@Nullable
-		private final DataClass nestedParam2;
+		private final @Nullable DataClass nestedParam2;
 
 		public NestedDataClass(String param1, @Nullable DataClass nestedParam2) {
 			this.param1 = param1;
@@ -165,20 +515,71 @@ class DataBinderConstructTests {
 			return this.param1;
 		}
 
-		@Nullable
-		public DataClass nestedParam2() {
+		public @Nullable DataClass nestedParam2() {
 			return this.nestedParam2;
 		}
 	}
 
 
-	private static class MapValueResolver implements DataBinder.ValueResolver {
+	/**
+	 * A self-referential record, for which the nesting depth of a property path is
+	 * bounded by the supplied input rather than by the structure of the type.
+	 */
+	private record NodeRecord(@Nullable NodeRecord next, @Nullable String value) {
+	}
 
-		private final Map<String, Object> map;
 
-		private MapValueResolver(Map<String, Object> map) {
-			this.map = map;
+	private record DataClassListRecord(List<DataClass> dataClassList) {
+	}
+
+
+	private record DataClassMapRecord(Map<String, DataClass> dataClassMap) {
+	}
+
+
+	record CountingRecord(String param1, String param2) {
+
+		static final AtomicInteger constructorCallCount = new AtomicInteger();
+
+		CountingRecord {
+			constructorCallCount.incrementAndGet();
 		}
+	}
+
+
+	private record CountingMapRecord(Map<String, CountingRecord> countingMap) {
+	}
+
+
+	private record DataClassArrayRecord(DataClass[] dataClassArray) {
+	}
+
+
+	private record IntegerListRecord(List<Integer> integerList) {
+	}
+
+
+	private record NestedIntegerListRecord(IntegerListRecord nested) {
+	}
+
+
+	private record IntegerMapRecord(Map<String, Integer> integerMap) {
+	}
+
+
+	private record IntegerArrayRecord(Integer[] integerArray) {
+	}
+
+
+	private record IntegerMapListRecord(List<Map<String, Integer>> integerMapList) {
+	}
+
+
+	private record IntegerListMapRecord(Map<String, List<Integer>> integerListMap) {
+	}
+
+
+	private record MapValueResolver(Map<String, Object> map) implements DataBinder.ValueResolver {
 
 		@Override
 		public Object resolveValue(String name, Class<?> type) {

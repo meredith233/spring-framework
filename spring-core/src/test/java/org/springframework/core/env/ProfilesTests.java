@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2023 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -140,6 +140,12 @@ class ProfilesTests {
 		assertOrExpression(profiles);
 	}
 
+	@Test  // gh-37593
+	void ofOrExpressionWithDoubledOperator() {
+		Profiles profiles = Profiles.of("(spring || framework)");
+		assertOrExpression(profiles);
+	}
+
 	private void assertOrExpression(Profiles profiles) {
 		assertThat(profiles.matches(activeProfiles("spring"))).isTrue();
 		assertThat(profiles.matches(activeProfiles("framework"))).isTrue();
@@ -155,13 +161,19 @@ class ProfilesTests {
 
 	@Test
 	void ofAndExpressionWithoutSpaces() {
-		Profiles profiles = Profiles.of("spring&framework)");
+		Profiles profiles = Profiles.of("(spring&framework)");
 		assertAndExpression(profiles);
 	}
 
 	@Test
 	void ofAndExpressionWithoutParentheses() {
 		Profiles profiles = Profiles.of("spring & framework");
+		assertAndExpression(profiles);
+	}
+
+	@Test  // gh-37593
+	void ofAndExpressionWithDoubledOperator() {
+		Profiles profiles = Profiles.of("(spring && framework)");
 		assertAndExpression(profiles);
 	}
 
@@ -260,6 +272,24 @@ class ProfilesTests {
 		assertThat(profiles.matches(activeProfiles("java"))).isTrue();
 	}
 
+	@Test  // gh-37594
+	void ofAndExpressionWithDoubleInvertedSingleElement() {
+		Profiles profiles = Profiles.of("!!spring & framework");
+		assertAndExpression(profiles);
+	}
+
+	@Test  // gh-37594
+	void ofOrExpressionWithDoubleInvertedSingleElement() {
+		Profiles profiles = Profiles.of("!!spring | framework");
+		assertOrExpression(profiles);
+	}
+
+	@Test  // gh-37594
+	void ofAndExpressionWithTripleInvertedSingleElement() {
+		Profiles profiles = Profiles.of("!!!spring & framework");
+		assertOfAndExpressionWithInvertedSingleElement(profiles);
+	}
+
 	@Test
 	void ofComplexExpression() {
 		Profiles profiles = Profiles.of("(spring & framework) | (spring & java)");
@@ -290,6 +320,50 @@ class ProfilesTests {
 		assertMalformed(() -> Profiles.of("("));
 		assertMalformed(() -> Profiles.of(")"));
 		assertMalformed(() -> Profiles.of("a & b | c"));
+	}
+
+	@Test  // gh-37593
+	void malformedExpressionsWithMissingOperator() {
+		assertMalformed(() -> Profiles.of("dev !prod"));
+		assertMalformed(() -> Profiles.of("dev (prod)"));
+		assertMalformed(() -> Profiles.of("(dev) prod"));
+		assertMalformed(() -> Profiles.of("(dev) (prod)"));
+		assertMalformed(() -> Profiles.of("(dev) !prod"));
+		assertMalformed(() -> Profiles.of("!dev (prod)"));
+	}
+
+	@Test  // gh-37593
+	void malformedExpressionsWithMissingOperand() {
+		assertMalformed(() -> Profiles.of("dev &"));
+		assertMalformed(() -> Profiles.of("dev |"));
+		assertMalformed(() -> Profiles.of("& dev"));
+		assertMalformed(() -> Profiles.of("| dev"));
+		assertMalformed(() -> Profiles.of("&& dev"));
+		assertMalformed(() -> Profiles.of("|| dev"));
+		assertMalformed(() -> Profiles.of("(dev &)"));
+		assertMalformed(() -> Profiles.of("(| dev)"));
+		assertMalformed(() -> Profiles.of("(dev) &"));
+		assertMalformed(() -> Profiles.of("dev & ()"));
+		assertMalformed(() -> Profiles.of("dev & !"));
+	}
+
+	@Test
+	void malformedExpressionsWithUnbalancedParentheses() {
+		assertMalformed(() -> Profiles.of("dev)"));
+		assertMalformed(() -> Profiles.of("(dev"));
+		assertMalformed(() -> Profiles.of("spring&framework)"));
+		assertMalformed(() -> Profiles.of("((dev)"));
+		assertMalformed(() -> Profiles.of("(dev))"));
+	}
+
+	@Test  // gh-37595
+	void malformedExpressionsWithWhitespaceSeparatedProfiles() {
+		assertMalformed(() -> Profiles.of("dev prod"));
+		assertMalformed(() -> Profiles.of("dev\tprod"));
+		assertMalformed(() -> Profiles.of("!dev prod"));
+		assertMalformed(() -> Profiles.of("(dev prod)"));
+		assertMalformed(() -> Profiles.of("dev prod & test"));
+		assertMalformed(() -> Profiles.of("test | dev prod"));
 	}
 
 	@Test

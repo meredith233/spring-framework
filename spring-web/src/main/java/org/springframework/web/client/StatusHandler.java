@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2023 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -25,6 +25,8 @@ import java.util.List;
 import java.util.function.Function;
 import java.util.function.Predicate;
 
+import org.jspecify.annotations.Nullable;
+
 import org.springframework.core.ResolvableType;
 import org.springframework.core.log.LogFormatUtils;
 import org.springframework.http.HttpHeaders;
@@ -32,95 +34,120 @@ import org.springframework.http.HttpRequest;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.client.ClientHttpResponse;
 import org.springframework.http.converter.HttpMessageConverter;
-import org.springframework.lang.Nullable;
 import org.springframework.util.Assert;
 import org.springframework.util.CollectionUtils;
 import org.springframework.util.ObjectUtils;
 
 /**
- * Used by {@link DefaultRestClient} and {@link DefaultRestClientBuilder}.
+ * Simple container for an error response Predicate and an error response handler
+ * to support the status handling mechanism of {@link RestClient.ResponseSpec}.
  *
  * @author Arjen Poutsma
+ * @author Rossen Stoyanchev
  * @since 6.1
  */
 final class StatusHandler {
 
 	private final ResponsePredicate predicate;
 
-	private final RestClient.ResponseSpec.ErrorHandler errorHandler;
+	private final RestClient.ResponseSpec.ErrorHandler handler;
 
 
-	private StatusHandler(ResponsePredicate predicate, RestClient.ResponseSpec.ErrorHandler errorHandler) {
+	private StatusHandler(ResponsePredicate predicate, RestClient.ResponseSpec.ErrorHandler handler) {
 		this.predicate = predicate;
-		this.errorHandler = errorHandler;
+		this.handler = handler;
 	}
 
 
-	public static StatusHandler of(Predicate<HttpStatusCode> predicate,
-			RestClient.ResponseSpec.ErrorHandler errorHandler) {
+	/**
+	 * Test whether the response has any errors.
+	 */
+	public boolean test(ClientHttpResponse response) throws IOException {
+		return this.predicate.test(response);
+	}
+
+	/**
+	 * Handle the error in the given response.
+	 * <p>This method is only called when {@link #test(ClientHttpResponse)}
+	 * has returned {@code true}.
+ß	 */
+	public void handle(HttpRequest request, ClientHttpResponse response) throws IOException {
+		this.handler.handle(request, response);
+	}
+
+
+	/**
+	 * Create a StatusHandler from a RestClient {@link RestClient.ResponseSpec.ErrorHandler}.
+	 */
+	public static StatusHandler of(
+			Predicate<HttpStatusCode> predicate, RestClient.ResponseSpec.ErrorHandler errorHandler) {
+
 		Assert.notNull(predicate, "Predicate must not be null");
 		Assert.notNull(errorHandler, "ErrorHandler must not be null");
 
 		return new StatusHandler(response -> predicate.test(response.getStatusCode()), errorHandler);
 	}
 
+	/**
+	 * Create a StatusHandler from a {@link ResponseErrorHandler}.
+	 * @deprecated as of 7.1 in favor of {@link #of(Predicate, RestClient.ResponseSpec.ErrorHandler)}
+	 */
+	@Deprecated(since = "7.1", forRemoval = true)
+	@SuppressWarnings("removal")
 	public static StatusHandler fromErrorHandler(ResponseErrorHandler errorHandler) {
 		Assert.notNull(errorHandler, "ResponseErrorHandler must not be null");
 
-		return new StatusHandler(errorHandler::hasError, (request, response) ->
-				errorHandler.handleError(request.getURI(), request.getMethod(), response));
+		return new StatusHandler(errorHandler::hasError,
+				(request, response) -> errorHandler.handleError(request.getURI(), request.getMethod(), response));
 	}
 
-	public static StatusHandler defaultHandler(List<HttpMessageConverter<?>> messageConverters) {
+	/**
+	 * Create a StatusHandler for default error response handling.
+	 */
+	public static StatusHandler createDefaultStatusHandler(List<HttpMessageConverter<?>> converters) {
 		return new StatusHandler(response -> response.getStatusCode().isError(),
 				(request, response) -> {
-					HttpStatusCode statusCode = response.getStatusCode();
-					String statusText = response.getStatusText();
-					HttpHeaders headers = response.getHeaders();
-					byte[] body = RestClientUtils.getBody(response);
-					Charset charset = RestClientUtils.getCharset(response);
-					String message = getErrorMessage(statusCode.value(), statusText, body, charset);
-					RestClientResponseException ex;
-
-					if (statusCode.is4xxClientError()) {
-						ex = HttpClientErrorException.create(message, statusCode, statusText, headers, body, charset);
-					}
-					else if (statusCode.is5xxServerError()) {
-						ex = HttpServerErrorException.create(message, statusCode, statusText, headers, body, charset);
-					}
-					else {
-						ex = new UnknownHttpStatusCodeException(message, statusCode.value(), statusText, headers, body, charset);
-					}
-					if (!CollectionUtils.isEmpty(messageConverters)) {
-						ex.setBodyConvertFunction(initBodyConvertFunction(response, body, messageConverters));
-					}
-					throw ex;
+					throw createException(response, converters);
 				});
 	}
 
-	private static Function<ResolvableType, ?> initBodyConvertFunction(ClientHttpResponse response, byte[] body, List<HttpMessageConverter<?>> messageConverters) {
-		Assert.state(!CollectionUtils.isEmpty(messageConverters), "Expected message converters");
-		return resolvableType -> {
-			try {
-				HttpMessageConverterExtractor<?> extractor =
-						new HttpMessageConverterExtractor<>(resolvableType.getType(), messageConverters);
+	/**
+	 * Create a {@link RestClientResponseException} of the appropriate
+	 * subtype depending on the response status code.
+	 * @param response the response
+	 * @param converters the converters to use to decode the body
+	 * @return the created exception
+	 * @throws IOException in case of a response failure (e.g. to obtain the status)
+	 * @since 7.0
+	 */
+	public static RestClientResponseException createException(
+			ClientHttpResponse response, List<HttpMessageConverter<?>> converters) throws IOException {
 
-				return extractor.extractData(new ClientHttpResponseDecorator(response) {
-					@Override
-					public InputStream getBody() {
-						return new ByteArrayInputStream(body);
-					}
-				});
-			}
-			catch (IOException ex) {
-				throw new RestClientException("Error while extracting response for type [" + resolvableType + "]", ex);
-			}
-		};
+		HttpStatusCode statusCode = response.getStatusCode();
+		String statusText = response.getStatusText();
+		HttpHeaders headers = response.getHeaders();
+		byte[] body = RestClientUtils.getBody(response);
+		Charset charset = RestClientUtils.getCharset(response);
+		String message = getErrorMessage(statusCode.value(), statusText, body, charset);
+		RestClientResponseException ex;
+
+		if (statusCode.is4xxClientError()) {
+			ex = HttpClientErrorException.create(message, statusCode, statusText, headers, body, charset);
+		}
+		else if (statusCode.is5xxServerError()) {
+			ex = HttpServerErrorException.create(message, statusCode, statusText, headers, body, charset);
+		}
+		else {
+			ex = new UnknownHttpStatusCodeException(message, statusCode.value(), statusText, headers, body, charset);
+		}
+		if (!CollectionUtils.isEmpty(converters)) {
+			ex.setBodyConvertFunction(initBodyConvertFunction(response, body, converters));
+		}
+		return ex;
 	}
 
-
-	private static String getErrorMessage(int rawStatusCode, String statusText, @Nullable byte[] responseBody,
-			@Nullable Charset charset) {
+	private static String getErrorMessage(
+			int rawStatusCode, String statusText, byte @Nullable [] responseBody, @Nullable Charset charset) {
 
 		String preface = rawStatusCode + " " + statusText + ": ";
 
@@ -136,14 +163,25 @@ final class StatusHandler {
 		return preface + bodyText;
 	}
 
+	@SuppressWarnings("NullAway")
+	private static Function<ResolvableType, ? extends @Nullable Object> initBodyConvertFunction(
+			ClientHttpResponse response, byte[] body, List<HttpMessageConverter<?>> messageConverters) {
 
-
-	public boolean test(ClientHttpResponse response) throws IOException {
-		return this.predicate.test(response);
-	}
-
-	public void handle(HttpRequest request, ClientHttpResponse response) throws IOException {
-		this.errorHandler.handle(request, response);
+		return resolvableType -> {
+			try {
+				ClientHttpResponseDecorator responseWrapper = new ClientHttpResponseDecorator(response) {
+					@Override
+					public InputStream getBody() {
+						return new ByteArrayInputStream(body);
+					}
+				};
+				return RestClientUtils.readWithMessageConverters(responseWrapper, messageConverters,
+						resolvableType.getType(), resolvableType.resolve(Object.class), null);
+			}
+			catch (IOException ex) {
+				throw new RestClientException("Error while extracting response for type [" + resolvableType + "]", ex);
+			}
+		};
 	}
 
 

@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2023 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -26,6 +26,7 @@ import jakarta.jms.MessageProducer;
 import jakarta.jms.Session;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.jspecify.annotations.Nullable;
 
 import org.springframework.jms.listener.SessionAwareMessageListener;
 import org.springframework.jms.support.JmsHeaderMapper;
@@ -38,8 +39,7 @@ import org.springframework.jms.support.converter.MessagingMessageConverter;
 import org.springframework.jms.support.converter.SimpleMessageConverter;
 import org.springframework.jms.support.converter.SmartMessageConverter;
 import org.springframework.jms.support.destination.DestinationResolver;
-import org.springframework.jms.support.destination.DynamicDestinationResolver;
-import org.springframework.lang.Nullable;
+import org.springframework.jms.support.destination.SimpleDestinationResolver;
 import org.springframework.messaging.MessageHeaders;
 import org.springframework.util.Assert;
 
@@ -59,18 +59,15 @@ public abstract class AbstractAdaptableMessageListener
 	/** Logger available to subclasses. */
 	protected final Log logger = LogFactory.getLog(getClass());
 
-	@Nullable
-	private Object defaultResponseDestination;
+	private @Nullable Object defaultResponseDestination;
 
-	private DestinationResolver destinationResolver = new DynamicDestinationResolver();
+	private DestinationResolver destinationResolver = new SimpleDestinationResolver();
 
-	@Nullable
-	private MessageConverter messageConverter = new SimpleMessageConverter();
+	private @Nullable MessageConverter messageConverter = new SimpleMessageConverter();
 
 	private final MessagingMessageConverterAdapter messagingMessageConverter = new MessagingMessageConverterAdapter();
 
-	@Nullable
-	private QosSettings responseQosSettings;
+	private @Nullable QosSettings responseQosSettings;
 
 
 	/**
@@ -116,9 +113,9 @@ public abstract class AbstractAdaptableMessageListener
 	/**
 	 * Set the DestinationResolver that should be used to resolve response
 	 * destination names for this adapter.
-	 * <p>The default resolver is a DynamicDestinationResolver. Specify a
+	 * <p>The default resolver is a SimpleDestinationResolver. Specify a
 	 * JndiDestinationResolver for resolving destination names as JNDI locations.
-	 * @see org.springframework.jms.support.destination.DynamicDestinationResolver
+	 * @see org.springframework.jms.support.destination.SimpleDestinationResolver
 	 * @see org.springframework.jms.support.destination.JndiDestinationResolver
 	 */
 	public void setDestinationResolver(DestinationResolver destinationResolver) {
@@ -151,8 +148,7 @@ public abstract class AbstractAdaptableMessageListener
 	 * listener method arguments, and objects returned from listener
 	 * methods back to JMS messages.
 	 */
-	@Nullable
-	protected MessageConverter getMessageConverter() {
+	protected @Nullable MessageConverter getMessageConverter() {
 		return this.messageConverter;
 	}
 
@@ -190,8 +186,7 @@ public abstract class AbstractAdaptableMessageListener
 	 * or {@code null} if the defaults should be used.
 	 * @since 5.0
 	 */
-	@Nullable
-	protected QosSettings getResponseQosSettings() {
+	protected @Nullable QosSettings getResponseQosSettings() {
 		return this.responseQosSettings;
 	}
 
@@ -240,10 +235,10 @@ public abstract class AbstractAdaptableMessageListener
 	 * Extract the message body from the given JMS message.
 	 * @param message the JMS {@code Message}
 	 * @return the content of the message, to be passed into the listener method
-	 * as an argument
+	 * as an argument, or {@code null} if the message has no body
 	 * @throws MessageConversionException if the message could not be extracted
 	 */
-	protected Object extractMessage(Message message) {
+	protected @Nullable Object extractMessage(Message message) {
 		try {
 			MessageConverter converter = getMessageConverter();
 			if (converter != null) {
@@ -405,8 +400,7 @@ public abstract class AbstractAdaptableMessageListener
 	 * @see #setDefaultResponseTopicName
 	 * @see #setDestinationResolver
 	 */
-	@Nullable
-	protected Destination resolveDefaultResponseDestination(Session session) throws JMSException {
+	protected @Nullable Destination resolveDefaultResponseDestination(Session session) throws JMSException {
 		if (this.defaultResponseDestination instanceof Destination destination) {
 			return destination;
 		}
@@ -468,7 +462,7 @@ public abstract class AbstractAdaptableMessageListener
 		}
 
 		@Override
-		protected Object extractPayload(Message message) throws JMSException {
+		protected @Nullable Object extractPayload(Message message) throws JMSException {
 			Object payload = extractMessage(message);
 			if (message instanceof BytesMessage bytesMessage) {
 				try {
@@ -504,11 +498,9 @@ public abstract class AbstractAdaptableMessageListener
 
 			private final jakarta.jms.Message message;
 
-			@Nullable
-			private Object payload;
+			private @Nullable Object payload;
 
-			@Nullable
-			private MessageHeaders headers;
+			private @Nullable MessageHeaders headers;
 
 			public LazyResolutionMessage(jakarta.jms.Message message) {
 				this.message = message;
@@ -539,6 +531,10 @@ public abstract class AbstractAdaptableMessageListener
 				Object payload = extractPayload(this.message);
 				if (payload instanceof org.springframework.messaging.Message springMessage) {
 					return springMessage.getPayload();
+				}
+				if (payload == null) {
+					throw new MessageConversionException(
+							"Cannot convert JMS message with no body to a Message with a payload: " + this.message);
 				}
 				return payload;
 			}

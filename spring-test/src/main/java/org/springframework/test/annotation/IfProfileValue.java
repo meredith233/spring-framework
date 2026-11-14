@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2019 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -24,8 +24,8 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
 /**
- * Test annotation for use with JUnit 4 to indicate whether a test is enabled or
- * disabled for a specific testing profile.
+ * Test annotation for use with JUnit 4 to indicate whether the annotated test
+ * class or test method is enabled or disabled for a specific testing profile.
  *
  * <p>In the context of this annotation, the term <em>profile</em> refers to
  * a Java system property by default; however, the semantics can be changed
@@ -94,11 +94,15 @@ import java.lang.annotation.Target;
  * @see org.springframework.test.context.junit4.statements.ProfileValueChecker
  * @see org.springframework.context.annotation.Profile
  * @see org.springframework.test.context.ActiveProfiles
+ * @deprecated since Spring Framework 7.0 in favor of the
+ * {@link org.springframework.test.context.junit.jupiter.SpringExtension SpringExtension}
+ * and JUnit Jupiter
  */
 @Target({ElementType.TYPE, ElementType.METHOD})
 @Retention(RetentionPolicy.RUNTIME)
 @Documented
 @Inherited
+@Deprecated(since = "7.0")
 public @interface IfProfileValue {
 
 	/**

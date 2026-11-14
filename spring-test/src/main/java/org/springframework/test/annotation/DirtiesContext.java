@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -35,8 +35,8 @@ import java.lang.annotation.Target;
  * will be supplied a new context.
  *
  * <p>{@code @DirtiesContext} may be used as a class-level and method-level
- * annotation within the same class or class hierarchy. In such scenarios, the
- * {@code ApplicationContext} will be marked as <em>dirty</em> before or
+ * annotation within the same test class or test class hierarchy. In such scenarios,
+ * the {@code ApplicationContext} will be marked as <em>dirty</em> before or
  * after any such annotated method as well as before or after the current test
  * class, depending on the configured {@link #methodMode} and {@link #classMode}.
  * When {@code @DirtiesContext} is declared at both the class level and the
@@ -76,8 +76,7 @@ import java.lang.annotation.Target;
  * <p>This annotation may be used as a <em>meta-annotation</em> to create custom
  * <em>composed annotations</em>.
  *
- * <p>As of Spring Framework 5.3, this annotation will be inherited from an
- * enclosing test class by default. See
+ * <p>This annotation will be inherited from an enclosing test class by default. See
  * {@link org.springframework.test.context.NestedTestConfiguration @NestedTestConfiguration}
  * for details.
  *

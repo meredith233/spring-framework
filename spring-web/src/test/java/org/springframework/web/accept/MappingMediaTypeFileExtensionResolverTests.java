@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -53,20 +53,32 @@ class MappingMediaTypeFileExtensionResolverTests {
 				.resolveFileExtensions(MediaType.TEXT_HTML)).isEmpty();
 	}
 
+	@Test
+	void resolveExtensionsWithQualityParameter() {
+		List<String> extensions = new MappingMediaTypeFileExtensionResolver(DEFAULT_MAPPINGS)
+				.resolveFileExtensions(MediaType.parseMediaType("application/json;q=0.9"));
+
+		assertThat(extensions).containsExactly("json");
+	}
+
 	@Test // SPR-13747
-	public void lookupMediaTypeCaseInsensitive() {
+	void lookupMediaTypeCaseInsensitive() {
 		assertThat(new MappingMediaTypeFileExtensionResolver(DEFAULT_MAPPINGS).lookupMediaType("JSON"))
 				.isEqualTo(MediaType.APPLICATION_JSON);
 	}
 
 	@Test
-	void allFileExtensions() {
-		Map<String, MediaType> mappings = new HashMap<>();
-		mappings.put("json", MediaType.APPLICATION_JSON);
-		mappings.put("JsOn", MediaType.APPLICATION_JSON);
-		mappings.put("jSoN", MediaType.APPLICATION_JSON);
+	void mappingsAreCaseInsensitive() {
+		Map<String, MediaType> map = new HashMap<>();
+		map.put("json", MediaType.APPLICATION_JSON);
+		map.put("JsOn", MediaType.APPLICATION_JSON);
+		map.put("jSoN", MediaType.APPLICATION_JSON);
 
-		MappingMediaTypeFileExtensionResolver resolver = new MappingMediaTypeFileExtensionResolver(mappings);
+		MappingMediaTypeFileExtensionResolver resolver = new MappingMediaTypeFileExtensionResolver(map);
+		map.forEach(resolver::addMapping);
+
 		assertThat(resolver.getAllFileExtensions()).containsExactly("json");
 	}
+
+
 }

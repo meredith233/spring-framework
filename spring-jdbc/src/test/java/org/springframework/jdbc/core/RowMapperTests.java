@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -113,7 +113,7 @@ class RowMapperTests {
 
 	@Test
 	@SuppressWarnings("deprecation")
-	public void queryWithArgsAndRowMapper() throws SQLException {
+	void queryWithArgsAndRowMapper() throws SQLException {
 		result = template.query("some SQL", new Object[] { "test1", "test2" }, testRowMapper);
 		preparedStatement.setString(1, "test1");
 		preparedStatement.setString(2, "test2");

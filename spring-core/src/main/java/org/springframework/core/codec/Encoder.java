@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2021 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,6 +20,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
+import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Publisher;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
@@ -27,7 +28,6 @@ import reactor.core.publisher.Mono;
 import org.springframework.core.ResolvableType;
 import org.springframework.core.io.buffer.DataBuffer;
 import org.springframework.core.io.buffer.DataBufferFactory;
-import org.springframework.lang.Nullable;
 import org.springframework.util.MimeType;
 
 /**
@@ -74,7 +74,7 @@ public interface Encoder<T> {
 	 * in fully aggregated form.
 	 * <p>By default this method raises {@link UnsupportedOperationException}
 	 * and it is expected that some encoders cannot produce a single buffer or
-	 * cannot do so synchronously (e.g. encoding a {@code Resource}).
+	 * cannot do so synchronously (for example, encoding a {@code Resource}).
 	 * @param value the value to be encoded
 	 * @param bufferFactory for creating the output {@code DataBuffer}
 	 * @param valueType the type for the value being encoded

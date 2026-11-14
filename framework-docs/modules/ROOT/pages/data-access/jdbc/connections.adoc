@@ -3,14 +3,14 @@
 
 This section covers:
 
-* xref:data-access/jdbc/connections.adoc#jdbc-datasource[Using `DataSource`]
-* xref:data-access/jdbc/connections.adoc#jdbc-DataSourceUtils[Using `DataSourceUtils`]
-* xref:data-access/jdbc/connections.adoc#jdbc-SmartDataSource[Implementing `SmartDataSource`]
-* xref:data-access/jdbc/connections.adoc#jdbc-AbstractDataSource[Extending `AbstractDataSource`]
-* xref:data-access/jdbc/connections.adoc#jdbc-SingleConnectionDataSource[Using `SingleConnectionDataSource`]
-* xref:data-access/jdbc/connections.adoc#jdbc-DriverManagerDataSource[Using `DriverManagerDataSource`]
-* xref:data-access/jdbc/connections.adoc#jdbc-TransactionAwareDataSourceProxy[Using `TransactionAwareDataSourceProxy`]
-* xref:data-access/jdbc/connections.adoc#jdbc-DataSourceTransactionManager[Using `DataSourceTransactionManager` / `JdbcTransactionManager`]
+* <<jdbc-datasource,Using `DataSource`>>
+* <<jdbc-DataSourceUtils,Using `DataSourceUtils`>>
+* <<jdbc-SmartDataSource,Implementing `SmartDataSource`>>
+* <<jdbc-AbstractDataSource,Extending `AbstractDataSource`>>
+* <<jdbc-SingleConnectionDataSource,Using `SingleConnectionDataSource`>>
+* <<jdbc-DriverManagerDataSource,Using `DriverManagerDataSource`>>
+* <<jdbc-TransactionAwareDataSourceProxy,Using `TransactionAwareDataSourceProxy`>>
+* <<jdbc-DataSourceTransactionManager,Using `DataSourceTransactionManager` / `JdbcTransactionManager`>>
 
 
 [[jdbc-datasource]]
@@ -61,6 +61,7 @@ include-code::./BasicDataSourceConfiguration[tag=snippet,indent=0]
 The following example shows C3P0 configuration:
 
 include-code::./ComboPooledDataSourceConfiguration[tag=snippet,indent=0]
+
 
 [[jdbc-DataSourceUtils]]
 == Using `DataSourceUtils`
@@ -177,7 +178,7 @@ corresponding `DataSource` proxy class for the target connection pool: see
 This is particularly useful for potentially empty transactions without actual statement
 execution (never fetching an actual resource in such a scenario), and also in front of
 a routing `DataSource` which means to take the transaction-synchronized read-only flag
-and/or isolation level into account (e.g. `IsolationLevelDataSourceRouter`).
+and/or isolation level into account (for example, `IsolationLevelDataSourceRouter`).
 
 `LazyConnectionDataSourceProxy` also provides special support for a read-only connection
 pool to use during a read-only transaction, avoiding the overhead of switching the JDBC
@@ -196,6 +197,3 @@ In terms of exception behavior, `JdbcTransactionManager` is roughly equivalent t
 `JpaTransactionManager` and also to `R2dbcTransactionManager`, serving as an immediate
 companion/replacement for each other. `DataSourceTransactionManager` on the other hand
 is equivalent to `JtaTransactionManager` and can serve as a direct replacement there.
-
-
-

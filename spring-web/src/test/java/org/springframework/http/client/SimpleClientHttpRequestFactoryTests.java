@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,9 +23,12 @@ import java.net.HttpURLConnection;
 import java.net.ProtocolException;
 import java.net.URI;
 import java.net.URL;
+import java.time.Duration;
 import java.util.Collections;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
@@ -33,12 +36,13 @@ import org.springframework.http.HttpStatus;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
+import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
-public class SimpleClientHttpRequestFactoryTests extends AbstractHttpRequestFactoryTests {
+class SimpleClientHttpRequestFactoryTests extends AbstractHttpRequestFactoryTests {
 
 	@Override
 	protected ClientHttpRequestFactory createRequestFactory() {
@@ -73,14 +77,14 @@ public class SimpleClientHttpRequestFactoryTests extends AbstractHttpRequestFact
 
 	@Test
 	void deleteWithoutBodyDoesNotRaiseException() throws Exception {
-		HttpURLConnection connection = new TestHttpURLConnection(new URL("https://example.com"));
+		HttpURLConnection connection = new TestHttpURLConnection(URI.create("https://example.com").toURL());
 		((SimpleClientHttpRequestFactory) this.factory).prepareConnection(connection, "DELETE");
 		SimpleClientHttpRequest request = new SimpleClientHttpRequest(connection, 4096);
 		request.execute();
 	}
 
 	@Test  // SPR-8809
-	public void interceptor() throws Exception {
+	void interceptor() throws Exception {
 		final String headerName = "MyHeader";
 		final String headerValue = "MyValue";
 		ClientHttpRequestInterceptor interceptor = (request, body, execution) -> {
@@ -106,7 +110,7 @@ public class SimpleClientHttpRequestFactoryTests extends AbstractHttpRequestFact
 	}
 
 	@Test  // SPR-13225
-	public void headerWithNullValue() {
+	void headerWithNullValue() {
 		HttpURLConnection urlConnection = mock();
 		given(urlConnection.getRequestMethod()).willReturn("GET");
 
@@ -115,6 +119,103 @@ public class SimpleClientHttpRequestFactoryTests extends AbstractHttpRequestFact
 		SimpleClientHttpRequest.addHeaders(urlConnection, headers);
 
 		verify(urlConnection, times(1)).addRequestProperty("foo", "");
+	}
+
+	@Test
+	void durationTimeouts() throws Exception {
+		SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
+		factory.setConnectTimeout(Duration.ofSeconds(5));
+		factory.setReadTimeout(Duration.ofSeconds(10));
+
+		HttpURLConnection connection = prepareConnection(factory);
+		assertThat(connection.getConnectTimeout()).isEqualTo(5_000);
+		assertThat(connection.getReadTimeout()).isEqualTo(10_000);
+	}
+
+	@ParameterizedTest  // gh-37427
+	@ValueSource(strings = {"P25D", "P50D", "PT9223372036854775807S"})
+	void durationTimeoutsExceedingIntegerMaxValueAreLimited(Duration timeout) throws Exception {
+		SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
+		factory.setConnectTimeout(timeout);
+		factory.setReadTimeout(timeout);
+
+		HttpURLConnection connection = prepareConnection(factory);
+		assertThat(connection.getConnectTimeout()).isEqualTo(Integer.MAX_VALUE);
+		assertThat(connection.getReadTimeout()).isEqualTo(Integer.MAX_VALUE);
+	}
+
+	@ParameterizedTest  // gh-37427
+	@ValueSource(strings = {"PT-0.001S", "P-25D", "P-50D"})
+	void negativeDurationTimeoutsAreRejected(Duration timeout) {
+		SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
+		assertThatIllegalArgumentException()
+				.isThrownBy(() -> factory.setConnectTimeout(timeout))
+				.withMessage("Timeout must be a non-negative value");
+		assertThatIllegalArgumentException()
+				.isThrownBy(() -> factory.setReadTimeout(timeout))
+				.withMessage("Timeout must be a non-negative value");
+	}
+
+	@Test  // gh-37425
+	void readTimeoutZero() throws Exception {
+		SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
+		factory.setReadTimeout(0);
+		assertThat(prepareConnection(factory).getReadTimeout()).isZero();
+
+		factory = new SimpleClientHttpRequestFactory();
+		factory.setReadTimeout(Duration.ZERO);
+		assertThat(prepareConnection(factory).getReadTimeout()).isZero();
+	}
+
+	@Test  // gh-37425
+	void negativeReadTimeoutIsRejected() {
+		SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
+		assertThatIllegalArgumentException()
+				.isThrownBy(() -> factory.setReadTimeout(-1))
+				.withMessage("Timeout must be a non-negative value");
+	}
+
+	@ParameterizedTest  // gh-37425
+	@ValueSource(strings = {"PT0.000000001S", "PT0.000999999S"})
+	void subMillisecondReadTimeoutIsRejected(Duration timeout) {
+		SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
+		assertThatIllegalArgumentException()
+				.isThrownBy(() -> factory.setReadTimeout(timeout))
+				.withMessage("Timeout must be zero or at least one millisecond");
+	}
+
+	@Test  // gh-37425
+	void connectTimeoutZero() throws Exception {
+		SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
+		factory.setConnectTimeout(0);
+		assertThat(prepareConnection(factory).getConnectTimeout()).isZero();
+
+		factory = new SimpleClientHttpRequestFactory();
+		factory.setConnectTimeout(Duration.ZERO);
+		assertThat(prepareConnection(factory).getConnectTimeout()).isZero();
+	}
+
+	@Test  // gh-37425
+	void negativeConnectTimeoutIsRejected() {
+		SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
+		assertThatIllegalArgumentException()
+				.isThrownBy(() -> factory.setConnectTimeout(-1))
+				.withMessage("Timeout must be a non-negative value");
+	}
+
+	@ParameterizedTest  // gh-37425
+	@ValueSource(strings = {"PT0.000000001S", "PT0.000999999S"})
+	void subMillisecondConnectTimeoutIsRejected(Duration timeout) {
+		SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
+		assertThatIllegalArgumentException()
+				.isThrownBy(() -> factory.setConnectTimeout(timeout))
+				.withMessage("Timeout must be zero or at least one millisecond");
+	}
+
+	private static HttpURLConnection prepareConnection(SimpleClientHttpRequestFactory factory) throws IOException {
+		HttpURLConnection connection = new TestHttpURLConnection(URI.create("https://example.com").toURL());
+		factory.prepareConnection(connection, "GET");
+		return connection;
 	}
 
 

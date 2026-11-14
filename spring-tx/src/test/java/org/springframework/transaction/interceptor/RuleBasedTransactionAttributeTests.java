@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2022 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -58,7 +58,7 @@ class RuleBasedTransactionAttributeTests {
 		assertThat(rta.rollbackOn(new RuntimeException())).isTrue();
 		assertThat(rta.rollbackOn(new MyRuntimeException())).isTrue();
 		assertThat(rta.rollbackOn(new Exception())).isFalse();
-		// Check that default behaviour is overridden
+		// Check that default behavior is overridden
 		assertThat(rta.rollbackOn(new IOException())).isTrue();
 	}
 
@@ -70,10 +70,10 @@ class RuleBasedTransactionAttributeTests {
 		RuleBasedTransactionAttribute rta = new RuleBasedTransactionAttribute(TransactionDefinition.PROPAGATION_REQUIRED, list);
 
 		assertThat(rta.rollbackOn(new RuntimeException())).isTrue();
-		// Check default behaviour is overridden
+		// Check default behavior is overridden
 		assertThat(rta.rollbackOn(new MyRuntimeException())).isFalse();
 		assertThat(rta.rollbackOn(new Exception())).isFalse();
-		// Check that default behaviour is overridden
+		// Check that default behavior is overridden
 		assertThat(rta.rollbackOn(new IOException())).isTrue();
 	}
 
@@ -94,9 +94,9 @@ class RuleBasedTransactionAttributeTests {
 
 	private void doTestRuleForSelectiveRollbackOnChecked(RuleBasedTransactionAttribute rta) {
 		assertThat(rta.rollbackOn(new RuntimeException())).isTrue();
-		// Check default behaviour is overridden
+		// Check default behavior is overridden
 		assertThat(rta.rollbackOn(new Exception())).isFalse();
-		// Check that default behaviour is overridden
+		// Check that default behavior is overridden
 		assertThat(rta.rollbackOn(new RemoteException())).isTrue();
 	}
 
@@ -107,15 +107,15 @@ class RuleBasedTransactionAttributeTests {
 	@Test
 	void ruleForCommitOnSubclassOfChecked() {
 		List<RollbackRuleAttribute> list = new ArrayList<>();
-		// Note that it's important to ensure that we have this as
-		// a FQN: otherwise it will match everything!
+		// Note that it's important to ensure that we have this as a
+		// fully-qualified class name: otherwise it will match everything!
 		list.add(new RollbackRuleAttribute("java.lang.Exception"));
 		list.add(new NoRollbackRuleAttribute("IOException"));
 		RuleBasedTransactionAttribute rta = new RuleBasedTransactionAttribute(TransactionDefinition.PROPAGATION_REQUIRED, list);
 
 		assertThat(rta.rollbackOn(new RuntimeException())).isTrue();
 		assertThat(rta.rollbackOn(new Exception())).isTrue();
-		// Check that default behaviour is overridden
+		// Check that default behavior is overridden
 		assertThat(rta.rollbackOn(new IOException())).isFalse();
 	}
 

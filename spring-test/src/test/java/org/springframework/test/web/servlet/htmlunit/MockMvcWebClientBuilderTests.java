@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,7 +17,7 @@
 package org.springframework.test.web.servlet.htmlunit;
 
 import java.io.IOException;
-import java.net.URL;
+import java.net.URI;
 
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -25,7 +25,7 @@ import org.htmlunit.HttpMethod;
 import org.htmlunit.WebClient;
 import org.htmlunit.WebRequest;
 import org.htmlunit.WebResponse;
-import org.htmlunit.util.Cookie;
+import org.htmlunit.http.Cookie;
 import org.junit.jupiter.api.Test;
 
 import org.springframework.context.annotation.Configuration;
@@ -109,22 +109,33 @@ class MockMvcWebClientBuilderTests {
 		assertThat(getResponse(client, "http://localhost/").getContentAsString()).isEqualTo("NA");
 	}
 
+	@Test
+	void cookieWithLargeMaxAgeIsStored() throws Exception {
+		this.mockMvc = MockMvcBuilders.standaloneSetup(new CookieController()).build();
+		WebClient client = MockMvcWebClientBuilder.mockMvcSetup(this.mockMvc).build();
+
+		assertThat(getResponse(client, "http://localhost/").getContentAsString()).isEqualTo("NA");
+		assertThat(postResponse(client, "http://localhost/long-lived", "cookie=foo")
+				.getContentAsString()).isEqualTo("Set");
+		assertThat(getResponse(client, "http://localhost/").getContentAsString()).isEqualTo("foo");
+	}
+
 	private void assertMockMvcUsed(WebClient client, String url) throws Exception {
 		assertThat(getResponse(client, url).getContentAsString()).isEqualTo("mvc");
 	}
 
 	private WebResponse getResponse(WebClient client, String url) throws IOException {
-		return createResponse(client, new WebRequest(new URL(url)));
+		return createResponse(client, new WebRequest(URI.create(url).toURL()));
 	}
 
 	private WebResponse postResponse(WebClient client, String url, String body) throws IOException {
-		WebRequest request = new WebRequest(new URL(url), HttpMethod.POST);
+		WebRequest request = new WebRequest(URI.create(url).toURL(), HttpMethod.POST);
 		request.setRequestBody(body);
 		return createResponse(client, request);
 	}
 
 	private WebResponse deleteResponse(WebClient client, String url) throws IOException {
-		return createResponse(client, new WebRequest(new URL(url), HttpMethod.DELETE));
+		return createResponse(client, new WebRequest(URI.create(url).toURL(), HttpMethod.DELETE));
 	}
 
 	private WebResponse createResponse(WebClient client, WebRequest request) throws IOException {
@@ -159,6 +170,15 @@ class MockMvcWebClientBuilderTests {
 		@PostMapping(path = "/", produces = "text/plain")
 		String setCookie(@RequestParam String cookie, HttpServletResponse response) {
 			response.addCookie(new jakarta.servlet.http.Cookie(COOKIE_NAME, cookie));
+			return "Set";
+		}
+
+		@PostMapping(path = "/long-lived", produces = "text/plain")
+		String setLongLivedCookie(@RequestParam String cookie, HttpServletResponse response) {
+			jakarta.servlet.http.Cookie longLived = new jakarta.servlet.http.Cookie(COOKIE_NAME, cookie);
+			longLived.setMaxAge(Integer.MAX_VALUE);
+			longLived.setPath("/");
+			response.addCookie(longLived);
 			return "Set";
 		}
 

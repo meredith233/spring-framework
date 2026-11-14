@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2017 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,9 +21,9 @@ import jakarta.servlet.ServletContext;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import org.jspecify.annotations.Nullable;
 
 import org.springframework.beans.factory.BeanNameAware;
-import org.springframework.lang.Nullable;
 import org.springframework.util.Assert;
 import org.springframework.web.servlet.ModelAndView;
 import org.springframework.web.util.WebUtils;
@@ -59,7 +59,7 @@ import org.springframework.web.util.WebUtils;
  *
  * <b>Example:</b> myDispatcher-servlet.xml, in turn forwarding "/myservlet" to your
  * servlet (identified by servlet name). All such requests will go through the
- * configured HandlerInterceptor chain (e.g. an OpenSessionInViewInterceptor).
+ * configured HandlerInterceptor chain (for example, an OpenSessionInViewInterceptor).
  * From the servlet point of view, everything will work as usual.
  *
  * <pre class="code">
@@ -88,11 +88,9 @@ import org.springframework.web.util.WebUtils;
  */
 public class ServletForwardingController extends AbstractController implements BeanNameAware {
 
-	@Nullable
-	private String servletName;
+	private @Nullable String servletName;
 
-	@Nullable
-	private String beanName;
+	private @Nullable String beanName;
 
 
 	public ServletForwardingController() {
@@ -119,8 +117,7 @@ public class ServletForwardingController extends AbstractController implements B
 
 
 	@Override
-	@Nullable
-	protected ModelAndView handleRequestInternal(HttpServletRequest request, HttpServletResponse response)
+	protected @Nullable ModelAndView handleRequestInternal(HttpServletRequest request, HttpServletResponse response)
 			throws Exception {
 
 		ServletContext servletContext = getServletContext();

@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2023 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -155,6 +155,14 @@ class CookieResultMatchersDsl internal constructor (private val actions: ResultA
 	 */
 	fun httpOnly(name: String, httpOnly: Boolean) {
 		actions.andExpect(matchers.httpOnly(name, httpOnly))
+	}
+
+	/**
+	 * @see CookieResultMatchers.partitioned
+	 * @since 6.2
+	 */
+	fun partitioned(name: String, partitioned: Boolean) {
+		actions.andExpect(matchers.partitioned(name, partitioned))
 	}
 
 	/**

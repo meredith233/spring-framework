@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -66,6 +66,8 @@ class TestScenarioCreator {
 					TestScenarioCreator.class.getDeclaredMethod("varargsFunction", String[].class));
 			testContext.registerFunction("varargsFunction2",
 					TestScenarioCreator.class.getDeclaredMethod("varargsFunction2", int.class, String[].class));
+			testContext.registerFunction("varargsObjectFunction",
+					TestScenarioCreator.class.getDeclaredMethod("varargsObjectFunction", Object[].class));
 		}
 		catch (Exception ex) {
 			throw new IllegalStateException(ex);
@@ -100,6 +102,31 @@ class TestScenarioCreator {
 		MethodHandle messageStaticFullyBound = messageStaticPartiallyBound
 				.bindTo(new String[] { "prerecorded", "3", "Oh Hello World", "ignored"});
 		testContext.registerFunction("messageStaticBound", messageStaticFullyBound);
+
+		// #formatObjectVarargs(format, args...)
+		MethodHandle formatObjectVarargs = MethodHandles.lookup().findStatic(TestScenarioCreator.class,
+				"formatObjectVarargs", MethodType.methodType(String.class, String.class, Object[].class));
+		testContext.registerFunction("formatObjectVarargs", formatObjectVarargs);
+
+		// #formatPrimitiveVarargs(format, args...)
+		MethodHandle formatPrimitiveVarargs = MethodHandles.lookup().findStatic(TestScenarioCreator.class,
+				"formatPrimitiveVarargs", MethodType.methodType(String.class, String.class, int[].class));
+		testContext.registerFunction("formatPrimitiveVarargs", formatPrimitiveVarargs);
+
+		// #varargsFunctionHandle(args...)
+		MethodHandle varargsFunctionHandle = MethodHandles.lookup().findStatic(TestScenarioCreator.class,
+				"varargsFunction", MethodType.methodType(String.class, String[].class));
+		testContext.registerFunction("varargsFunctionHandle", varargsFunctionHandle);
+
+		// #varargsObjectFunctionHandle(args...)
+		MethodHandle varargsObjectFunctionHandle = MethodHandles.lookup().findStatic(TestScenarioCreator.class,
+				"varargsObjectFunction", MethodType.methodType(String.class, Object[].class));
+		testContext.registerFunction("varargsObjectFunctionHandle", varargsObjectFunctionHandle);
+
+		// #add(int, int)
+		MethodHandle add = MethodHandles.lookup().findStatic(TestScenarioCreator.class,
+				"add", MethodType.methodType(int.class, int.class, int.class));
+		testContext.registerFunction("add", add);
 	}
 
 	/**
@@ -150,8 +177,28 @@ class TestScenarioCreator {
 		return i + "-" + Arrays.toString(strings);
 	}
 
+	public static String varargsObjectFunction(Object... args) {
+		return Arrays.toString(args);
+	}
+
 	public static String message(String template, String... args) {
 		return template.formatted((Object[]) args);
+	}
+
+	public static String formatObjectVarargs(String format, Object... args) {
+		return String.format(format, args);
+	}
+
+	public static String formatPrimitiveVarargs(String format, int... nums) {
+		Object[] args = new Object[nums.length];
+		for (int i = 0; i < nums.length; i++) {
+			args[i] = nums[i];
+		}
+		return String.format(format, args);
+	}
+
+	public static int add(int x, int y) {
+		return x + y;
 	}
 
 }

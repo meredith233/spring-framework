@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2021 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -24,9 +24,9 @@ import java.util.Map;
 import java.util.Set;
 
 import jakarta.servlet.http.HttpServletRequest;
+import org.jspecify.annotations.Nullable;
 
 import org.springframework.http.HttpHeaders;
-import org.springframework.lang.Nullable;
 import org.springframework.util.MultiValueMap;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -45,11 +45,9 @@ public class DefaultMultipartHttpServletRequest extends AbstractMultipartHttpSer
 
 	private static final String CONTENT_TYPE = "Content-Type";
 
-	@Nullable
-	private Map<String, String[]> multipartParameters;
+	private @Nullable Map<String, String[]> multipartParameters;
 
-	@Nullable
-	private Map<String, String> multipartParameterContentTypes;
+	private @Nullable Map<String, String> multipartParameterContentTypes;
 
 
 	/**
@@ -78,8 +76,7 @@ public class DefaultMultipartHttpServletRequest extends AbstractMultipartHttpSer
 
 
 	@Override
-	@Nullable
-	public String getParameter(String name) {
+	public @Nullable String getParameter(String name) {
 		String[] values = getMultipartParameters().get(name);
 		if (values != null) {
 			return (values.length > 0 ? values[0] : null);
@@ -130,8 +127,7 @@ public class DefaultMultipartHttpServletRequest extends AbstractMultipartHttpSer
 	}
 
 	@Override
-	@Nullable
-	public String getMultipartContentType(String paramOrFileName) {
+	public @Nullable String getMultipartContentType(String paramOrFileName) {
 		MultipartFile file = getFile(paramOrFileName);
 		if (file != null) {
 			return file.getContentType();
@@ -142,8 +138,7 @@ public class DefaultMultipartHttpServletRequest extends AbstractMultipartHttpSer
 	}
 
 	@Override
-	@Nullable
-	public HttpHeaders getMultipartHeaders(String paramOrFileName) {
+	public @Nullable HttpHeaders getMultipartHeaders(String paramOrFileName) {
 		String contentType = getMultipartContentType(paramOrFileName);
 		if (contentType != null) {
 			HttpHeaders headers = new HttpHeaders();
@@ -169,12 +164,11 @@ public class DefaultMultipartHttpServletRequest extends AbstractMultipartHttpSer
 	 * lazily initializing it if necessary.
 	 * @see #initializeMultipart()
 	 */
-	@SuppressWarnings("NullAway")
 	protected Map<String, String[]> getMultipartParameters() {
 		if (this.multipartParameters == null) {
 			initializeMultipart();
 		}
-		return this.multipartParameters;
+		return (this.multipartParameters != null ? this.multipartParameters : Collections.emptyMap());
 	}
 
 	/**
@@ -190,12 +184,12 @@ public class DefaultMultipartHttpServletRequest extends AbstractMultipartHttpSer
 	 * lazily initializing it if necessary.
 	 * @see #initializeMultipart()
 	 */
-	@SuppressWarnings("NullAway")
 	protected Map<String, String> getMultipartParameterContentTypes() {
 		if (this.multipartParameterContentTypes == null) {
 			initializeMultipart();
 		}
-		return this.multipartParameterContentTypes;
+		return (this.multipartParameterContentTypes != null ? this.multipartParameterContentTypes :
+				Collections.emptyMap());
 	}
 
 }

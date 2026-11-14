@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2018 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,9 +20,9 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.Map;
 
+import org.jspecify.annotations.Nullable;
 import reactor.core.publisher.Mono;
 
-import org.springframework.lang.Nullable;
 import org.springframework.util.Assert;
 
 /**
@@ -56,8 +56,7 @@ public interface WebSession {
 	 * @return the attribute value
 	 */
 	@SuppressWarnings("unchecked")
-	@Nullable
-	default <T> T getAttribute(String name) {
+	default <T> @Nullable T getAttribute(String name) {
 		return (T) getAttributes().get(name);
 	}
 
@@ -102,20 +101,6 @@ public interface WebSession {
 	boolean isStarted();
 
 	/**
-	 * Generate a new id for the session and update the underlying session
-	 * storage to reflect the new id. After a successful call {@link #getId()}
-	 * reflects the new session id.
-	 * @return completion notification (success or error)
-	 */
-	Mono<Void> changeSessionId();
-
-	/**
-	 * Invalidate the current session and clear session storage.
-	 * @return completion notification (success or error)
-	 */
-	Mono<Void> invalidate();
-
-	/**
 	 * Save the session through the {@code WebSessionStore} as follows:
 	 * <ul>
 	 * <li>If the session is new (i.e. created but never persisted), it must have
@@ -131,6 +116,20 @@ public interface WebSession {
 	 * @return {@code Mono} to indicate completion with success or error
 	 */
 	Mono<Void> save();
+
+	/**
+	 * Generate a new id for the session and update the underlying session
+	 * storage to reflect the new id. After a successful call {@link #getId()}
+	 * reflects the new session id.
+	 * @return completion notification (success or error)
+	 */
+	Mono<Void> changeSessionId();
+
+	/**
+	 * Invalidate the current session and clear session storage.
+	 * @return completion notification (success or error)
+	 */
+	Mono<Void> invalidate();
 
 	/**
 	 * Return {@code true} if the session expired after {@link #getMaxIdleTime()

@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -63,13 +63,13 @@ class InitializeDatabaseIntegrationTests {
 
 
 	@Test
-	void testCreateEmbeddedDatabase() {
+	void createEmbeddedDatabase() {
 		context = new ClassPathXmlApplicationContext("org/springframework/jdbc/config/jdbc-initialize-config.xml");
 		assertCorrectSetup(context.getBean("dataSource", DataSource.class));
 	}
 
 	@Test
-	void testDisableCreateEmbeddedDatabase() {
+	void disableCreateEmbeddedDatabase() {
 		System.setProperty("ENABLED", "false");
 		context = new ClassPathXmlApplicationContext("org/springframework/jdbc/config/jdbc-initialize-config.xml");
 		assertThatExceptionOfType(BadSqlGrammarException.class).isThrownBy(() ->
@@ -77,13 +77,13 @@ class InitializeDatabaseIntegrationTests {
 	}
 
 	@Test
-	void testIgnoreFailedDrops() {
+	void ignoreFailedDrops() {
 		context = new ClassPathXmlApplicationContext("org/springframework/jdbc/config/jdbc-initialize-fail-config.xml");
 		assertCorrectSetup(context.getBean("dataSource", DataSource.class));
 	}
 
 	@Test
-	void testScriptNameWithPattern() {
+	void scriptNameWithPattern() {
 		context = new ClassPathXmlApplicationContext("org/springframework/jdbc/config/jdbc-initialize-pattern-config.xml");
 		DataSource dataSource = context.getBean("dataSource", DataSource.class);
 		assertCorrectSetup(dataSource);
@@ -92,21 +92,21 @@ class InitializeDatabaseIntegrationTests {
 	}
 
 	@Test
-	void testScriptNameWithPlaceholder() {
+	void scriptNameWithPlaceholder() {
 		context = new ClassPathXmlApplicationContext("org/springframework/jdbc/config/jdbc-initialize-placeholder-config.xml");
 		DataSource dataSource = context.getBean("dataSource", DataSource.class);
 		assertCorrectSetup(dataSource);
 	}
 
 	@Test
-	void testScriptNameWithExpressions() {
+	void scriptNameWithExpressions() {
 		context = new ClassPathXmlApplicationContext("org/springframework/jdbc/config/jdbc-initialize-expression-config.xml");
 		DataSource dataSource = context.getBean("dataSource", DataSource.class);
 		assertCorrectSetup(dataSource);
 	}
 
 	@Test
-	void testCacheInitialization() {
+	void cacheInitialization() {
 		context = new ClassPathXmlApplicationContext("org/springframework/jdbc/config/jdbc-initialize-cache-config.xml");
 		assertCorrectSetup(context.getBean("dataSource", DataSource.class));
 		CacheData cache = context.getBean(CacheData.class);

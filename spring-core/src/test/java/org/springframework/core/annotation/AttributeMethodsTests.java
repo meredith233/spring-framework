@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -90,6 +90,18 @@ class AttributeMethodsTests {
 	}
 
 	@Test
+	void canThrowTypeNotPresentExceptionWhenHasEnumArrayAttributeReturnsTrue() {
+		AttributeMethods methods = AttributeMethods.forAnnotationType(EnumArrayValue.class);
+		assertThat(methods.canThrowTypeNotPresentException(0)).isTrue();
+	}
+
+	@Test
+	void canThrowTypeNotPresentExceptionWhenHasNonEnumArrayAttributeReturnsFalse() {
+		AttributeMethods methods = AttributeMethods.forAnnotationType(StringArrayValue.class);
+		assertThat(methods.canThrowTypeNotPresentException(0)).isFalse();
+	}
+
+	@Test
 	void canThrowTypeNotPresentExceptionWhenNotClassOrClassArrayAttributeReturnsFalse() {
 		AttributeMethods methods = AttributeMethods.forAnnotationType(ValueOnly.class);
 		assertThat(methods.canThrowTypeNotPresentException(0)).isFalse();
@@ -112,7 +124,7 @@ class AttributeMethodsTests {
 		ClassValue annotation = mockAnnotation(ClassValue.class);
 		given(annotation.value()).willThrow(TypeNotPresentException.class);
 		AttributeMethods attributes = AttributeMethods.forAnnotationType(annotation.annotationType());
-		assertThat(attributes.canLoad(annotation)).isFalse();
+		assertThat(attributes.canLoad(annotation, getClass())).isFalse();
 	}
 
 	@Test
@@ -121,7 +133,7 @@ class AttributeMethodsTests {
 		ClassValue annotation = mock();
 		given(annotation.value()).willReturn((Class) InputStream.class);
 		AttributeMethods attributes = AttributeMethods.forAnnotationType(annotation.annotationType());
-		assertThat(attributes.canLoad(annotation)).isTrue();
+		assertThat(attributes.canLoad(annotation, getClass())).isTrue();
 	}
 
 	@Test
@@ -137,6 +149,38 @@ class AttributeMethodsTests {
 	void validateWhenDoesNotHaveTypeNotPresentExceptionThrowsNothing() {
 		ClassValue annotation = mockAnnotation(ClassValue.class);
 		given(annotation.value()).willReturn((Class) InputStream.class);
+		AttributeMethods attributes = AttributeMethods.forAnnotationType(annotation.annotationType());
+		attributes.validate(annotation);
+	}
+
+	@Test
+	void isValidWhenHasEnumConstantNotPresentExceptionReturnsFalse() {
+		EnumArrayValue annotation = mockAnnotation(EnumArrayValue.class);
+		given(annotation.value()).willThrow(new EnumConstantNotPresentException(ExampleEnum.class, "MISSING"));
+		AttributeMethods attributes = AttributeMethods.forAnnotationType(annotation.annotationType());
+		assertThat(attributes.canLoad(annotation, getClass())).isFalse();
+	}
+
+	@Test
+	void isValidWhenDoesNotHaveEnumConstantNotPresentExceptionReturnsTrue() {
+		EnumArrayValue annotation = mockAnnotation(EnumArrayValue.class);
+		given(annotation.value()).willReturn(new ExampleEnum[] {ExampleEnum.ONE});
+		AttributeMethods attributes = AttributeMethods.forAnnotationType(annotation.annotationType());
+		assertThat(attributes.canLoad(annotation, getClass())).isTrue();
+	}
+
+	@Test
+	void validateWhenHasEnumConstantNotPresentExceptionThrowsException() {
+		EnumArrayValue annotation = mockAnnotation(EnumArrayValue.class);
+		given(annotation.value()).willThrow(new EnumConstantNotPresentException(ExampleEnum.class, "MISSING"));
+		AttributeMethods attributes = AttributeMethods.forAnnotationType(annotation.annotationType());
+		assertThatIllegalStateException().isThrownBy(() -> attributes.validate(annotation));
+	}
+
+	@Test
+	void validateWhenDoesNotHaveEnumConstantNotPresentExceptionThrowsNothing() {
+		EnumArrayValue annotation = mockAnnotation(EnumArrayValue.class);
+		given(annotation.value()).willReturn(new ExampleEnum[] {ExampleEnum.ONE});
 		AttributeMethods attributes = AttributeMethods.forAnnotationType(annotation.annotationType());
 		attributes.validate(annotation);
 	}
@@ -205,6 +249,26 @@ class AttributeMethodsTests {
 		String two();
 
 		String three() default "3";
+
+	}
+
+	@Retention(RetentionPolicy.RUNTIME)
+	@interface EnumArrayValue {
+
+		ExampleEnum[] value();
+
+	}
+
+	@Retention(RetentionPolicy.RUNTIME)
+	@interface StringArrayValue {
+
+		String[] value();
+
+	}
+
+	enum ExampleEnum {
+
+		ONE
 
 	}
 

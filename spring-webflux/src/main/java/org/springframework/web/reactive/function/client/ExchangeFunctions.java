@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2022 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,6 +17,7 @@
 package org.springframework.web.reactive.function.client;
 
 import java.net.URI;
+import java.util.Map;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -98,23 +99,29 @@ public abstract class ExchangeFunctions {
 			HttpMethod httpMethod = clientRequest.method();
 			URI url = clientRequest.url();
 
-			return this.connector
-					.connect(httpMethod, url, httpRequest -> clientRequest.writeTo(httpRequest, this.strategies))
-					.doOnRequest(n -> logRequest(clientRequest))
-					.doOnCancel(() -> logger.debug(clientRequest.logPrefix() + "Cancel signal (to close connection)"))
+			Mono<ClientHttpResponse> responseMono = this.connector
+					.connect(httpMethod, url, httpRequest -> clientRequest.writeTo(httpRequest, this.strategies));
+			if (logger.isDebugEnabled()) {
+				responseMono = responseMono
+						.doOnRequest(n -> logRequest(clientRequest))
+						.doOnCancel(() -> logger.debug(clientRequest.logPrefix() + "Cancel signal (to close connection)"));
+			}
+			return responseMono
 					.onErrorResume(WebClientUtils.WRAP_EXCEPTION_PREDICATE, t -> wrapException(t, clientRequest))
 					.map(httpResponse -> {
 						String logPrefix = getLogPrefix(clientRequest, httpResponse);
 						logResponse(httpResponse, logPrefix);
 						return new DefaultClientResponse(
-								httpResponse, this.strategies, logPrefix, httpMethod.name() + " " + url,
+								httpResponse, this.strategies, logPrefix,
+								WebClientUtils.getRequestDescription(httpMethod, url),
 								() -> createRequest(clientRequest));
 					});
 		}
 
 		private void logRequest(ClientRequest request) {
 			LogFormatUtils.traceDebug(logger, traceOn ->
-					request.logPrefix() + "HTTP " + request.method() + " " + request.url() +
+					request.logPrefix() + "HTTP " +
+							WebClientUtils.getRequestDescription(request.method(), request.url()) +
 							(traceOn ? ", headers=" + formatHeaders(request.headers()) : "")
 			);
 		}
@@ -147,6 +154,11 @@ public abstract class ExchangeFunctions {
 				@Override
 				public URI getURI() {
 					return request.url();
+				}
+
+				@Override
+				public Map<String, Object> getAttributes() {
+					return request.attributes();
 				}
 
 				@Override

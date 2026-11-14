@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,31 +16,46 @@
 
 package org.springframework.test.context.bean.override;
 
+import java.lang.annotation.Documented;
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
+import org.springframework.aot.hint.annotation.Reflective;
+
 /**
- * Mark an annotation as eligible for Bean Override processing.
+ * Mark a <em>composed annotation</em> as eligible for Bean Override processing.
  *
- * <p>Specifying this annotation triggers the defined  {@link BeanOverrideProcessor}
+ * <p>Specifying this annotation registers the configured {@link BeanOverrideProcessor}
  * which must be capable of handling the composed annotation and its attributes.
  *
- * <p>The composed annotation is meant to be detected on fields only so it is
- * expected that it has a {@code Target} of {@link ElementType#FIELD FIELD}.
+ * <p>Since the composed annotation will typically only be applied to non-static
+ * fields, it is expected that the composed annotation is meta-annotated with
+ * {@link Target @Target(ElementType.FIELD)}. However, certain bean override
+ * annotations may be declared with an additional {@code ElementType.TYPE} target
+ * for use at the type level. Similarly, as of Spring Framework 7.1, certain bean
+ * override annotations may be declared with an additional {@code ElementType.PARAMETER}
+ * target for use on constructor parameters. For example, {@code @MockitoBean} can
+ * be declared on a field, constructor parameter, test class, or test interface.
+ *
+ * <p>For concrete examples of such composed annotations, see
+ * {@link org.springframework.test.context.bean.override.convention.TestBean @TestBean},
+ * {@link org.springframework.test.context.bean.override.mockito.MockitoBean @MockitoBean}, and
+ * {@link org.springframework.test.context.bean.override.mockito.MockitoSpyBean @MockitoSpyBean}.
  *
  * @author Simon Baslé
+ * @author Sam Brannen
  * @since 6.2
- * @see BeanOverrideBeanFactoryPostProcessor
  */
 @Retention(RetentionPolicy.RUNTIME)
 @Target(ElementType.ANNOTATION_TYPE)
+@Documented
+@Reflective(BeanOverrideReflectiveProcessor.class)
 public @interface BeanOverride {
 
 	/**
-	 * The {@link BeanOverrideProcessor} implementation to trigger against
-	 * the composed annotation.
+	 * The {@link BeanOverrideProcessor} implementation to use.
 	 */
 	Class<? extends BeanOverrideProcessor> value();
 

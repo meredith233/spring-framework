@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -30,6 +30,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * @author Rob Harrop
  * @author Juergen Hoeller
  */
+@SuppressWarnings({"deprecation", "removal"})
 class AutoPopulatingListTests {
 
 	@Test
@@ -57,8 +58,7 @@ class AutoPopulatingListTests {
 		for (int x = 0; x < 10; x++) {
 			Object element = list.get(x);
 			assertThat(list.get(x)).as("Element is null").isNotNull();
-			boolean condition = element instanceof TestObject;
-			assertThat(condition).as("Element is incorrect type").isTrue();
+			assertThat(element).as("Element is incorrect type").isInstanceOf(TestObject.class);
 			assertThat(element).isNotSameAs(lastElement);
 			lastElement = element;
 		}
@@ -68,14 +68,10 @@ class AutoPopulatingListTests {
 		list.add(11, helloWorld);
 		assertThat(list).element(11, InstanceOfAssertFactories.STRING).isEqualTo(helloWorld);
 
-		boolean condition3 = list.get(10) instanceof TestObject;
-		assertThat(condition3).isTrue();
-		boolean condition2 = list.get(12) instanceof TestObject;
-		assertThat(condition2).isTrue();
-		boolean condition1 = list.get(13) instanceof TestObject;
-		assertThat(condition1).isTrue();
-		boolean condition = list.get(20) instanceof TestObject;
-		assertThat(condition).isTrue();
+		assertThat(list.get(10)).isInstanceOf(TestObject.class);
+		assertThat(list.get(12)).isInstanceOf(TestObject.class);
+		assertThat(list.get(13)).isInstanceOf(TestObject.class);
+		assertThat(list.get(20)).isInstanceOf(TestObject.class);
 	}
 
 	private void doTestWithElementFactory(AutoPopulatingList<Object> list) {

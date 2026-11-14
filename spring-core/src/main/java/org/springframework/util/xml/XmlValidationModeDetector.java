@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2022 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,7 +22,8 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 
-import org.springframework.lang.Nullable;
+import org.jspecify.annotations.Nullable;
+
 import org.springframework.util.StringUtils;
 
 /**
@@ -150,7 +151,9 @@ public class XmlValidationModeDetector {
 	private String consumeCommentTokens(String line) {
 		int indexOfStartComment = line.indexOf(START_COMMENT);
 		if (indexOfStartComment == -1 && !line.contains(END_COMMENT)) {
-			return line;
+			// If we are inside a multi-line comment, the entire line is comment
+			// data and must not be treated as content.
+			return (this.inComment ? "" : line);
 		}
 
 		String result = "";
@@ -170,8 +173,7 @@ public class XmlValidationModeDetector {
 	 * Consume the next comment token, update the "inComment" flag,
 	 * and return the remaining content.
 	 */
-	@Nullable
-	private String consume(String line) {
+	private @Nullable String consume(String line) {
 		int index = (this.inComment ? endComment(line) : startComment(line));
 		return (index == -1 ? null : line.substring(index));
 	}

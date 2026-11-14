@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -61,6 +61,14 @@ class ContentBasedVersionStrategyTests {
 		String file = "font-awesome/css/font-awesome.min%s%s.css";
 
 		assertThat(this.versionStrategy.removeVersion(String.format(file, "-", hash), hash)).isEqualTo(String.format(file, "", ""));
+	}
+
+	@Test
+	void removeVersionOnlyOnce() {
+		String hash = "sha";
+		String file = "font-awesome/css%s%s/font-awesome.min%s%s.css";
+
+		assertThat(this.versionStrategy.removeVersion(String.format(file, "-", hash, "-", hash), hash)).isEqualTo(String.format(file, "-", hash, "", ""));
 	}
 
 	@Test

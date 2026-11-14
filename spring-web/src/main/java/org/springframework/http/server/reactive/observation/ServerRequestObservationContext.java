@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2023 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,11 +20,12 @@ import java.util.Collections;
 import java.util.Map;
 import java.util.Optional;
 
+import io.micrometer.observation.transport.Propagator;
 import io.micrometer.observation.transport.RequestReplyReceiverContext;
+import org.jspecify.annotations.Nullable;
 
 import org.springframework.http.server.reactive.ServerHttpRequest;
 import org.springframework.http.server.reactive.ServerHttpResponse;
-import org.springframework.lang.Nullable;
 
 /**
  * Context that holds information for metadata collection regarding
@@ -46,11 +47,15 @@ public class ServerRequestObservationContext extends RequestReplyReceiverContext
 	 */
 	public static final String CURRENT_OBSERVATION_CONTEXT_ATTRIBUTE = ServerRequestObservationContext.class.getName();
 
+	// Same name as ExceptionHandlingWebHandler.HANDLED_WEB_EXCEPTION, which
+	// cannot be referenced from here without creating a package cycle.
+	private static final String HANDLED_EXCEPTION_ATTRIBUTE = "ExceptionHandlingWebHandler.handledException";
+
+	private static final HeaderGetter GETTER = new HeaderGetter();
 
 	private final Map<String, Object> attributes;
 
-	@Nullable
-	private String pathPattern;
+	private @Nullable String pathPattern;
 
 	private boolean connectionAborted;
 
@@ -64,7 +69,7 @@ public class ServerRequestObservationContext extends RequestReplyReceiverContext
 	public ServerRequestObservationContext(
 			ServerHttpRequest request, ServerHttpResponse response, Map<String, Object> attributes) {
 
-		super((req, key) -> req.getHeaders().getFirst(key));
+		super(GETTER);
 		setCarrier(request);
 		setResponse(response);
 		this.attributes = Collections.unmodifiableMap(attributes);
@@ -84,8 +89,7 @@ public class ServerRequestObservationContext extends RequestReplyReceiverContext
 	 * <p>Path patterns must have a low cardinality for the entire application.
 	 * @return the path pattern, or {@code null} if none found
 	 */
-	@Nullable
-	public String getPathPattern() {
+	public @Nullable String getPathPattern() {
 		return this.pathPattern;
 	}
 
@@ -129,6 +133,35 @@ public class ServerRequestObservationContext extends RequestReplyReceiverContext
 	public static Optional<ServerRequestObservationContext> findCurrent(Map<String, Object> attributes) {
 		return Optional.ofNullable(
 				(ServerRequestObservationContext) attributes.get(CURRENT_OBSERVATION_CONTEXT_ATTRIBUTE));
+	}
+
+	/**
+	 * Record an exception that was handled by the web framework or the
+	 * application on the observation for the current exchange. The exception
+	 * is reported to the {@link io.micrometer.observation.Observation} when the
+	 * exchange completes, so that all handlers, including tracing, are notified.
+	 * <p>This has no effect if there is no observation for the exchange.
+	 * @param attributes the current exchange attributes
+	 * @param error the handled exception
+	 * @since 7.1
+	 */
+	public static void recordHandledException(Map<String, Object> attributes, Throwable error) {
+		if (findCurrent(attributes).isPresent()) {
+			attributes.put(HANDLED_EXCEPTION_ATTRIBUTE, error);
+		}
+	}
+
+	static final class HeaderGetter implements Propagator.Getter<ServerHttpRequest> {
+
+		@Override
+		public @Nullable String get(ServerHttpRequest carrier, String key) {
+			return carrier.getHeaders().getFirst(key);
+		}
+
+		@Override
+		public Iterable<String> getAll(ServerHttpRequest carrier, String key) {
+			return carrier.getHeaders().getOrEmpty(key);
+		}
 	}
 
 }

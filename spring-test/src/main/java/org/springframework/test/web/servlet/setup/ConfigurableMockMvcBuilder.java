@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2023 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,13 +23,14 @@ import java.util.Map;
 import jakarta.servlet.DispatcherType;
 import jakarta.servlet.Filter;
 import jakarta.servlet.FilterConfig;
+import org.jspecify.annotations.Nullable;
 
-import org.springframework.lang.Nullable;
 import org.springframework.test.web.servlet.DispatcherServletCustomizer;
 import org.springframework.test.web.servlet.MockMvcBuilder;
 import org.springframework.test.web.servlet.RequestBuilder;
 import org.springframework.test.web.servlet.ResultHandler;
 import org.springframework.test.web.servlet.ResultMatcher;
+import org.springframework.web.client.ApiVersionInserter;
 
 /**
  * Defines common methods for building a {@code MockMvc}.
@@ -75,6 +76,17 @@ public interface ConfigurableMockMvcBuilder<B extends ConfigurableMockMvcBuilder
 	<T extends B> T addFilter(
 			Filter filter, @Nullable String filterName, Map<String, String> initParams,
 			EnumSet<DispatcherType> dispatcherTypes, String... urlPatterns);
+
+	/**
+	 * Set the {@link ApiVersionInserter} to use to apply to versions specified via
+	 * {@link org.springframework.test.web.servlet.request.AbstractMockHttpServletRequestBuilder#apiVersion(Object)}.
+	 * <p>{@code ApiVersionInserter} exposes shortcut methods for several
+	 * built-in inserter implementation types. See the class-level Javadoc
+	 * of {@link ApiVersionInserter} for a list of choices.
+	 * @param versionInserter the inserter to use
+	 * @since 7.0
+	 */
+	<T extends B> T apiVersionInserter(@Nullable ApiVersionInserter versionInserter);
 
 	/**
 	 * Define default request properties that should be merged into all
@@ -136,7 +148,7 @@ public interface ConfigurableMockMvcBuilder<B extends ConfigurableMockMvcBuilder
 
 	/**
 	 * Add a {@code MockMvcConfigurer} that automates MockMvc setup and
-	 * configures it for some specific purpose (e.g. security).
+	 * configures it for some specific purpose (for example, security).
 	 * <p>There is a built-in {@link SharedHttpSessionConfigurer} that can be
 	 * used to re-use the HTTP session across requests. 3rd party frameworks
 	 * like Spring Security also use this mechanism to provide configuration

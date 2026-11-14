@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2017 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,12 +16,13 @@
 
 package org.springframework.web.socket.handler;
 
-import org.springframework.lang.Nullable;
+import org.jspecify.annotations.Nullable;
+
 import org.springframework.web.socket.CloseStatus;
 
 /**
  * Raised when a WebSocket session has exceeded limits it has been configured
- * for, e.g. timeout, buffer size, etc.
+ * for, for example, timeout, buffer size, etc.
  *
  * @author Rossen Stoyanchev
  * @since 4.0.3

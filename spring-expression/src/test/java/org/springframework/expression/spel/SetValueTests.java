@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -310,7 +310,7 @@ class SetValueTests extends AbstractExpressionTests {
 			if (DEBUG) {
 				SpelUtilities.printAbstractSyntaxTree(System.out, e);
 			}
-			assertThat(e.isWritable(context)).as("Expression is not writeable but should be").isTrue();
+			assertThat(e.isWritable(context)).as("Expression is not writable but should be").isTrue();
 			e.setValue(context, value);
 			assertThat(e.getValue(context, expectedType)).as("Retrieved value was not equal to set value").isEqualTo(value);
 		}
@@ -330,7 +330,7 @@ class SetValueTests extends AbstractExpressionTests {
 			if (DEBUG) {
 				SpelUtilities.printAbstractSyntaxTree(System.out, e);
 			}
-			assertThat(e.isWritable(context)).as("Expression is not writeable but should be").isTrue();
+			assertThat(e.isWritable(context)).as("Expression is not writable but should be").isTrue();
 			e.setValue(context, value);
 			assertThat(expectedValue).isEqualTo(e.getValue(context));
 		}

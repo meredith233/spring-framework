@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -71,19 +71,19 @@ class GenericSqlQueryTests {
 	}
 
 	@Test
-	void testCustomerQueryWithPlaceholders() throws SQLException {
+	void customerQueryWithPlaceholders() throws SQLException {
 		SqlQuery<?> query = (SqlQuery<?>) beanFactory.getBean("queryWithPlaceholders");
 		doTestCustomerQuery(query, false);
 	}
 
 	@Test
-	void testCustomerQueryWithNamedParameters() throws SQLException {
+	void customerQueryWithNamedParameters() throws SQLException {
 		SqlQuery<?> query = (SqlQuery<?>) beanFactory.getBean("queryWithNamedParameters");
 		doTestCustomerQuery(query, true);
 	}
 
 	@Test
-	void testCustomerQueryWithRowMapperInstance() throws SQLException {
+	void customerQueryWithRowMapperInstance() throws SQLException {
 		SqlQuery<?> query = (SqlQuery<?>) beanFactory.getBean("queryWithRowMapperBean");
 		doTestCustomerQuery(query, true);
 	}

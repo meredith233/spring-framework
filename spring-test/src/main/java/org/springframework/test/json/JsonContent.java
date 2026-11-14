@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,8 +17,8 @@
 package org.springframework.test.json;
 
 import org.assertj.core.api.AssertProvider;
+import org.jspecify.annotations.Nullable;
 
-import org.springframework.lang.Nullable;
 import org.springframework.util.Assert;
 
 /**
@@ -33,19 +33,27 @@ public final class JsonContent implements AssertProvider<JsonContentAssert> {
 
 	private final String json;
 
-	@Nullable
-	private final Class<?> resourceLoadClass;
+	private final @Nullable JsonConverterDelegate converterDelegate;
 
+
+	/**
+	 * Create a new {@code JsonContent} instance with the message converter to
+	 * use to deserialize content.
+	 * @param json the actual JSON content
+	 * @param converterDelegate the content converter to use
+	 */
+	public JsonContent(String json, @Nullable JsonConverterDelegate converterDelegate) {
+		Assert.notNull(json, "JSON must not be null");
+		this.json = json;
+		this.converterDelegate = converterDelegate;
+	}
 
 	/**
 	 * Create a new {@code JsonContent} instance.
 	 * @param json the actual JSON content
-	 * @param resourceLoadClass the source class used to load resources
 	 */
-	JsonContent(String json, @Nullable Class<?> resourceLoadClass) {
-		Assert.notNull(json, "JSON must not be null");
-		this.json = json;
-		this.resourceLoadClass = resourceLoadClass;
+	public JsonContent(String json) {
+		this(json, (JsonConverterDelegate) null);
 	}
 
 
@@ -55,15 +63,22 @@ public final class JsonContent implements AssertProvider<JsonContentAssert> {
 	 */
 	@Override
 	public JsonContentAssert assertThat() {
-		return new JsonContentAssert(this.json, this.resourceLoadClass, null);
+		return new JsonContentAssert(this);
 	}
 
 	/**
 	 * Return the actual JSON content string.
-	 * @return the JSON content
 	 */
 	public String getJson() {
 		return this.json;
+	}
+
+	/**
+	 * Return the {@link JsonConverterDelegate} to use to decode JSON content.
+	 * @since 7.0
+	 */
+	public @Nullable JsonConverterDelegate getJsonConverterDelegate() {
+		return this.converterDelegate;
 	}
 
 	@Override

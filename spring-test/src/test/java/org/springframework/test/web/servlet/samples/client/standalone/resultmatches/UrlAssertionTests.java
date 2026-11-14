@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2020 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -33,14 +33,14 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  *
  * @author Rossen Stoyanchev
  */
-public class UrlAssertionTests {
+class UrlAssertionTests {
 
 	private final WebTestClient testClient =
 			MockMvcWebTestClient.bindToController(new SimpleController()).build();
 
 
 	@Test
-	public void testRedirect() {
+	void redirect() {
 		testClient.get().uri("/persons")
 				.exchange()
 				.expectStatus().isFound()
@@ -48,7 +48,7 @@ public class UrlAssertionTests {
 	}
 
 	@Test
-	public void testRedirectPattern() throws Exception {
+	void redirectPattern() throws Exception {
 		EntityExchangeResult<Void> result =
 				testClient.get().uri("/persons").exchange().expectBody().isEmpty();
 
@@ -57,7 +57,7 @@ public class UrlAssertionTests {
 	}
 
 	@Test
-	public void testForward() {
+	void forward() {
 		testClient.get().uri("/")
 				.exchange()
 				.expectStatus().isOk()
@@ -65,7 +65,7 @@ public class UrlAssertionTests {
 	}
 
 	@Test
-	public void testForwardPattern() throws Exception {
+	void forwardPattern() throws Exception {
 		EntityExchangeResult<Void> result =
 				testClient.get().uri("/").exchange().expectBody().isEmpty();
 

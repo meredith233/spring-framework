@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,17 +16,21 @@
 
 package org.springframework.web.client;
 
+import java.net.URI;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.BiPredicate;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
 
 import io.micrometer.observation.ObservationRegistry;
+import org.jspecify.annotations.Nullable;
 
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.client.ClientHttpRequestFactory;
 import org.springframework.http.client.ClientHttpRequestInitializer;
@@ -35,24 +39,16 @@ import org.springframework.http.client.HttpComponentsClientHttpRequestFactory;
 import org.springframework.http.client.InterceptingClientHttpRequestFactory;
 import org.springframework.http.client.JdkClientHttpRequestFactory;
 import org.springframework.http.client.JettyClientHttpRequestFactory;
+import org.springframework.http.client.ReactorClientHttpRequestFactory;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.http.client.observation.ClientRequestObservationConvention;
-import org.springframework.http.converter.ByteArrayHttpMessageConverter;
 import org.springframework.http.converter.HttpMessageConverter;
-import org.springframework.http.converter.ResourceHttpMessageConverter;
-import org.springframework.http.converter.StringHttpMessageConverter;
-import org.springframework.http.converter.cbor.MappingJackson2CborHttpMessageConverter;
-import org.springframework.http.converter.json.GsonHttpMessageConverter;
-import org.springframework.http.converter.json.JsonbHttpMessageConverter;
-import org.springframework.http.converter.json.KotlinSerializationJsonHttpMessageConverter;
-import org.springframework.http.converter.json.MappingJackson2HttpMessageConverter;
-import org.springframework.http.converter.smile.MappingJackson2SmileHttpMessageConverter;
-import org.springframework.http.converter.support.AllEncompassingFormHttpMessageConverter;
-import org.springframework.http.converter.yaml.MappingJackson2YamlHttpMessageConverter;
-import org.springframework.lang.Nullable;
+import org.springframework.http.converter.HttpMessageConverters;
 import org.springframework.util.Assert;
 import org.springframework.util.ClassUtils;
 import org.springframework.util.CollectionUtils;
+import org.springframework.util.LinkedMultiValueMap;
+import org.springframework.util.MultiValueMap;
 import org.springframework.web.util.DefaultUriBuilderFactory;
 import org.springframework.web.util.UriBuilderFactory;
 import org.springframework.web.util.UriTemplateHandler;
@@ -62,86 +58,63 @@ import org.springframework.web.util.UriTemplateHandler;
  *
  * @author Arjen Poutsma
  * @author Hyoungjune Kim
+ * @author Sebastien Deleuze
  * @since 6.1
  */
 final class DefaultRestClientBuilder implements RestClient.Builder {
 
 	// request factories
 
-	private static final boolean httpComponentsClientPresent;
+	private static final boolean HTTP_COMPONENTS_CLIENT_PRESENT;
 
-	private static final boolean jettyClientPresent;
+	private static final boolean JETTY_CLIENT_PRESENT;
 
-	private static final boolean jdkClientPresent;
+	private static final boolean REACTOR_NETTY_CLIENT_PRESENT;
 
-	// message factories
-
-	private static final boolean jackson2Present;
-
-	private static final boolean gsonPresent;
-
-	private static final boolean jsonbPresent;
-
-	private static final boolean kotlinSerializationJsonPresent;
-
-	private static final boolean jackson2SmilePresent;
-
-	private static final boolean jackson2CborPresent;
-
-	private static final boolean jackson2YamlPresent;
-
+	private static final boolean JDK_CLIENT_PRESENT;
 
 	static {
 		ClassLoader loader = DefaultRestClientBuilder.class.getClassLoader();
 
-		httpComponentsClientPresent = ClassUtils.isPresent("org.apache.hc.client5.http.classic.HttpClient", loader);
-		jettyClientPresent = ClassUtils.isPresent("org.eclipse.jetty.client.HttpClient", loader);
-		jdkClientPresent = ClassUtils.isPresent("java.net.http.HttpClient", loader);
-
-		jackson2Present = ClassUtils.isPresent("com.fasterxml.jackson.databind.ObjectMapper", loader) &&
-				ClassUtils.isPresent("com.fasterxml.jackson.core.JsonGenerator", loader);
-		gsonPresent = ClassUtils.isPresent("com.google.gson.Gson", loader);
-		jsonbPresent = ClassUtils.isPresent("jakarta.json.bind.Jsonb", loader);
-		kotlinSerializationJsonPresent = ClassUtils.isPresent("kotlinx.serialization.json.Json", loader);
-		jackson2SmilePresent = ClassUtils.isPresent("com.fasterxml.jackson.dataformat.smile.SmileFactory", loader);
-		jackson2CborPresent = ClassUtils.isPresent("com.fasterxml.jackson.dataformat.cbor.CBORFactory", loader);
-		jackson2YamlPresent = ClassUtils.isPresent("com.fasterxml.jackson.dataformat.yaml.YAMLFactory", loader);
+		HTTP_COMPONENTS_CLIENT_PRESENT = ClassUtils.isPresent("org.apache.hc.client5.http.classic.HttpClient", loader);
+		JETTY_CLIENT_PRESENT = ClassUtils.isPresent("org.eclipse.jetty.client.HttpClient", loader);
+		REACTOR_NETTY_CLIENT_PRESENT = ClassUtils.isPresent("reactor.netty.http.client.HttpClient", loader);
+		JDK_CLIENT_PRESENT = ClassUtils.isPresent("java.net.http.HttpClient", loader);
 	}
 
-	@Nullable
-	private String baseUrl;
+	private @Nullable String baseUrl;
 
-	@Nullable
-	private Map<String, ?> defaultUriVariables;
+	private @Nullable Map<String, ?> defaultUriVariables;
 
-	@Nullable
-	private UriBuilderFactory uriBuilderFactory;
+	private @Nullable UriBuilderFactory uriBuilderFactory;
 
-	@Nullable
-	private HttpHeaders defaultHeaders;
+	private @Nullable HttpHeaders defaultHeaders;
 
-	@Nullable
-	private Consumer<RestClient.RequestHeadersSpec<?>> defaultRequest;
+	private @Nullable LinkedMultiValueMap<String, String> defaultCookies;
 
-	@Nullable
-	private List<StatusHandler> statusHandlers;
+	private @Nullable Object defaultApiVersion;
 
-	@Nullable
-	private ClientHttpRequestFactory requestFactory;
+	private @Nullable ApiVersionInserter apiVersionInserter;
 
-	@Nullable
-	private List<HttpMessageConverter<?>> messageConverters;
+	private @Nullable Consumer<RestClient.RequestHeadersSpec<?>> defaultRequest;
 
-	@Nullable
-	private List<ClientHttpRequestInterceptor> interceptors;
+	private @Nullable List<StatusHandler> statusHandlers;
 
-	@Nullable
-	private List<ClientHttpRequestInitializer> initializers;
+	private @Nullable List<ClientHttpRequestInterceptor> interceptors;
+
+	private @Nullable BiPredicate<URI, HttpMethod> bufferingPredicate;
+
+	private @Nullable List<ClientHttpRequestInitializer> initializers;
+
+	private @Nullable ClientHttpRequestFactory requestFactory;
+
+	private @Nullable List<HttpMessageConverter<?>> messageConverters;
+
+	private @Nullable Consumer<HttpMessageConverters.ClientBuilder> convertersConfigurer;
 
 	private ObservationRegistry observationRegistry = ObservationRegistry.NOOP;
 
-	@Nullable
-	private ClientRequestObservationConvention observationConvention;
+	private @Nullable ClientRequestObservationConvention observationConvention;
 
 
 	public DefaultRestClientBuilder() {
@@ -151,52 +124,46 @@ final class DefaultRestClientBuilder implements RestClient.Builder {
 		Assert.notNull(other, "Other must not be null");
 
 		this.baseUrl = other.baseUrl;
-		this.defaultUriVariables = (other.defaultUriVariables != null ?
-				new LinkedHashMap<>(other.defaultUriVariables) : null);
+		this.defaultUriVariables = (other.defaultUriVariables != null ? new LinkedHashMap<>(other.defaultUriVariables) : null);
 		this.uriBuilderFactory = other.uriBuilderFactory;
-
-		if (other.defaultHeaders != null) {
-			this.defaultHeaders = new HttpHeaders();
-			this.defaultHeaders.putAll(other.defaultHeaders);
-		}
-		else {
-			this.defaultHeaders = null;
-		}
+		this.defaultHeaders = (other.defaultHeaders != null ? HttpHeaders.copyOf(other.defaultHeaders) : null);
+		this.defaultCookies = (other.defaultCookies != null ? other.defaultCookies.deepCopy() : null);
+		this.defaultApiVersion = other.defaultApiVersion;
+		this.apiVersionInserter = other.apiVersionInserter;
 		this.defaultRequest = other.defaultRequest;
 		this.statusHandlers = (other.statusHandlers != null ? new ArrayList<>(other.statusHandlers) : null);
-
-		this.requestFactory = other.requestFactory;
-		this.messageConverters = (other.messageConverters != null ?
-				new ArrayList<>(other.messageConverters) : null);
-
 		this.interceptors = (other.interceptors != null) ? new ArrayList<>(other.interceptors) : null;
+		this.bufferingPredicate = other.bufferingPredicate;
 		this.initializers = (other.initializers != null) ? new ArrayList<>(other.initializers) : null;
+		this.requestFactory = other.requestFactory;
+		this.messageConverters = (other.messageConverters != null ? new ArrayList<>(other.messageConverters) : null);
+		this.convertersConfigurer = other.convertersConfigurer;
 		this.observationRegistry = other.observationRegistry;
 		this.observationConvention = other.observationConvention;
 	}
 
+	@SuppressWarnings("removal")
 	public DefaultRestClientBuilder(RestTemplate restTemplate) {
 		Assert.notNull(restTemplate, "RestTemplate must not be null");
 
 		this.uriBuilderFactory = getUriBuilderFactory(restTemplate);
 		this.statusHandlers = new ArrayList<>();
 		this.statusHandlers.add(StatusHandler.fromErrorHandler(restTemplate.getErrorHandler()));
-
-		this.requestFactory = getRequestFactory(restTemplate);
-		this.messageConverters = new ArrayList<>(restTemplate.getMessageConverters());
-
 		if (!CollectionUtils.isEmpty(restTemplate.getInterceptors())) {
 			this.interceptors = new ArrayList<>(restTemplate.getInterceptors());
 		}
+		this.bufferingPredicate = restTemplate.getBufferingPredicate();
 		if (!CollectionUtils.isEmpty(restTemplate.getClientHttpRequestInitializers())) {
 			this.initializers = new ArrayList<>(restTemplate.getClientHttpRequestInitializers());
 		}
+		this.requestFactory = getRequestFactory(restTemplate);
+		this.messageConverters = new ArrayList<>(restTemplate.getMessageConverters());
 		this.observationRegistry = restTemplate.getObservationRegistry();
 		this.observationConvention = restTemplate.getObservationConvention();
 	}
 
-	@Nullable
-	private static UriBuilderFactory getUriBuilderFactory(RestTemplate restTemplate) {
+	@SuppressWarnings("removal")
+	private static @Nullable UriBuilderFactory getUriBuilderFactory(RestTemplate restTemplate) {
 		UriTemplateHandler uriTemplateHandler = restTemplate.getUriTemplateHandler();
 		if (uriTemplateHandler instanceof DefaultUriBuilderFactory builderFactory) {
 			// only reuse the DefaultUriBuilderFactory if it has been customized
@@ -228,6 +195,7 @@ final class DefaultRestClientBuilder implements RestClient.Builder {
 				factory.shouldParsePath());
 	}
 
+	@SuppressWarnings("removal")
 	private static ClientHttpRequestFactory getRequestFactory(RestTemplate restTemplate) {
 		ClientHttpRequestFactory requestFactory = restTemplate.getRequestFactory();
 		if (requestFactory instanceof InterceptingClientHttpRequestFactory interceptingClientHttpRequestFactory) {
@@ -242,6 +210,12 @@ final class DefaultRestClientBuilder implements RestClient.Builder {
 	@Override
 	public RestClient.Builder baseUrl(String baseUrl) {
 		this.baseUrl = baseUrl;
+		return this;
+	}
+
+	@Override
+	public RestClient.Builder baseUrl(URI baseUrl) {
+		this.baseUrl = baseUrl.toString();
 		return this;
 	}
 
@@ -277,6 +251,37 @@ final class DefaultRestClientBuilder implements RestClient.Builder {
 	}
 
 	@Override
+	public RestClient.Builder defaultCookie(String cookie, String... values) {
+		initCookies().addAll(cookie, Arrays.asList(values));
+		return this;
+	}
+
+	@Override
+	public RestClient.Builder defaultCookies(Consumer<MultiValueMap<String, String>> cookiesConsumer) {
+		cookiesConsumer.accept(initCookies());
+		return this;
+	}
+
+	private MultiValueMap<String, String> initCookies() {
+		if (this.defaultCookies == null) {
+			this.defaultCookies = new LinkedMultiValueMap<>(3);
+		}
+		return this.defaultCookies;
+	}
+
+	@Override
+	public RestClient.Builder defaultApiVersion(@Nullable Object version) {
+		this.defaultApiVersion = version;
+		return this;
+	}
+
+	@Override
+	public RestClient.Builder apiVersionInserter(@Nullable ApiVersionInserter apiVersionInserter) {
+		this.apiVersionInserter = apiVersionInserter;
+		return this;
+	}
+
+	@Override
 	public RestClient.Builder defaultRequest(Consumer<RestClient.RequestHeadersSpec<?>> defaultRequest) {
 		this.defaultRequest = this.defaultRequest != null ?
 				this.defaultRequest.andThen(defaultRequest) : defaultRequest;
@@ -289,6 +294,7 @@ final class DefaultRestClientBuilder implements RestClient.Builder {
 	}
 
 	@Override
+	@SuppressWarnings("removal")
 	public RestClient.Builder defaultStatusHandler(ResponseErrorHandler errorHandler) {
 		return defaultStatusHandlerInternal(StatusHandler.fromErrorHandler(errorHandler));
 	}
@@ -322,6 +328,12 @@ final class DefaultRestClientBuilder implements RestClient.Builder {
 	}
 
 	@Override
+	public RestClient.Builder bufferContent(BiPredicate<URI, HttpMethod> predicate) {
+		this.bufferingPredicate = predicate;
+		return this;
+	}
+
+	@Override
 	public RestClient.Builder requestInitializer(ClientHttpRequestInitializer initializer) {
 		Assert.notNull(initializer, "Initializer must not be null");
 		initInitializers().add(initializer);
@@ -349,8 +361,31 @@ final class DefaultRestClientBuilder implements RestClient.Builder {
 	}
 
 	@Override
+	@SuppressWarnings("removal")
 	public RestClient.Builder messageConverters(Consumer<List<HttpMessageConverter<?>>> configurer) {
-		configurer.accept(initMessageConverters());
+		if (this.messageConverters == null) {
+			this.messageConverters = new ArrayList<>();
+			HttpMessageConverters.forClient().registerDefaults().build().forEach(this.messageConverters::add);
+		}
+		configurer.accept(this.messageConverters);
+		validateConverters(this.messageConverters);
+		return this;
+	}
+
+	@Override
+	@SuppressWarnings("removal")
+	public RestClient.Builder messageConverters(Iterable<HttpMessageConverter<?>> messageConverters) {
+		validateConverters(messageConverters);
+		List<HttpMessageConverter<?>> converters = new ArrayList<>();
+		messageConverters.forEach(converters::add);
+		this.messageConverters = converters;
+		return this;
+	}
+
+	@Override
+	public RestClient.Builder configureMessageConverters(Consumer<HttpMessageConverters.ClientBuilder> configurer) {
+		this.convertersConfigurer = (this.convertersConfigurer != null ?
+				this.convertersConfigurer.andThen(configurer) : configurer);
 		return this;
 	}
 
@@ -373,37 +408,11 @@ final class DefaultRestClientBuilder implements RestClient.Builder {
 		return this;
 	}
 
-	private List<HttpMessageConverter<?>> initMessageConverters() {
-		if (this.messageConverters == null) {
-			this.messageConverters = new ArrayList<>();
-			this.messageConverters.add(new ByteArrayHttpMessageConverter());
-			this.messageConverters.add(new StringHttpMessageConverter());
-			this.messageConverters.add(new ResourceHttpMessageConverter(false));
-			this.messageConverters.add(new AllEncompassingFormHttpMessageConverter());
-
-			if (kotlinSerializationJsonPresent) {
-				this.messageConverters.add(new KotlinSerializationJsonHttpMessageConverter());
-			}
-			if (jackson2Present) {
-				this.messageConverters.add(new MappingJackson2HttpMessageConverter());
-			}
-			else if (gsonPresent) {
-				this.messageConverters.add(new GsonHttpMessageConverter());
-			}
-			else if (jsonbPresent) {
-				this.messageConverters.add(new JsonbHttpMessageConverter());
-			}
-			if (jackson2SmilePresent) {
-				this.messageConverters.add(new MappingJackson2SmileHttpMessageConverter());
-			}
-			if (jackson2CborPresent) {
-				this.messageConverters.add(new MappingJackson2CborHttpMessageConverter());
-			}
-			if (jackson2YamlPresent) {
-				this.messageConverters.add(new MappingJackson2YamlHttpMessageConverter());
-			}
-		}
-		return this.messageConverters;
+	private void validateConverters(@Nullable Iterable<HttpMessageConverter<?>> converters) {
+		Assert.notNull(converters, "At least one HttpMessageConverter is required");
+		Assert.isTrue(converters.iterator().hasNext(), "At least one HttpMessageConverter is required");
+		converters.forEach(converter -> Assert.notNull(converter,
+				"The HttpMessageConverter list must not contain null elements"));
 	}
 
 
@@ -414,34 +423,36 @@ final class DefaultRestClientBuilder implements RestClient.Builder {
 
 	@Override
 	public RestClient build() {
+
 		ClientHttpRequestFactory requestFactory = initRequestFactory();
 		UriBuilderFactory uriBuilderFactory = initUriBuilderFactory();
 		HttpHeaders defaultHeaders = copyDefaultHeaders();
-		List<HttpMessageConverter<?>> messageConverters = (this.messageConverters != null ?
-				this.messageConverters : initMessageConverters());
-		return new DefaultRestClient(requestFactory,
-				this.interceptors, this.initializers, uriBuilderFactory,
-				defaultHeaders,
-				this.defaultRequest,
-				this.statusHandlers,
-				messageConverters,
-				this.observationRegistry,
-				this.observationConvention,
-				new DefaultRestClientBuilder(this)
-				);
+		MultiValueMap<String, String> defaultCookies = copyDefaultCookies();
+		List<HttpMessageConverter<?>> converters = initMessageConverters();
+
+		return new DefaultRestClient(
+				requestFactory, this.interceptors, this.bufferingPredicate, this.initializers,
+				uriBuilderFactory, defaultHeaders, defaultCookies, this.defaultApiVersion,
+				this.apiVersionInserter, this.defaultRequest,
+				this.statusHandlers, converters,
+				this.observationRegistry, this.observationConvention,
+				new DefaultRestClientBuilder(this));
 	}
 
 	private ClientHttpRequestFactory initRequestFactory() {
 		if (this.requestFactory != null) {
 			return this.requestFactory;
 		}
-		else if (httpComponentsClientPresent) {
+		else if (HTTP_COMPONENTS_CLIENT_PRESENT) {
 			return new HttpComponentsClientHttpRequestFactory();
 		}
-		else if (jettyClientPresent) {
+		else if (JETTY_CLIENT_PRESENT) {
 			return new JettyClientHttpRequestFactory();
 		}
-		else if (jdkClientPresent) {
+		else if (REACTOR_NETTY_CLIENT_PRESENT) {
+			return new ReactorClientHttpRequestFactory();
+		}
+		else if (JDK_CLIENT_PRESENT) {
 			// java.net.http module might not be loaded, so we can't default to the JDK HttpClient
 			return new JdkClientHttpRequestFactory();
 		}
@@ -460,16 +471,38 @@ final class DefaultRestClientBuilder implements RestClient.Builder {
 		return factory;
 	}
 
-	@Nullable
-	private HttpHeaders copyDefaultHeaders() {
-		if (this.defaultHeaders != null) {
-			HttpHeaders copy = new HttpHeaders();
-			this.defaultHeaders.forEach((key, values) -> copy.put(key, new ArrayList<>(values)));
-			return HttpHeaders.readOnlyHttpHeaders(copy);
-		}
-		else {
+	private @Nullable HttpHeaders copyDefaultHeaders() {
+		if (this.defaultHeaders == null) {
 			return null;
 		}
+		HttpHeaders copy = new HttpHeaders();
+		this.defaultHeaders.forEach((key, values) -> copy.put(key, new ArrayList<>(values)));
+		return HttpHeaders.readOnlyHttpHeaders(copy);
+	}
+
+	private @Nullable MultiValueMap<String, String> copyDefaultCookies() {
+		if (this.defaultCookies == null) {
+			return null;
+		}
+		MultiValueMap<String, String> copy = new LinkedMultiValueMap<>(this.defaultCookies.size());
+		this.defaultCookies.forEach((key, values) -> copy.put(key, new ArrayList<>(values)));
+		return CollectionUtils.unmodifiableMultiValueMap(copy);
+	}
+
+	private List<HttpMessageConverter<?>> initMessageConverters() {
+		HttpMessageConverters.ClientBuilder builder = HttpMessageConverters.forClient();
+		if (this.messageConverters != null) {
+			this.messageConverters.forEach(builder::addCustomConverter);
+		}
+		else {
+			builder.registerDefaults();
+		}
+		if (this.convertersConfigurer != null) {
+			this.convertersConfigurer.accept(builder);
+		}
+		List<HttpMessageConverter<?>> result = new ArrayList<>();
+		builder.build().forEach(result::add);
+		return result;
 	}
 
 }

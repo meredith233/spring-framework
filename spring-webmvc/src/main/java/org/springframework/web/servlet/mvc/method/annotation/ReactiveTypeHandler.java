@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2023 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -26,8 +26,10 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 
 import io.micrometer.context.ContextSnapshot;
+import io.micrometer.context.ContextSnapshotFactory;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
@@ -39,11 +41,12 @@ import org.springframework.core.ReactiveAdapter;
 import org.springframework.core.ReactiveAdapterRegistry;
 import org.springframework.core.ResolvableType;
 import org.springframework.core.task.SyncTaskExecutor;
+import org.springframework.core.task.TaskDecorator;
 import org.springframework.core.task.TaskExecutor;
+import org.springframework.core.task.support.ContextPropagatingTaskDecorator;
 import org.springframework.http.MediaType;
 import org.springframework.http.codec.ServerSentEvent;
 import org.springframework.http.server.ServerHttpResponse;
-import org.springframework.lang.Nullable;
 import org.springframework.util.Assert;
 import org.springframework.util.ClassUtils;
 import org.springframework.util.CollectionUtils;
@@ -78,7 +81,9 @@ class ReactiveTypeHandler {
 
 	private static final MediaType WILDCARD_SUBTYPE_SUFFIXED_BY_NDJSON = MediaType.valueOf("application/*+x-ndjson");
 
-	private static final boolean isContextPropagationPresent = ClassUtils.isPresent(
+	private static final MediaType APPLICATION_GRPC = MediaType.valueOf("application/grpc");
+
+	private static final boolean CONTEXT_PROPAGATION_PRESENT = ClassUtils.isPresent(
 			"io.micrometer.context.ContextSnapshot", ReactiveTypeHandler.class.getClassLoader());
 
 	private static final Log logger = LogFactory.getLog(ReactiveTypeHandler.class);
@@ -90,18 +95,31 @@ class ReactiveTypeHandler {
 
 	private final ContentNegotiationManager contentNegotiationManager;
 
+	private final @Nullable Object contextSnapshotHelper;
+
 
 	public ReactiveTypeHandler() {
-		this(ReactiveAdapterRegistry.getSharedInstance(), new SyncTaskExecutor(), new ContentNegotiationManager());
+		this(ReactiveAdapterRegistry.getSharedInstance(), new SyncTaskExecutor(), new ContentNegotiationManager(), null);
 	}
 
-	ReactiveTypeHandler(ReactiveAdapterRegistry registry, TaskExecutor executor, ContentNegotiationManager manager) {
+	ReactiveTypeHandler(
+			ReactiveAdapterRegistry registry, TaskExecutor executor, ContentNegotiationManager manager,
+			@Nullable Object contextSnapshotFactory) {
+
 		Assert.notNull(registry, "ReactiveAdapterRegistry is required");
 		Assert.notNull(executor, "TaskExecutor is required");
 		Assert.notNull(manager, "ContentNegotiationManager is required");
 		this.adapterRegistry = registry;
 		this.taskExecutor = executor;
 		this.contentNegotiationManager = manager;
+		this.contextSnapshotHelper = initContextSnapshotHelper(contextSnapshotFactory);
+	}
+
+	private static @Nullable Object initContextSnapshotHelper(@Nullable Object snapshotFactory) {
+		if (CONTEXT_PROPAGATION_PRESENT) {
+			return new ContextSnapshotHelper((ContextSnapshotFactory) snapshotFactory);
+		}
+		return null;
 	}
 
 
@@ -119,8 +137,8 @@ class ReactiveTypeHandler {
 	 * @return an emitter for streaming, or {@code null} if handled internally
 	 * with a {@link DeferredResult}
 	 */
-	@Nullable
-	public ResponseBodyEmitter handleValue(Object returnValue, MethodParameter returnType,
+	public @Nullable ResponseBodyEmitter handleValue(
+			Object returnValue, MethodParameter returnType, @Nullable MediaType presetMediaType,
 			ModelAndViewContainer mav, NativeWebRequest request) throws Exception {
 
 		Assert.notNull(returnValue, "Expected return value");
@@ -128,29 +146,38 @@ class ReactiveTypeHandler {
 		ReactiveAdapter adapter = this.adapterRegistry.getAdapter(clazz);
 		Assert.state(adapter != null, () -> "Unexpected return value type: " + clazz);
 
-		if (isContextPropagationPresent) {
-			returnValue = ContextSnapshotHelper.writeReactorContext(returnValue);
+		TaskDecorator taskDecorator = null;
+		if (CONTEXT_PROPAGATION_PRESENT) {
+			ContextSnapshotHelper helper = (ContextSnapshotHelper) this.contextSnapshotHelper;
+			Assert.notNull(helper, "No ContextSnapshotHelper");
+			returnValue = helper.writeReactorContext(returnValue);
+			taskDecorator = helper.getTaskDecorator();
 		}
 
 		ResolvableType elementType = ResolvableType.forMethodParameter(returnType).getGeneric();
 		Class<?> elementClass = elementType.toClass();
 
-		Collection<MediaType> mediaTypes = getMediaTypes(request);
+		Collection<MediaType> mediaTypes = (presetMediaType != null ? List.of(presetMediaType) : getMediaTypes(request));
 		Optional<MediaType> mediaType = mediaTypes.stream().filter(MimeType::isConcrete).findFirst();
 
 		if (adapter.isMultiValue()) {
 			if (mediaTypes.stream().anyMatch(MediaType.TEXT_EVENT_STREAM::includes) ||
 					ServerSentEvent.class.isAssignableFrom(elementClass)) {
 				SseEmitter emitter = new SseEmitter(STREAMING_TIMEOUT_VALUE);
-				new SseEmitterSubscriber(emitter, this.taskExecutor).connect(adapter, returnValue);
+				new SseEmitterSubscriber(emitter, this.taskExecutor, taskDecorator).connect(adapter, returnValue);
+				return emitter;
+			}
+			if (mediaTypes.stream().anyMatch(APPLICATION_GRPC::includes)) {
+				ResponseBodyEmitter emitter = getEmitter(mediaType.orElse(APPLICATION_GRPC));
+				new BasicEmitterSubscriber(emitter, APPLICATION_GRPC, this.taskExecutor).connect(adapter, returnValue);
 				return emitter;
 			}
 			if (CharSequence.class.isAssignableFrom(elementClass)) {
 				ResponseBodyEmitter emitter = getEmitter(mediaType.orElse(MediaType.TEXT_PLAIN));
-				new TextEmitterSubscriber(emitter, this.taskExecutor).connect(adapter, returnValue);
+				new BasicEmitterSubscriber(emitter, MediaType.TEXT_PLAIN, this.taskExecutor).connect(adapter, returnValue);
 				return emitter;
 			}
-			MediaType streamingResponseType = findConcreteStreamingMediaType(mediaTypes);
+			MediaType streamingResponseType = findConcreteJsonStreamMediaType(mediaTypes);
 			if (streamingResponseType != null) {
 				ResponseBodyEmitter emitter = getEmitter(streamingResponseType);
 				new JsonEmitterSubscriber(emitter, this.taskExecutor).connect(adapter, returnValue);
@@ -167,11 +194,11 @@ class ReactiveTypeHandler {
 	}
 
 	/**
-	 * Attempts to find a concrete {@code MediaType} that can be streamed (as json separated
-	 * by newlines in the response body). This method considers two concrete types
-	 * {@code APPLICATION_NDJSON} and {@code APPLICATION_STREAM_JSON}) as well as any
-	 * subtype of application that has the {@code +x-ndjson} suffix. In the later case,
-	 * the media type MUST be concrete for it to be considered.
+	 * Attempts to find a concrete {@code MediaType} that can be streamed (as JSON payloads
+	 * separated by newlines in the response body). This method considers {@code APPLICATION_JSONL},
+	 * {@code APPLICATION_NDJSON}, and any subtype of application
+	 * that has the {@code +x-ndjson} suffix. In the latter case, the media type MUST be
+	 * concrete for it to be considered.
 	 *
 	 * <p>For example {@code application/vnd.myapp+x-ndjson} is considered a streaming type
 	 * while {@code application/*+x-ndjson} isn't.
@@ -179,9 +206,7 @@ class ReactiveTypeHandler {
 	 * @return the concrete streaming {@code MediaType} if one could be found or {@code null}
 	 * if none could be found
 	 */
-	@SuppressWarnings("deprecation")
-	@Nullable
-	static MediaType findConcreteStreamingMediaType(Collection<MediaType> acceptedMediaTypes) {
+	static @Nullable MediaType findConcreteJsonStreamMediaType(Collection<MediaType> acceptedMediaTypes) {
 		for (MediaType acceptedType : acceptedMediaTypes) {
 			if (WILDCARD_SUBTYPE_SUFFIXED_BY_NDJSON.includes(acceptedType)) {
 				if (acceptedType.isConcrete()) {
@@ -198,8 +223,8 @@ class ReactiveTypeHandler {
 			else if (MediaType.APPLICATION_NDJSON.includes(acceptedType)) {
 				return MediaType.APPLICATION_NDJSON;
 			}
-			else if (MediaType.APPLICATION_STREAM_JSON.includes(acceptedType)) {
-				return MediaType.APPLICATION_STREAM_JSON;
+			else if (MediaType.APPLICATION_JSONL.includes(acceptedType)) {
+				return MediaType.APPLICATION_JSONL;
 			}
 		}
 		return null; // not a concrete streaming type
@@ -209,11 +234,11 @@ class ReactiveTypeHandler {
 	private Collection<MediaType> getMediaTypes(NativeWebRequest request)
 			throws HttpMediaTypeNotAcceptableException {
 
-		Collection<MediaType> mediaTypes = (Collection<MediaType>) request.getAttribute(
+		Collection<MediaType> producibleMediaTypes = (Collection<MediaType>) request.getAttribute(
 				HandlerMapping.PRODUCIBLE_MEDIA_TYPES_ATTRIBUTE, RequestAttributes.SCOPE_REQUEST);
 
-		return CollectionUtils.isEmpty(mediaTypes) ?
-				this.contentNegotiationManager.resolveMediaTypes(request) : mediaTypes;
+		return (CollectionUtils.isEmpty(producibleMediaTypes) ?
+				this.contentNegotiationManager.resolveMediaTypes(request) : producibleMediaTypes);
 	}
 
 	private ResponseBodyEmitter getEmitter(MediaType mediaType) {
@@ -232,13 +257,11 @@ class ReactiveTypeHandler {
 
 		private final TaskExecutor taskExecutor;
 
-		@Nullable
-		private Subscription subscription;
+		private @Nullable Subscription subscription;
 
-		private final AtomicReference<Object> elementRef = new AtomicReference<>();
+		private final AtomicReference<@Nullable Object> elementRef = new AtomicReference<>();
 
-		@Nullable
-		private Throwable error;
+		private @Nullable Throwable error;
 
 		private volatile boolean terminated;
 
@@ -246,9 +269,14 @@ class ReactiveTypeHandler {
 
 		private volatile boolean done;
 
-		protected AbstractEmitterSubscriber(ResponseBodyEmitter emitter, TaskExecutor executor) {
+		private final Runnable sendTask;
+
+		protected AbstractEmitterSubscriber(
+				ResponseBodyEmitter emitter, TaskExecutor executor, @Nullable TaskDecorator taskDecorator) {
+
 			this.emitter = emitter;
 			this.taskExecutor = executor;
+			this.sendTask = (taskDecorator != null ? taskDecorator.decorate(this) : this);
 		}
 
 		public void connect(ReactiveAdapter adapter, Object returnValue) {
@@ -301,7 +329,7 @@ class ReactiveTypeHandler {
 
 		private void schedule() {
 			try {
-				this.taskExecutor.execute(this);
+				this.taskExecutor.execute(this.sendTask);
 			}
 			catch (Throwable ex) {
 				try {
@@ -333,10 +361,18 @@ class ReactiveTypeHandler {
 					this.subscription.request(1);
 				}
 				catch (final Throwable ex) {
-					if (logger.isTraceEnabled()) {
-						logger.trace("Send for " + this.emitter + " failed: " + ex);
+					if (logger.isDebugEnabled()) {
+						logger.debug("Send for " + this.emitter + " failed: " + ex);
 					}
 					terminate();
+					try {
+						this.emitter.completeWithError(ex);
+					}
+					catch (Exception ex2) {
+						if (logger.isDebugEnabled()) {
+							logger.debug("Failure from emitter completeWithError: " + ex2);
+						}
+					}
 					return;
 				}
 			}
@@ -346,16 +382,30 @@ class ReactiveTypeHandler {
 				Throwable ex = this.error;
 				this.error = null;
 				if (ex != null) {
-					if (logger.isTraceEnabled()) {
-						logger.trace("Publisher for " + this.emitter + " failed: " + ex);
+					if (logger.isDebugEnabled()) {
+						logger.debug("Publisher for " + this.emitter + " failed: " + ex);
 					}
-					this.emitter.completeWithError(ex);
+					try {
+						this.emitter.completeWithError(ex);
+					}
+					catch (Exception ex2) {
+						if (logger.isDebugEnabled()) {
+							logger.debug("Failure from emitter completeWithError: " + ex2);
+						}
+					}
 				}
 				else {
 					if (logger.isTraceEnabled()) {
 						logger.trace("Publisher for " + this.emitter + " completed");
 					}
-					this.emitter.complete();
+					try {
+						this.emitter.complete();
+					}
+					catch (Exception ex2) {
+						if (logger.isDebugEnabled()) {
+							logger.debug("Failure from emitter complete: " + ex2);
+						}
+					}
 				}
 				return;
 			}
@@ -378,8 +428,8 @@ class ReactiveTypeHandler {
 
 	private static class SseEmitterSubscriber extends AbstractEmitterSubscriber {
 
-		SseEmitterSubscriber(SseEmitter sseEmitter, TaskExecutor executor) {
-			super(sseEmitter, executor);
+		SseEmitterSubscriber(SseEmitter sseEmitter, TaskExecutor executor, @Nullable TaskDecorator taskDecorator) {
+			super(sseEmitter, executor, taskDecorator);
 		}
 
 		@Override
@@ -421,8 +471,10 @@ class ReactiveTypeHandler {
 
 	private static class JsonEmitterSubscriber extends AbstractEmitterSubscriber {
 
-		JsonEmitterSubscriber(ResponseBodyEmitter emitter, TaskExecutor executor) {
-			super(emitter, executor);
+		JsonEmitterSubscriber(
+				ResponseBodyEmitter emitter, TaskExecutor executor) {
+
+			super(emitter, executor, null);
 		}
 
 		@Override
@@ -433,15 +485,18 @@ class ReactiveTypeHandler {
 	}
 
 
-	private static class TextEmitterSubscriber extends AbstractEmitterSubscriber {
+	private static class BasicEmitterSubscriber extends AbstractEmitterSubscriber {
 
-		TextEmitterSubscriber(ResponseBodyEmitter emitter, TaskExecutor executor) {
-			super(emitter, executor);
+		private final MediaType mediaType;
+
+		BasicEmitterSubscriber(ResponseBodyEmitter emitter, MediaType mediaType, TaskExecutor executor) {
+			super(emitter, executor, null);
+			this.mediaType = mediaType;
 		}
 
 		@Override
 		protected void send(Object element) throws IOException {
-			getEmitter().send(element, MediaType.TEXT_PLAIN);
+			getEmitter().send(element, this.mediaType);
 		}
 	}
 
@@ -514,21 +569,31 @@ class ReactiveTypeHandler {
 	}
 
 
-	private static class ContextSnapshotHelper {
+	private static final class ContextSnapshotHelper {
 
-		@SuppressWarnings("deprecation")
-		public static Object writeReactorContext(Object returnValue) {
-			if (Mono.class.isAssignableFrom(returnValue.getClass())) {
-				ContextSnapshot snapshot = ContextSnapshot.captureAll();
+		private final ContextSnapshotFactory snapshotFactory;
+
+		private ContextSnapshotHelper(@Nullable ContextSnapshotFactory factory) {
+			this.snapshotFactory = (factory != null ? factory : ContextSnapshotFactory.builder().build());
+		}
+
+		@SuppressWarnings("ReactiveStreamsUnusedPublisher")
+		public Object writeReactorContext(Object returnValue) {
+			if (returnValue instanceof Mono) {
+				ContextSnapshot snapshot = this.snapshotFactory.captureAll();
 				return ((Mono<?>) returnValue).contextWrite(snapshot::updateContext);
 			}
-			else if (Flux.class.isAssignableFrom(returnValue.getClass())) {
-				ContextSnapshot snapshot = ContextSnapshot.captureAll();
+			else if (returnValue instanceof Flux) {
+				ContextSnapshot snapshot = this.snapshotFactory.captureAll();
 				return ((Flux<?>) returnValue).contextWrite(snapshot::updateContext);
 			}
 			else {
 				return returnValue;
 			}
+		}
+
+		public TaskDecorator getTaskDecorator() {
+			return new ContextPropagatingTaskDecorator(this.snapshotFactory);
 		}
 	}
 

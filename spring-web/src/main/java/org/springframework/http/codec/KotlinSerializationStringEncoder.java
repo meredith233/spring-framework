@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,15 +16,17 @@
 
 package org.springframework.http.codec;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Predicate;
 
-import kotlin.text.Charsets;
 import kotlinx.serialization.KSerializer;
 import kotlinx.serialization.StringFormat;
+import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Publisher;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
@@ -36,12 +38,17 @@ import org.springframework.core.codec.EncodingException;
 import org.springframework.core.io.buffer.DataBuffer;
 import org.springframework.core.io.buffer.DataBufferFactory;
 import org.springframework.http.MediaType;
-import org.springframework.lang.Nullable;
 import org.springframework.util.MimeType;
 
 /**
  * Abstract base class for {@link Encoder} implementations that defer to Kotlin
  * {@linkplain StringFormat string serializers}.
+ *
+ * <p>As of Spring Framework 7.0, by default it only encodes types annotated with
+ * {@link kotlinx.serialization.Serializable @Serializable} at type or generics level
+ * since it allows combined usage with other general purpose encoders without conflicts.
+ * Alternative constructors with a {@code Predicate<ResolvableType>} parameter can be used
+ * to customize this behavior.
  *
  * @author Sebastien Deleuze
  * @author Iain Henderson
@@ -52,12 +59,34 @@ import org.springframework.util.MimeType;
 public abstract class KotlinSerializationStringEncoder<T extends StringFormat> extends KotlinSerializationSupport<T>
 	implements Encoder<Object> {
 
+	private static final byte[] NEWLINE_SEPARATOR = {'\n'};
+
+	protected static final byte[] EMPTY_BYTES = new byte[0];
+
+
 	// CharSequence encoding needed for now, see https://github.com/Kotlin/kotlinx.serialization/issues/204 for more details
 	private final CharSequenceEncoder charSequenceEncoder = CharSequenceEncoder.allMimeTypes();
 	private final Set<MimeType> streamingMediaTypes = new HashSet<>();
 
+
+	/**
+	 * Creates a new instance with the given format and supported mime types
+	 * which only encodes types annotated with
+	 * {@link kotlinx.serialization.Serializable @Serializable} at type or
+	 * generics level.
+	 */
 	protected KotlinSerializationStringEncoder(T format, MimeType... supportedMimeTypes) {
 		super(format, supportedMimeTypes);
+	}
+
+	/**
+	 * Creates a new instance with the given format and supported mime types
+	 * which only encodes types for which the specified predicate returns
+	 * {@code true}.
+	 * @since 7.0
+	 */
+	protected KotlinSerializationStringEncoder(T format, Predicate<ResolvableType> typePredicate, MimeType... supportedMimeTypes) {
+		super(format, typePredicate, supportedMimeTypes);
 	}
 
 	/**
@@ -72,7 +101,7 @@ public abstract class KotlinSerializationStringEncoder<T extends StringFormat> e
 
 	@Override
 	public boolean canEncode(ResolvableType elementType, @Nullable MimeType mimeType) {
-		return canSerialize(elementType, mimeType);
+		return canSerialize(elementType, mimeType) && !String.class.isAssignableFrom(elementType.toClass());
 	}
 
 	@Override
@@ -85,22 +114,40 @@ public abstract class KotlinSerializationStringEncoder<T extends StringFormat> e
 		return supportedMimeTypes();
 	}
 
-
 	@Override
 	public Flux<DataBuffer> encode(Publisher<?> inputStream, DataBufferFactory bufferFactory,
-			ResolvableType elementType,
-			@Nullable MimeType mimeType, @Nullable Map<String, Object> hints) {
-		if (inputStream instanceof Mono) {
-			return Mono.from(inputStream)
+			ResolvableType elementType, @Nullable MimeType mimeType, @Nullable Map<String, Object> hints) {
+
+		if (inputStream instanceof Mono<?> mono) {
+			return mono
 					.map(value -> encodeValue(value, bufferFactory, elementType, mimeType, hints))
 					.flux();
 		}
-
 		if (mimeType != null && this.streamingMediaTypes.contains(mimeType)) {
 			return Flux.from(inputStream)
-					.map(list -> encodeValue(list, bufferFactory, elementType, mimeType, hints)
-							.write("\n", Charsets.UTF_8));
+					.map(value -> encodeStreamingValue(value, bufferFactory, elementType, mimeType, hints, EMPTY_BYTES,
+							NEWLINE_SEPARATOR));
 		}
+		return encodeNonStream(inputStream, bufferFactory, elementType, mimeType, hints);
+	}
+
+	protected DataBuffer encodeStreamingValue(Object value, DataBufferFactory bufferFactory,
+			ResolvableType valueType, @Nullable MimeType mimeType,
+			@Nullable Map<String, Object> hints, byte[] prefix, byte[] suffix) {
+
+		List<DataBuffer> buffers = new ArrayList<>(3);
+		if (prefix.length > 0) {
+			buffers.add(bufferFactory.allocateBuffer(prefix.length).write(prefix));
+		}
+		buffers.add(encodeValue(value, bufferFactory, valueType, mimeType, hints));
+		if (suffix.length > 0) {
+			buffers.add(bufferFactory.allocateBuffer(suffix.length).write(suffix));
+		}
+		return bufferFactory.join(buffers);
+	}
+
+	protected Flux<DataBuffer> encodeNonStream(Publisher<?> inputStream, DataBufferFactory bufferFactory,
+			ResolvableType elementType, @Nullable MimeType mimeType, @Nullable Map<String, Object> hints) {
 
 		ResolvableType listType = ResolvableType.forClassWithGenerics(List.class, elementType);
 		return Flux.from(inputStream)
@@ -108,7 +155,6 @@ public abstract class KotlinSerializationStringEncoder<T extends StringFormat> e
 				.map(list -> encodeValue(list, bufferFactory, listType, mimeType, hints))
 				.flux();
 	}
-
 
 	@Override
 	public DataBuffer encodeValue(Object value, DataBufferFactory bufferFactory,

@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,7 +19,6 @@ package org.springframework.web.reactive.function.server;
 import java.time.Duration;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
-import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -165,7 +164,7 @@ class DefaultRenderingResponseTests {
 		RenderingResponse renderingResponse = RenderingResponse.create("view")
 				.status(HttpStatus.FOUND)
 				.modelAttributes(model)
-				.build().block(Duration.of(5, ChronoUnit.MILLIS));
+				.build().block(Duration.ofMillis(5));
 		assertThat(renderingResponse).isNotNull();
 
 		MockServerWebExchange exchange = MockServerWebExchange.from(MockServerHttpRequest.get("http://localhost"));
@@ -274,5 +273,26 @@ class DefaultRenderingResponseTests {
 				.verify();
 	}
 
+	@Test  // gh-37378
+	void from() {
+		ResponseCookie cookie = ResponseCookie.from("currency", "USD").build();
+		RenderingResponse other = RenderingResponse.create("foo")
+				.status(HttpStatus.CREATED)
+				.header("foo", "bar")
+				.cookie(cookie)
+				.modelAttribute("model", "value")
+				.build().block();
+
+		Mono<RenderingResponse> result = RenderingResponse.from(other).build();
+		StepVerifier.create(result)
+				.assertNext(response -> {
+					assertThat(response.name()).isEqualTo("foo");
+					assertThat(response.statusCode()).isEqualTo(HttpStatus.CREATED);
+					assertThat(response.headers().getFirst("foo")).isEqualTo("bar");
+					assertThat(response.cookies()).containsEntry("currency", List.of(cookie));
+					assertThat(response.model()).containsEntry("model", "value");
+				})
+				.verifyComplete();
+	}
 
 }

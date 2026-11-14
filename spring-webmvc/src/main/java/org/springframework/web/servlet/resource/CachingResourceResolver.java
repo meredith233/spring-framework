@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2023 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,18 +17,16 @@
 package org.springframework.web.servlet.resource;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
 
 import jakarta.servlet.http.HttpServletRequest;
+import org.jspecify.annotations.Nullable;
 
 import org.springframework.cache.Cache;
 import org.springframework.cache.CacheManager;
 import org.springframework.core.io.Resource;
-import org.springframework.http.HttpHeaders;
-import org.springframework.lang.Nullable;
 import org.springframework.util.Assert;
 import org.springframework.util.StringUtils;
 
@@ -106,11 +104,10 @@ public class CachingResourceResolver extends AbstractResourceResolver {
 
 
 	@Override
-	@Nullable
-	protected Resource resolveResourceInternal(@Nullable HttpServletRequest request, String requestPath,
+	protected @Nullable Resource resolveResourceInternal(@Nullable HttpServletRequest request, String requestPath,
 			List<? extends Resource> locations, ResourceResolverChain chain) {
 
-		String key = computeKey(request, requestPath);
+		String key = computeKey(request, requestPath, locations);
 		Resource resource = this.cache.get(key, Resource.class);
 
 		if (resource != null) {
@@ -128,35 +125,47 @@ public class CachingResourceResolver extends AbstractResourceResolver {
 		return resource;
 	}
 
+	/**
+	 * Compute the caching key for the given request and resource request path.
+	 * @deprecated since 6.2.19 in favor of {@link #computeKey(HttpServletRequest, String, List)}.
+	 */
+	@Deprecated(since = "6.2.19", forRemoval = true)
 	protected String computeKey(@Nullable HttpServletRequest request, String requestPath) {
+		return computeKey(request, requestPath, Collections.emptyList());
+	}
+
+	/**
+	 * Compute the caching key for the given request and resource request path in the configured locations.
+	 */
+	protected String computeKey(@Nullable HttpServletRequest request, String requestPath, List<? extends Resource> locations) {
+		StringBuilder builder = new StringBuilder(RESOLVED_RESOURCE_CACHE_KEY_PREFIX);
+		if (!locations.isEmpty()) {
+			builder.append(Integer.toHexString(locations.hashCode())).append(":");
+		}
+		builder.append(requestPath);
 		if (request != null) {
 			String codingKey = getContentCodingKey(request);
 			if (StringUtils.hasText(codingKey)) {
-				return RESOLVED_RESOURCE_CACHE_KEY_PREFIX + requestPath + "+encoding=" + codingKey;
+				builder.append("+encoding=").append(codingKey);
 			}
 		}
-		return RESOLVED_RESOURCE_CACHE_KEY_PREFIX + requestPath;
+		return builder.toString();
 	}
 
-	@Nullable
-	private String getContentCodingKey(HttpServletRequest request) {
-		String header = request.getHeader(HttpHeaders.ACCEPT_ENCODING);
-		if (!StringUtils.hasText(header)) {
+	private @Nullable String getContentCodingKey(HttpServletRequest request) {
+		List<String> acceptedCodings = EncodedResourceResolver.parseAcceptEncoding(request);
+		if (acceptedCodings.isEmpty()) {
 			return null;
 		}
-		return Arrays.stream(StringUtils.tokenizeToStringArray(header, ","))
-				.map(token -> {
-					int index = token.indexOf(';');
-					return (index >= 0 ? token.substring(0, index) : token).trim().toLowerCase();
-				})
+		return acceptedCodings
+				.stream()
 				.filter(this.contentCodings::contains)
 				.sorted()
 				.collect(Collectors.joining(","));
 	}
 
 	@Override
-	@Nullable
-	protected String resolveUrlPathInternal(String resourceUrlPath,
+	protected @Nullable String resolveUrlPathInternal(String resourceUrlPath,
 			List<? extends Resource> locations, ResourceResolverChain chain) {
 
 		String key = RESOLVED_URL_PATH_CACHE_KEY_PREFIX + resourceUrlPath;

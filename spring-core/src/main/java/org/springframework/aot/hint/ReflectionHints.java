@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2023 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,13 +21,16 @@ import java.lang.reflect.Executable;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.function.Consumer;
 import java.util.stream.Stream;
 
+import org.jspecify.annotations.Nullable;
+
 import org.springframework.aot.hint.TypeHint.Builder;
-import org.springframework.lang.Nullable;
 import org.springframework.util.Assert;
 import org.springframework.util.ClassUtils;
 
@@ -44,6 +47,7 @@ public class ReflectionHints {
 
 	private final Map<TypeReference, TypeHint.Builder> types = new HashMap<>();
 
+	private final Set<LambdaHint> lambdaHints = new LinkedHashSet<>();
 
 	/**
 	 * Return the types that require reflection.
@@ -53,14 +57,23 @@ public class ReflectionHints {
 		return this.types.values().stream().map(TypeHint.Builder::build);
 	}
 
+
+	/**
+	 * Return the lambda hints.
+	 * @return a stream of {@link LambdaHint}
+	 * @since 7.0.6
+	 */
+	public Stream<LambdaHint> lambdaHints() {
+		return this.lambdaHints.stream();
+	}
+
 	/**
 	 * Return the reflection hints for the type defined by the specified
 	 * {@link TypeReference}.
 	 * @param type the type to inspect
 	 * @return the reflection hints for this type, or {@code null}
 	 */
-	@Nullable
-	public TypeHint getTypeHint(TypeReference type) {
+	public @Nullable TypeHint getTypeHint(TypeReference type) {
 		Builder typeHintBuilder = this.types.get(type);
 		return (typeHintBuilder != null ? typeHintBuilder.build() : null);
 	}
@@ -70,8 +83,7 @@ public class ReflectionHints {
 	 * @param type the type to inspect
 	 * @return the reflection hints for this type, or {@code null}
 	 */
-	@Nullable
-	public TypeHint getTypeHint(Class<?> type) {
+	public @Nullable TypeHint getTypeHint(Class<?> type) {
 		return getTypeHint(TypeReference.of(type));
 	}
 
@@ -176,8 +188,31 @@ public class ReflectionHints {
 	}
 
 	/**
-	 * Register the need for reflection on the specified {@link Field}.
-	 * @param field the field that requires reflection
+	 * Register or customize reflection hints for all the interfaces implemented by
+	 * the given type and its parent classes, ignoring the common Java language interfaces.
+	 * The specified {@code typeHint} consumer is invoked for each type.
+	 * @param type the type to consider
+	 * @param typeHint a builder to further customize hints for each type
+	 * @return {@code this}, to facilitate method chaining
+	 * @since 6.2
+	 */
+	public ReflectionHints registerForInterfaces(Class<?> type, Consumer<TypeHint.Builder> typeHint) {
+		Class<?> currentClass = type;
+		while (currentClass != null && currentClass != Object.class) {
+			for (Class<?> interfaceType : currentClass.getInterfaces()) {
+				if (!ClassUtils.isJavaLanguageInterface(interfaceType)) {
+					this.registerType(interfaceType, typeHint);
+					registerForInterfaces(interfaceType, typeHint);
+				}
+			}
+			currentClass = currentClass.getSuperclass();
+		}
+		return this;
+	}
+
+	/**
+	 * Register the need for reflective field access on the specified {@link Field}.
+	 * @param field the field that requires reflective access
 	 * @return {@code this}, to facilitate method chaining
 	 */
 	public ReflectionHints registerField(Field field) {
@@ -207,6 +242,42 @@ public class ReflectionHints {
 	public ReflectionHints registerMethod(Method method, ExecutableMode mode) {
 		return registerType(TypeReference.of(method.getDeclaringClass()),
 				typeHint -> typeHint.withMethod(method.getName(), mapParameters(method), mode));
+	}
+
+	/**
+	 * Register the need for Java Serialization on the specified type.
+	 * @param type the type that should be serializable
+	 * @return {@code this}, to facilitate method chaining
+	 * @since 7.0.6
+	 */
+	public ReflectionHints registerJavaSerialization(Class<?> type) {
+		return registerType(TypeReference.of(type),
+				typeHint -> typeHint.withJavaSerialization(true));
+	}
+
+	/**
+	 * Register a {@link LambdaHint}.
+	 * @param declaringClass the type declaring the lambda
+	 * @param lambdaHint the consumer of the hint builder
+	 * @return {@code this}, to facilitate method chaining
+	 * @since 7.0.6
+	 */
+	public ReflectionHints registerLambda(TypeReference declaringClass, Consumer<LambdaHint.Builder> lambdaHint) {
+		LambdaHint.Builder builder = LambdaHint.of(declaringClass);
+		lambdaHint.accept(builder);
+		this.lambdaHints.add(builder.build());
+		return this;
+	}
+
+	/**
+	 * Register a {@link LambdaHint}.
+	 * @param declaringClass the type declaring the lambda
+	 * @param lambdaHint the consumer of the hint builder
+	 * @return {@code this}, to facilitate method chaining
+	 * @since 7.0.6
+	 */
+	public ReflectionHints registerLambda(Class<?> declaringClass, Consumer<LambdaHint.Builder> lambdaHint) {
+		return this.registerLambda(TypeReference.of(declaringClass), lambdaHint);
 	}
 
 	private List<TypeReference> mapParameters(Executable executable) {

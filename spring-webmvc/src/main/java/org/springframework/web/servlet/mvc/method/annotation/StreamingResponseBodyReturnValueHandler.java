@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2019 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,18 +16,17 @@
 
 package org.springframework.web.servlet.mvc.method.annotation;
 
-import java.io.OutputStream;
 import java.util.concurrent.Callable;
 
 import jakarta.servlet.ServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import org.jspecify.annotations.Nullable;
 
 import org.springframework.core.MethodParameter;
 import org.springframework.core.ResolvableType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.server.ServerHttpResponse;
 import org.springframework.http.server.ServletServerHttpResponse;
-import org.springframework.lang.Nullable;
 import org.springframework.util.Assert;
 import org.springframework.web.context.request.NativeWebRequest;
 import org.springframework.web.context.request.async.WebAsyncUtils;
@@ -89,26 +88,26 @@ public class StreamingResponseBodyReturnValueHandler implements HandlerMethodRet
 		Assert.isInstanceOf(StreamingResponseBody.class, returnValue, "StreamingResponseBody expected");
 		StreamingResponseBody streamingBody = (StreamingResponseBody) returnValue;
 
-		Callable<Void> callable = new StreamingResponseBodyTask(outputMessage.getBody(), streamingBody);
+		Callable<Void> callable = new StreamingResponseBodyTask(outputMessage, streamingBody);
 		WebAsyncUtils.getAsyncManager(webRequest).startCallableProcessing(callable, mavContainer);
 	}
 
 
 	private static class StreamingResponseBodyTask implements Callable<Void> {
 
-		private final OutputStream outputStream;
+		private final ServerHttpResponse outputMessage;
 
 		private final StreamingResponseBody streamingBody;
 
-		public StreamingResponseBodyTask(OutputStream outputStream, StreamingResponseBody streamingBody) {
-			this.outputStream = outputStream;
+		public StreamingResponseBodyTask(ServerHttpResponse outputMessage, StreamingResponseBody streamingBody) {
+			this.outputMessage = outputMessage;
 			this.streamingBody = streamingBody;
 		}
 
 		@Override
 		public Void call() throws Exception {
-			this.streamingBody.writeTo(this.outputStream);
-			this.outputStream.flush();
+			this.streamingBody.writeTo(this.outputMessage.getBody());
+			this.outputMessage.flush();
 			return null;
 		}
 	}

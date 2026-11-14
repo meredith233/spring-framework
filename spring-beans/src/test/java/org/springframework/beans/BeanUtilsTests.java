@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -33,22 +33,27 @@ import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
 
+import org.jspecify.annotations.Nullable;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
+import org.springframework.beans.PropertyDescriptorUtilsPropertyResolutionTests.UnboundedGenericsTests.ServiceWithOverriddenGetterAndOverloadedSetter;
 import org.springframework.beans.factory.BeanFactory;
 import org.springframework.beans.propertyeditors.CustomDateEditor;
 import org.springframework.beans.testfixture.beans.DerivedTestBean;
 import org.springframework.beans.testfixture.beans.ITestBean;
 import org.springframework.beans.testfixture.beans.TestBean;
+import org.springframework.cglib.proxy.Enhancer;
+import org.springframework.cglib.proxy.MethodInterceptor;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.ResourceEditor;
-import org.springframework.lang.Nullable;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
+import static org.assertj.core.api.Assertions.assertThatIllegalStateException;
 import static org.assertj.core.api.SoftAssertions.assertSoftly;
 
 /**
@@ -65,14 +70,14 @@ class BeanUtilsTests {
 
 	@Test
 	void instantiateClassGivenInterface() {
-		assertThatExceptionOfType(FatalBeanException.class).isThrownBy(() ->
-				BeanUtils.instantiateClass(List.class));
+		assertThatExceptionOfType(FatalBeanException.class)
+				.isThrownBy(() -> BeanUtils.instantiateClass(List.class));
 	}
 
 	@Test
 	void instantiateClassGivenClassWithoutDefaultConstructor() {
-		assertThatExceptionOfType(FatalBeanException.class).isThrownBy(() ->
-				BeanUtils.instantiateClass(CustomDateEditor.class));
+		assertThatExceptionOfType(FatalBeanException.class)
+				.isThrownBy(() -> BeanUtils.instantiateClass(CustomDateEditor.class));
 	}
 
 	@Test  // gh-22531
@@ -89,16 +94,16 @@ class BeanUtilsTests {
 	void instantiateClassWithFewerArgsThanParameters() throws NoSuchMethodException {
 		Constructor<BeanWithPrimitiveTypes> constructor = getBeanWithPrimitiveTypesConstructor();
 
-		assertThatExceptionOfType(BeanInstantiationException.class).isThrownBy(() ->
-				BeanUtils.instantiateClass(constructor, null, null, "foo"));
+		assertThatExceptionOfType(BeanInstantiationException.class)
+				.isThrownBy(() -> BeanUtils.instantiateClass(constructor, null, null, "foo"));
 	}
 
 	@Test  // gh-22531
 	void instantiateClassWithMoreArgsThanParameters() throws NoSuchMethodException {
 		Constructor<BeanWithPrimitiveTypes> constructor = getBeanWithPrimitiveTypesConstructor();
 
-		assertThatExceptionOfType(BeanInstantiationException.class).isThrownBy(() ->
-				BeanUtils.instantiateClass(constructor, null, null, null, null, null, null, null, null, "foo", null));
+		assertThatExceptionOfType(BeanInstantiationException.class)
+				.isThrownBy(() -> BeanUtils.instantiateClass(constructor, null, null, null, null, null, null, null, null, "foo", null));
 	}
 
 	@Test  // gh-22531, gh-27390
@@ -156,249 +161,6 @@ class BeanUtilsTests {
 	}
 
 	@Test
-	void copyProperties() throws Exception {
-		TestBean tb = new TestBean();
-		tb.setName("rod");
-		tb.setAge(32);
-		tb.setTouchy("touchy");
-		TestBean tb2 = new TestBean();
-		assertThat(tb2.getName()).as("Name empty").isNull();
-		assertThat(tb2.getAge()).as("Age empty").isEqualTo(0);
-		assertThat(tb2.getTouchy()).as("Touchy empty").isNull();
-		BeanUtils.copyProperties(tb, tb2);
-		assertThat(tb2.getName()).as("Name copied").isEqualTo(tb.getName());
-		assertThat(tb2.getAge()).as("Age copied").isEqualTo(tb.getAge());
-		assertThat(tb2.getTouchy()).as("Touchy copied").isEqualTo(tb.getTouchy());
-	}
-
-	@Test
-	void copyPropertiesWithDifferentTypes1() throws Exception {
-		DerivedTestBean tb = new DerivedTestBean();
-		tb.setName("rod");
-		tb.setAge(32);
-		tb.setTouchy("touchy");
-		TestBean tb2 = new TestBean();
-		assertThat(tb2.getName()).as("Name empty").isNull();
-		assertThat(tb2.getAge()).as("Age empty").isEqualTo(0);
-		assertThat(tb2.getTouchy()).as("Touchy empty").isNull();
-		BeanUtils.copyProperties(tb, tb2);
-		assertThat(tb2.getName()).as("Name copied").isEqualTo(tb.getName());
-		assertThat(tb2.getAge()).as("Age copied").isEqualTo(tb.getAge());
-		assertThat(tb2.getTouchy()).as("Touchy copied").isEqualTo(tb.getTouchy());
-	}
-
-	@Test
-	void copyPropertiesWithDifferentTypes2() throws Exception {
-		TestBean tb = new TestBean();
-		tb.setName("rod");
-		tb.setAge(32);
-		tb.setTouchy("touchy");
-		DerivedTestBean tb2 = new DerivedTestBean();
-		assertThat(tb2.getName()).as("Name empty").isNull();
-		assertThat(tb2.getAge()).as("Age empty").isEqualTo(0);
-		assertThat(tb2.getTouchy()).as("Touchy empty").isNull();
-		BeanUtils.copyProperties(tb, tb2);
-		assertThat(tb2.getName()).as("Name copied").isEqualTo(tb.getName());
-		assertThat(tb2.getAge()).as("Age copied").isEqualTo(tb.getAge());
-		assertThat(tb2.getTouchy()).as("Touchy copied").isEqualTo(tb.getTouchy());
-	}
-
-	/**
-	 * {@code Integer} can be copied to {@code Number}.
-	 */
-	@Test
-	void copyPropertiesFromSubTypeToSuperType() {
-		IntegerHolder integerHolder = new IntegerHolder();
-		integerHolder.setNumber(42);
-		NumberHolder numberHolder = new NumberHolder();
-
-		BeanUtils.copyProperties(integerHolder, numberHolder);
-		assertThat(integerHolder.getNumber()).isEqualTo(42);
-		assertThat(numberHolder.getNumber()).isEqualTo(42);
-	}
-
-	/**
-	 * {@code List<Integer>} can be copied to {@code List<Integer>}.
-	 */
-	@Test
-	void copyPropertiesHonorsGenericTypeMatchesFromIntegerToInteger() {
-		IntegerListHolder1 integerListHolder1 = new IntegerListHolder1();
-		integerListHolder1.getList().add(42);
-		IntegerListHolder2 integerListHolder2 = new IntegerListHolder2();
-
-		BeanUtils.copyProperties(integerListHolder1, integerListHolder2);
-		assertThat(integerListHolder1.getList()).containsExactly(42);
-		assertThat(integerListHolder2.getList()).containsExactly(42);
-	}
-
-	/**
-	 * {@code List<?>} can be copied to {@code List<?>}.
-	 */
-	@Test
-	void copyPropertiesHonorsGenericTypeMatchesFromWildcardToWildcard() {
-		List<?> list = List.of("foo", 42);
-		WildcardListHolder1 wildcardListHolder1 = new WildcardListHolder1();
-		wildcardListHolder1.setList(list);
-		WildcardListHolder2 wildcardListHolder2 = new WildcardListHolder2();
-		assertThat(wildcardListHolder2.getList()).isEmpty();
-
-		BeanUtils.copyProperties(wildcardListHolder1, wildcardListHolder2);
-		assertThat(wildcardListHolder1.getList()).isEqualTo(list);
-		assertThat(wildcardListHolder2.getList()).isEqualTo(list);
-	}
-
-	/**
-	 * {@code List<Integer>} can be copied to {@code List<?>}.
-	 */
-	@Test
-	void copyPropertiesHonorsGenericTypeMatchesFromIntegerToWildcard() {
-		IntegerListHolder1 integerListHolder1 = new IntegerListHolder1();
-		integerListHolder1.getList().add(42);
-		WildcardListHolder2 wildcardListHolder2 = new WildcardListHolder2();
-
-		BeanUtils.copyProperties(integerListHolder1, wildcardListHolder2);
-		assertThat(integerListHolder1.getList()).containsExactly(42);
-		assertThat(wildcardListHolder2.getList()).isEqualTo(List.of(42));
-	}
-
-	/**
-	 * {@code List<Integer>} can be copied to {@code List<? extends Number>}.
-	 */
-	@Test
-	void copyPropertiesHonorsGenericTypeMatchesForUpperBoundedWildcard() {
-		IntegerListHolder1 integerListHolder1 = new IntegerListHolder1();
-		integerListHolder1.getList().add(42);
-		NumberUpperBoundedWildcardListHolder numberListHolder = new NumberUpperBoundedWildcardListHolder();
-
-		BeanUtils.copyProperties(integerListHolder1, numberListHolder);
-		assertThat(integerListHolder1.getList()).containsExactly(42);
-		assertThat(numberListHolder.getList()).isEqualTo(List.of(42));
-	}
-
-	/**
-	 * {@code Number} can NOT be copied to {@code Integer}.
-	 */
-	@Test
-	void copyPropertiesDoesNotCopyFromSuperTypeToSubType() {
-		NumberHolder numberHolder = new NumberHolder();
-		numberHolder.setNumber(42);
-		IntegerHolder integerHolder = new IntegerHolder();
-
-		BeanUtils.copyProperties(numberHolder, integerHolder);
-		assertThat(numberHolder.getNumber()).isEqualTo(42);
-		assertThat(integerHolder.getNumber()).isNull();
-	}
-
-	/**
-	 * {@code List<Integer>} can NOT be copied to {@code List<Long>}.
-	 */
-	@Test
-	void copyPropertiesDoesNotHonorGenericTypeMismatches() {
-		IntegerListHolder1 integerListHolder = new IntegerListHolder1();
-		integerListHolder.getList().add(42);
-		LongListHolder longListHolder = new LongListHolder();
-
-		BeanUtils.copyProperties(integerListHolder, longListHolder);
-		assertThat(integerListHolder.getList()).containsExactly(42);
-		assertThat(longListHolder.getList()).isEmpty();
-	}
-
-	/**
-	 * {@code List<Integer>} can NOT be copied to {@code List<Number>}.
-	 */
-	@Test
-	void copyPropertiesDoesNotHonorGenericTypeMismatchesFromSubTypeToSuperType() {
-		IntegerListHolder1 integerListHolder = new IntegerListHolder1();
-		integerListHolder.getList().add(42);
-		NumberListHolder numberListHolder = new NumberListHolder();
-
-		BeanUtils.copyProperties(integerListHolder, numberListHolder);
-		assertThat(integerListHolder.getList()).containsExactly(42);
-		assertThat(numberListHolder.getList()).isEmpty();
-	}
-
-	@Test  // gh-26531
-	void copyPropertiesIgnoresGenericsIfSourceOrTargetHasUnresolvableGenerics() throws Exception {
-		Order original = new Order("test", List.of("foo", "bar"));
-
-		// Create a Proxy that loses the generic type information for the getLineItems() method.
-		OrderSummary proxy = proxyOrder(original);
-		assertThat(OrderSummary.class.getDeclaredMethod("getLineItems").toGenericString())
-			.contains("java.util.List<java.lang.String>");
-		assertThat(proxy.getClass().getDeclaredMethod("getLineItems").toGenericString())
-			.contains("java.util.List")
-			.doesNotContain("<java.lang.String>");
-
-		// Ensure that our custom Proxy works as expected.
-		assertThat(proxy.getId()).isEqualTo("test");
-		assertThat(proxy.getLineItems()).containsExactly("foo", "bar");
-
-		// Copy from proxy to target.
-		Order target = new Order();
-		BeanUtils.copyProperties(proxy, target);
-		assertThat(target.getId()).isEqualTo("test");
-		assertThat(target.getLineItems()).containsExactly("foo", "bar");
-	}
-
-	@Test
-	void copyPropertiesWithEditable() throws Exception {
-		TestBean tb = new TestBean();
-		assertThat(tb.getName()).as("Name empty").isNull();
-		tb.setAge(32);
-		tb.setTouchy("bla");
-		TestBean tb2 = new TestBean();
-		tb2.setName("rod");
-		assertThat(tb2.getAge()).as("Age empty").isEqualTo(0);
-		assertThat(tb2.getTouchy()).as("Touchy empty").isNull();
-
-		// "touchy" should not be copied: it's not defined in ITestBean
-		BeanUtils.copyProperties(tb, tb2, ITestBean.class);
-		assertThat(tb2.getName()).as("Name copied").isNull();
-		assertThat(tb2.getAge()).as("Age copied").isEqualTo(32);
-		assertThat(tb2.getTouchy()).as("Touchy still empty").isNull();
-	}
-
-	@Test
-	void copyPropertiesWithIgnore() throws Exception {
-		TestBean tb = new TestBean();
-		assertThat(tb.getName()).as("Name empty").isNull();
-		tb.setAge(32);
-		tb.setTouchy("bla");
-		TestBean tb2 = new TestBean();
-		tb2.setName("rod");
-		assertThat(tb2.getAge()).as("Age empty").isEqualTo(0);
-		assertThat(tb2.getTouchy()).as("Touchy empty").isNull();
-
-		// "spouse", "touchy", "age" should not be copied
-		BeanUtils.copyProperties(tb, tb2, "spouse", "touchy", "age");
-		assertThat(tb2.getName()).as("Name copied").isNull();
-		assertThat(tb2.getAge()).as("Age still empty").isEqualTo(0);
-		assertThat(tb2.getTouchy()).as("Touchy still empty").isNull();
-	}
-
-	@Test
-	void copyPropertiesWithIgnoredNonExistingProperty() {
-		NameAndSpecialProperty source = new NameAndSpecialProperty();
-		source.setName("name");
-		TestBean target = new TestBean();
-		BeanUtils.copyProperties(source, target, "specialProperty");
-		assertThat(target.getName()).isEqualTo("name");
-	}
-
-	@Test
-	void copyPropertiesWithInvalidProperty() {
-		InvalidProperty source = new InvalidProperty();
-		source.setName("name");
-		source.setFlag1(true);
-		source.setFlag2(true);
-		InvalidProperty target = new InvalidProperty();
-		BeanUtils.copyProperties(source, target);
-		assertThat(target.getName()).isEqualTo("name");
-		assertThat((boolean) target.getFlag1()).isTrue();
-		assertThat(target.getFlag2()).isTrue();
-	}
-
-	@Test
 	void resolveSimpleSignature() throws Exception {
 		Method desiredMethod = MethodSignatureBean.class.getMethod("doSomething");
 		assertSignatureEquals(desiredMethod, "doSomething");
@@ -407,14 +169,14 @@ class BeanUtilsTests {
 
 	@Test
 	void resolveInvalidSignatureEndParen() {
-		assertThatIllegalArgumentException().isThrownBy(() ->
-				BeanUtils.resolveSignature("doSomething(", MethodSignatureBean.class));
+		assertThatIllegalArgumentException()
+				.isThrownBy(() -> BeanUtils.resolveSignature("doSomething(", MethodSignatureBean.class));
 	}
 
 	@Test
 	void resolveInvalidSignatureStartParen() {
-		assertThatIllegalArgumentException().isThrownBy(() ->
-				BeanUtils.resolveSignature("doSomething)", MethodSignatureBean.class));
+		assertThatIllegalArgumentException()
+				.isThrownBy(() -> BeanUtils.resolveSignature("doSomething)", MethodSignatureBean.class));
 	}
 
 	@Test
@@ -454,8 +216,8 @@ class BeanUtilsTests {
 		assertSignatureEquals(desiredMethod, "doSomethingWithAMultiDimensionalArray(java.lang.String[][])");
 	}
 
-	@Test
-	void spr6063() {
+	@Test  // gh-10731
+	void propertyDescriptorShouldMatchWithCachedDescriptors() {
 		PropertyDescriptor[] descrs = BeanUtils.getPropertyDescriptors(Bean.class);
 
 		PropertyDescriptor keyDescr = BeanUtils.getPropertyDescriptor(Bean.class, "value");
@@ -465,6 +227,41 @@ class BeanUtilsTests {
 				assertThat(propertyDescriptor.getPropertyType()).as(propertyDescriptor.getName() + " has unexpected type").isEqualTo(keyDescr.getPropertyType());
 			}
 		}
+	}
+
+	@Test
+	void getWriteMethodParameterForReadOnlyProperty() {
+		PropertyDescriptor pd = BeanUtils.getPropertyDescriptor(ReadOnlyAndWriteOnlyBean.class, "readOnly");
+		assertThatIllegalStateException()
+				.isThrownBy(() -> BeanUtils.getWriteMethodParameter(pd))
+				.withMessage("No write method available for property 'readOnly' of bean class [%s]",
+						ReadOnlyAndWriteOnlyBean.class.getName());
+	}
+
+	@Test
+	void getWriteMethodParameterForReadOnlyPropertyWithStandardPropertyDescriptor() throws Exception {
+		PropertyDescriptor pd = new PropertyDescriptor("readOnly",
+				ReadOnlyAndWriteOnlyBean.class.getMethod("getReadOnly"), null);
+		assertThatIllegalStateException()
+				.isThrownBy(() -> BeanUtils.getWriteMethodParameter(pd))
+				.withMessage("No write method available for property 'readOnly'");
+	}
+
+	@Test
+	void genericTypeAwarePropertyDescriptorForReadOnlyAndWriteOnlyProperties() {
+		GenericTypeAwarePropertyDescriptor readOnly = (GenericTypeAwarePropertyDescriptor)
+				BeanUtils.getPropertyDescriptor(ReadOnlyAndWriteOnlyBean.class, "readOnly");
+		assertThatIllegalStateException()
+				.isThrownBy(readOnly::getWriteMethodForActualAccess)
+				.withMessage("No write method available for property 'readOnly' of bean class [%s]",
+						ReadOnlyAndWriteOnlyBean.class.getName());
+
+		GenericTypeAwarePropertyDescriptor writeOnly = (GenericTypeAwarePropertyDescriptor)
+				BeanUtils.getPropertyDescriptor(ReadOnlyAndWriteOnlyBean.class, "writeOnly");
+		assertThatIllegalStateException()
+				.isThrownBy(writeOnly::getReadMethodType)
+				.withMessage("No read method available for property 'writeOnly' of bean class [%s]",
+						ReadOnlyAndWriteOnlyBean.class.getName());
 	}
 
 	@ParameterizedTest
@@ -501,10 +298,313 @@ class BeanUtilsTests {
 		assertThat(BeanUtils.isSimpleProperty(type)).as("Type [" + type.getName() + "] should not be a simple property").isFalse();
 	}
 
+	@Test
+	void resolveMultipleRecordPublicConstructor() throws NoSuchMethodException {
+		assertThat(BeanUtils.getResolvableConstructor(RecordWithMultiplePublicConstructors.class))
+				.isEqualTo(RecordWithMultiplePublicConstructors.class.getDeclaredConstructor(String.class, String.class));
+	}
+
+	@Test
+	void resolveMultipleRecordePackagePrivateConstructor() throws NoSuchMethodException {
+		assertThat(BeanUtils.getResolvableConstructor(RecordWithMultiplePackagePrivateConstructors.class))
+				.isEqualTo(RecordWithMultiplePackagePrivateConstructors.class.getDeclaredConstructor(String.class, String.class));
+	}
+
 	private void assertSignatureEquals(Method desiredMethod, String signature) {
 		assertThat(BeanUtils.resolveSignature(signature, MethodSignatureBean.class)).isEqualTo(desiredMethod);
 	}
 
+
+	@Nested
+	class CopyPropertiesTests {
+
+		@Test
+		void copyProperties() throws Exception {
+			TestBean tb = new TestBean();
+			tb.setName("rod");
+			tb.setAge(32);
+			tb.setTouchy("touchy");
+			TestBean tb2 = new TestBean();
+			assertThat(tb2.getName()).as("Name empty").isNull();
+			assertThat(tb2.getAge()).as("Age empty").isEqualTo(0);
+			assertThat(tb2.getTouchy()).as("Touchy empty").isNull();
+			BeanUtils.copyProperties(tb, tb2);
+			assertThat(tb2.getName()).as("Name copied").isEqualTo(tb.getName());
+			assertThat(tb2.getAge()).as("Age copied").isEqualTo(tb.getAge());
+			assertThat(tb2.getTouchy()).as("Touchy copied").isEqualTo(tb.getTouchy());
+		}
+
+		@Test
+		void copyPropertiesWithDifferentTypes1() throws Exception {
+			DerivedTestBean tb = new DerivedTestBean();
+			tb.setName("rod");
+			tb.setAge(32);
+			tb.setTouchy("touchy");
+			TestBean tb2 = new TestBean();
+			assertThat(tb2.getName()).as("Name empty").isNull();
+			assertThat(tb2.getAge()).as("Age empty").isEqualTo(0);
+			assertThat(tb2.getTouchy()).as("Touchy empty").isNull();
+			BeanUtils.copyProperties(tb, tb2);
+			assertThat(tb2.getName()).as("Name copied").isEqualTo(tb.getName());
+			assertThat(tb2.getAge()).as("Age copied").isEqualTo(tb.getAge());
+			assertThat(tb2.getTouchy()).as("Touchy copied").isEqualTo(tb.getTouchy());
+		}
+
+		@Test
+		void copyPropertiesWithDifferentTypes2() throws Exception {
+			TestBean tb = new TestBean();
+			tb.setName("rod");
+			tb.setAge(32);
+			tb.setTouchy("touchy");
+			DerivedTestBean tb2 = new DerivedTestBean();
+			assertThat(tb2.getName()).as("Name empty").isNull();
+			assertThat(tb2.getAge()).as("Age empty").isEqualTo(0);
+			assertThat(tb2.getTouchy()).as("Touchy empty").isNull();
+			BeanUtils.copyProperties(tb, tb2);
+			assertThat(tb2.getName()).as("Name copied").isEqualTo(tb.getName());
+			assertThat(tb2.getAge()).as("Age copied").isEqualTo(tb.getAge());
+			assertThat(tb2.getTouchy()).as("Touchy copied").isEqualTo(tb.getTouchy());
+		}
+
+		/**
+		 * {@code Integer} can be copied to {@code Number}.
+		 */
+		@Test
+		void copyPropertiesFromSubTypeToSuperType() {
+			IntegerHolder integerHolder = new IntegerHolder();
+			integerHolder.setNumber(42);
+			NumberHolder numberHolder = new NumberHolder();
+
+			BeanUtils.copyProperties(integerHolder, numberHolder);
+			assertThat(integerHolder.getNumber()).isEqualTo(42);
+			assertThat(numberHolder.getNumber()).isEqualTo(42);
+		}
+
+		/**
+		 * {@code List<Integer>} can be copied to {@code List<Integer>}.
+		 */
+		@Test
+		void copyPropertiesHonorsGenericTypeMatchesFromIntegerToInteger() {
+			IntegerListHolder1 integerListHolder1 = new IntegerListHolder1();
+			integerListHolder1.getList().add(42);
+			IntegerListHolder2 integerListHolder2 = new IntegerListHolder2();
+
+			BeanUtils.copyProperties(integerListHolder1, integerListHolder2);
+			assertThat(integerListHolder1.getList()).containsExactly(42);
+			assertThat(integerListHolder2.getList()).containsExactly(42);
+		}
+
+		/**
+		 * {@code List<?>} can be copied to {@code List<?>}.
+		 */
+		@Test
+		void copyPropertiesHonorsGenericTypeMatchesFromWildcardToWildcard() {
+			List<?> list = List.of("foo", 42);
+			WildcardListHolder1 wildcardListHolder1 = new WildcardListHolder1();
+			wildcardListHolder1.setList(list);
+			WildcardListHolder2 wildcardListHolder2 = new WildcardListHolder2();
+			assertThat(wildcardListHolder2.getList()).isEmpty();
+
+			BeanUtils.copyProperties(wildcardListHolder1, wildcardListHolder2);
+			assertThat(wildcardListHolder1.getList()).isEqualTo(list);
+			assertThat(wildcardListHolder2.getList()).isEqualTo(list);
+		}
+
+		/**
+		 * {@code List<Integer>} can be copied to {@code List<?>}.
+		 */
+		@Test
+		void copyPropertiesHonorsGenericTypeMatchesFromIntegerToWildcard() {
+			IntegerListHolder1 integerListHolder1 = new IntegerListHolder1();
+			integerListHolder1.getList().add(42);
+			WildcardListHolder2 wildcardListHolder2 = new WildcardListHolder2();
+
+			BeanUtils.copyProperties(integerListHolder1, wildcardListHolder2);
+			assertThat(integerListHolder1.getList()).containsExactly(42);
+			assertThat(wildcardListHolder2.getList()).isEqualTo(List.of(42));
+		}
+
+		/**
+		 * {@code List<Integer>} can be copied to {@code List<? extends Number>}.
+		 */
+		@Test
+		void copyPropertiesHonorsGenericTypeMatchesForUpperBoundedWildcard() {
+			IntegerListHolder1 integerListHolder1 = new IntegerListHolder1();
+			integerListHolder1.getList().add(42);
+			NumberUpperBoundedWildcardListHolder numberListHolder = new NumberUpperBoundedWildcardListHolder();
+
+			BeanUtils.copyProperties(integerListHolder1, numberListHolder);
+			assertThat(integerListHolder1.getList()).containsExactly(42);
+			assertThat(numberListHolder.getList()).isEqualTo(List.of(42));
+		}
+
+		/**
+		 * {@code Number} can NOT be copied to {@code Integer}.
+		 */
+		@Test
+		void copyPropertiesDoesNotCopyFromSuperTypeToSubType() {
+			NumberHolder numberHolder = new NumberHolder();
+			numberHolder.setNumber(42);
+			IntegerHolder integerHolder = new IntegerHolder();
+
+			BeanUtils.copyProperties(numberHolder, integerHolder);
+			assertThat(numberHolder.getNumber()).isEqualTo(42);
+			assertThat(integerHolder.getNumber()).isNull();
+		}
+
+		/**
+		 * {@code List<Integer>} can NOT be copied to {@code List<Long>}.
+		 */
+		@Test
+		void copyPropertiesDoesNotHonorGenericTypeMismatches() {
+			IntegerListHolder1 integerListHolder = new IntegerListHolder1();
+			integerListHolder.getList().add(42);
+			LongListHolder longListHolder = new LongListHolder();
+
+			BeanUtils.copyProperties(integerListHolder, longListHolder);
+			assertThat(integerListHolder.getList()).containsExactly(42);
+			assertThat(longListHolder.getList()).isEmpty();
+		}
+
+		/**
+		 * {@code List<Integer>} can NOT be copied to {@code List<Number>}.
+		 */
+		@Test
+		void copyPropertiesDoesNotHonorGenericTypeMismatchesFromSubTypeToSuperType() {
+			IntegerListHolder1 integerListHolder = new IntegerListHolder1();
+			integerListHolder.getList().add(42);
+			NumberListHolder numberListHolder = new NumberListHolder();
+
+			BeanUtils.copyProperties(integerListHolder, numberListHolder);
+			assertThat(integerListHolder.getList()).containsExactly(42);
+			assertThat(numberListHolder.getList()).isEmpty();
+		}
+
+		@Test  // gh-26531
+		void copyPropertiesIgnoresGenericsIfSourceOrTargetHasUnresolvableGenerics() throws Exception {
+			Order original = new Order("test", List.of("foo", "bar"));
+
+			// Create a Proxy that loses the generic type information for the getLineItems() method.
+			OrderSummary proxy = (OrderSummary) Proxy.newProxyInstance(getClass().getClassLoader(),
+				new Class<?>[] {OrderSummary.class}, new OrderInvocationHandler(original));
+			assertThat(OrderSummary.class.getDeclaredMethod("getLineItems").toGenericString())
+					.contains("java.util.List<java.lang.String>");
+			assertThat(proxy.getClass().getDeclaredMethod("getLineItems").toGenericString())
+					.contains("java.util.List")
+					.doesNotContain("<java.lang.String>");
+
+			// Ensure that our custom Proxy works as expected.
+			assertThat(proxy.getId()).isEqualTo("test");
+			assertThat(proxy.getLineItems()).containsExactly("foo", "bar");
+
+			// Copy from proxy to target.
+			Order target = new Order();
+			BeanUtils.copyProperties(proxy, target);
+			assertThat(target.getId()).isEqualTo("test");
+			assertThat(target.getLineItems()).containsExactly("foo", "bar");
+		}
+
+		@Test  // gh-32888
+		void copyPropertiesWithGenericCglibClass() {
+			Enhancer enhancer = new Enhancer();
+			enhancer.setSuperclass(User.class);
+			enhancer.setCallback((MethodInterceptor) (obj, method, args, proxy) -> proxy.invokeSuper(obj, args));
+			User user = (User) enhancer.create();
+			user.setId(1);
+			user.setName("proxy");
+			user.setAddress("addr");
+
+			User target = new User();
+			BeanUtils.copyProperties(user, target);
+			assertThat(target.getId()).isEqualTo(user.getId());
+			assertThat(target.getName()).isEqualTo(user.getName());
+			assertThat(target.getAddress()).isEqualTo(user.getAddress());
+		}
+
+		@Test
+		void copyPropertiesWithEditable() throws Exception {
+			TestBean tb = new TestBean();
+			assertThat(tb.getName()).as("Name empty").isNull();
+			tb.setAge(32);
+			tb.setTouchy("bla");
+			TestBean tb2 = new TestBean();
+			tb2.setName("rod");
+			assertThat(tb2.getAge()).as("Age empty").isEqualTo(0);
+			assertThat(tb2.getTouchy()).as("Touchy empty").isNull();
+
+			// "touchy" should not be copied: it's not defined in ITestBean
+			BeanUtils.copyProperties(tb, tb2, ITestBean.class);
+			assertThat(tb2.getName()).as("Name copied").isNull();
+			assertThat(tb2.getAge()).as("Age copied").isEqualTo(32);
+			assertThat(tb2.getTouchy()).as("Touchy still empty").isNull();
+		}
+
+		@Test
+		void copyPropertiesWithIgnore() throws Exception {
+			TestBean tb = new TestBean();
+			assertThat(tb.getName()).as("Name empty").isNull();
+			tb.setAge(32);
+			tb.setTouchy("bla");
+			TestBean tb2 = new TestBean();
+			tb2.setName("rod");
+			assertThat(tb2.getAge()).as("Age empty").isEqualTo(0);
+			assertThat(tb2.getTouchy()).as("Touchy empty").isNull();
+
+			// "spouse", "touchy", "age" should not be copied
+			BeanUtils.copyProperties(tb, tb2, "spouse", "touchy", "age");
+			assertThat(tb2.getName()).as("Name copied").isNull();
+			assertThat(tb2.getAge()).as("Age still empty").isEqualTo(0);
+			assertThat(tb2.getTouchy()).as("Touchy still empty").isNull();
+		}
+
+		@Test
+		void copyPropertiesWithIgnoredNonExistingProperty() {
+			NameAndSpecialProperty source = new NameAndSpecialProperty();
+			source.setName("name");
+			TestBean target = new TestBean();
+			BeanUtils.copyProperties(source, target, "specialProperty");
+			assertThat(target.getName()).isEqualTo("name");
+		}
+
+		@Test
+		void copyPropertiesWithInvalidProperty() {
+			InvalidProperty source = new InvalidProperty();
+			source.setName("name");
+			source.setFlag1(true);
+			source.setFlag2(true);
+			InvalidProperty target = new InvalidProperty();
+			BeanUtils.copyProperties(source, target);
+			assertThat(target.getName()).isEqualTo("name");
+			assertThat((boolean) target.getFlag1()).isTrue();
+			assertThat(target.getFlag2()).isTrue();
+		}
+
+		@Test  // gh-36019
+		void copyPropertiesHonorsGenericsInTypeHieararchyAndIgnoresOverloadedSetterMethod() {
+			var source = new ServiceWithOverriddenGetterAndOverloadedSetter();
+			var target = new ServiceWithOverriddenGetterAndOverloadedSetter();
+
+			source.setId(1);
+			BeanUtils.copyProperties(source, target);
+
+			assertThat(target.getId()).isEqualTo(source.getId()).isEqualTo("1");
+		}
+	}
+
+
+	public record RecordWithMultiplePublicConstructors(String value, String name) {
+		@SuppressWarnings("unused")
+		public RecordWithMultiplePublicConstructors(String value) {
+			this(value, "default value");
+		}
+	}
+
+	record RecordWithMultiplePackagePrivateConstructors(String value, String name) {
+		@SuppressWarnings("unused")
+		RecordWithMultiplePackagePrivateConstructors(String value) {
+			this(value, "default value");
+		}
+	}
 
 	@SuppressWarnings("unused")
 	private static class NumberHolder {
@@ -520,6 +620,7 @@ class BeanUtilsTests {
 		}
 	}
 
+
 	@SuppressWarnings("unused")
 	private static class IntegerHolder {
 
@@ -533,6 +634,7 @@ class BeanUtilsTests {
 			this.number = number;
 		}
 	}
+
 
 	@SuppressWarnings("unused")
 	private static class WildcardListHolder1 {
@@ -548,6 +650,7 @@ class BeanUtilsTests {
 		}
 	}
 
+
 	@SuppressWarnings("unused")
 	private static class WildcardListHolder2 {
 
@@ -561,6 +664,7 @@ class BeanUtilsTests {
 			this.list = list;
 		}
 	}
+
 
 	@SuppressWarnings("unused")
 	private static class NumberUpperBoundedWildcardListHolder {
@@ -576,6 +680,7 @@ class BeanUtilsTests {
 		}
 	}
 
+
 	@SuppressWarnings("unused")
 	private static class NumberListHolder {
 
@@ -589,6 +694,7 @@ class BeanUtilsTests {
 			this.list = list;
 		}
 	}
+
 
 	@SuppressWarnings("unused")
 	private static class IntegerListHolder1 {
@@ -604,6 +710,7 @@ class BeanUtilsTests {
 		}
 	}
 
+
 	@SuppressWarnings("unused")
 	private static class IntegerListHolder2 {
 
@@ -617,6 +724,7 @@ class BeanUtilsTests {
 			this.list = list;
 		}
 	}
+
 
 	@SuppressWarnings("unused")
 	private static class LongListHolder {
@@ -798,7 +906,19 @@ class BeanUtilsTests {
 		}
 	}
 
-	private static class BeanWithNullableTypes {
+
+	static class ReadOnlyAndWriteOnlyBean {
+
+		public String getReadOnly() {
+			return "readOnly";
+		}
+
+		public void setWriteOnly(String writeOnly) {
+		}
+	}
+
+
+	static class BeanWithNullableTypes {
 
 		private Integer counter;
 
@@ -813,13 +933,11 @@ class BeanUtilsTests {
 			this.value = value;
 		}
 
-		@Nullable
-		public Integer getCounter() {
+		public @Nullable Integer getCounter() {
 			return counter;
 		}
 
-		@Nullable
-		public Boolean isFlag() {
+		public @Nullable Boolean isFlag() {
 			return flag;
 		}
 
@@ -827,6 +945,7 @@ class BeanUtilsTests {
 			return value;
 		}
 	}
+
 
 	private static class BeanWithPrimitiveTypes {
 
@@ -839,7 +958,6 @@ class BeanUtilsTests {
 		private double doubleCount;
 		private char character;
 		private String text;
-
 
 		@SuppressWarnings("unused")
 		public BeanWithPrimitiveTypes(boolean flag, byte byteCount, short shortCount, int intCount, long longCount,
@@ -891,8 +1009,8 @@ class BeanUtilsTests {
 		public String getText() {
 			return text;
 		}
-
 	}
+
 
 	private static class PrivateBeanWithPrivateConstructor {
 
@@ -900,12 +1018,13 @@ class BeanUtilsTests {
 		}
 	}
 
+
 	@SuppressWarnings("unused")
 	private static class Order {
 
 		private String id;
-		private List<String> lineItems;
 
+		private List<String> lineItems;
 
 		Order() {
 		}
@@ -937,6 +1056,7 @@ class BeanUtilsTests {
 		}
 	}
 
+
 	private interface OrderSummary {
 
 		String getId();
@@ -945,16 +1065,9 @@ class BeanUtilsTests {
 	}
 
 
-	private OrderSummary proxyOrder(Order order) {
-		return (OrderSummary) Proxy.newProxyInstance(getClass().getClassLoader(),
-			new Class<?>[] { OrderSummary.class }, new OrderInvocationHandler(order));
-	}
-
-
 	private static class OrderInvocationHandler implements InvocationHandler {
 
 		private final Order order;
-
 
 		OrderInvocationHandler(Order order) {
 			this.order = order;
@@ -970,6 +1083,47 @@ class BeanUtilsTests {
 			catch (InvocationTargetException ex) {
 				throw ex.getTargetException();
 			}
+		}
+	}
+
+
+	private static class GenericBaseModel<T> {
+
+		private T id;
+
+		private String name;
+
+		public T getId() {
+			return id;
+		}
+
+		public void setId(T id) {
+			this.id = id;
+		}
+
+		public String getName() {
+			return name;
+		}
+
+		public void setName(String name) {
+			this.name = name;
+		}
+	}
+
+
+	private static class User extends GenericBaseModel<Integer> {
+
+		private String address;
+
+		public User() {
+		}
+
+		public String getAddress() {
+			return address;
+		}
+
+		public void setAddress(String address) {
+			this.address = address;
 		}
 	}
 

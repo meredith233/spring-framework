@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -39,6 +39,7 @@ import jakarta.mail.internet.InternetAddress;
 import jakarta.mail.internet.MimeMessage;
 import org.junit.jupiter.api.Test;
 
+import org.springframework.core.io.ByteArrayResource;
 import org.springframework.mail.MailParseException;
 import org.springframework.mail.MailSendException;
 import org.springframework.mail.SimpleMailMessage;
@@ -271,6 +272,25 @@ class JavaMailSenderTests {
 	}
 
 	@Test
+	void javaMailSenderWithMimeMessageHelperAndCustomResource() throws Exception {
+		sender.setHost("host");
+		sender.setUsername("username");
+		sender.setPassword("password");
+
+		MimeMessageHelper message = new MimeMessageHelper(sender.createMimeMessage(), true);
+		message.setTo("you@mail.org");
+		message.addInline("id", new ByteArrayResource(new byte[] {1, 2, 3}));
+
+		sender.send(message.getMimeMessage());
+
+		assertThat(sender.transport.getConnectedHost()).isEqualTo("host");
+		assertThat(sender.transport.getConnectedUsername()).isEqualTo("username");
+		assertThat(sender.transport.getConnectedPassword()).isEqualTo("password");
+		assertThat(sender.transport.isCloseCalled()).isTrue();
+		assertThat(sender.transport.getSentMessages()).containsExactly(message.getMimeMessage());
+	}
+
+	@Test
 	void javaMailSenderWithParseExceptionOnSimpleMessage() {
 		SimpleMailMessage simpleMessage = new SimpleMailMessage();
 		simpleMessage.setFrom("");
@@ -421,13 +441,13 @@ class JavaMailSenderTests {
 	}
 
 	@Test
-	void testConnection() {
+	void connection() {
 		sender.setHost("host");
 		assertThatNoException().isThrownBy(sender::testConnection);
 	}
 
 	@Test
-	void testConnectionWithFailure() {
+	void connectionWithFailure() {
 		sender.setHost(null);
 		assertThatExceptionOfType(MessagingException.class).isThrownBy(sender::testConnection);
 	}

@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,6 +22,8 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.core.io.InputStreamResource;
@@ -39,6 +41,9 @@ import static org.mockito.Mockito.mock;
  * @author Brian Clozel
  */
 class HttpRangeTests {
+
+	private static final long LAST_MODIFIED = 1660000000000L;
+
 
 	@Test
 	void invalidFirstPosition() {
@@ -106,6 +111,74 @@ class HttpRangeTests {
 	}
 
 	@Test
+	void resolveRangesWithoutIfRange() {
+		HttpHeaders requestHeaders = new HttpHeaders();
+		requestHeaders.setRange(List.of(HttpRange.createByteRange(0, 1)));
+
+		assertThat(HttpRange.resolveRanges(requestHeaders, new HttpHeaders())).hasSize(1);
+	}
+
+	@Test
+	void resolveRangesWithMatchingIfRangeETag() {
+		assertThat(resolveWithIfRange("\"current\"", "\"current\"")).hasSize(1);
+	}
+
+	@ParameterizedTest
+	@CsvSource(delimiter = '|', textBlock = """
+			"stale"       | "current"
+			W/"current"   | W/"current"
+			"current"     | W/"current"
+			""")
+	void resolveRangesWithNonMatchingIfRangeETag(String ifRange, String eTag) {
+		assertThat(resolveWithIfRange(ifRange, eTag)).isEmpty();
+	}
+
+	@Test
+	void resolveRangesWithMatchingIfRangeDate() {
+		HttpHeaders requestHeaders = rangeRequestHeaders();
+		requestHeaders.setDate(HttpHeaders.IF_RANGE, LAST_MODIFIED);
+		HttpHeaders responseHeaders = new HttpHeaders();
+		responseHeaders.setLastModified(LAST_MODIFIED);
+
+		assertThat(HttpRange.resolveRanges(requestHeaders, responseHeaders)).hasSize(1);
+	}
+
+	@Test
+	void resolveRangesWithNonMatchingIfRangeDate() {
+		HttpHeaders requestHeaders = rangeRequestHeaders();
+		requestHeaders.setDate(HttpHeaders.IF_RANGE, LAST_MODIFIED - 1000);
+		HttpHeaders responseHeaders = new HttpHeaders();
+		responseHeaders.setLastModified(LAST_MODIFIED);
+
+		assertThat(HttpRange.resolveRanges(requestHeaders, responseHeaders)).isEmpty();
+	}
+
+	@Test
+	void resolveRangesIgnoresInvalidRangeWhenIfRangeDoesNotMatch() {
+		HttpHeaders requestHeaders = new HttpHeaders();
+		requestHeaders.set(HttpHeaders.RANGE, "invalid");
+		requestHeaders.set(HttpHeaders.IF_RANGE, "\"stale\"");
+		HttpHeaders responseHeaders = new HttpHeaders();
+		responseHeaders.setETag("\"current\"");
+
+		assertThat(HttpRange.resolveRanges(requestHeaders, responseHeaders)).isEmpty();
+	}
+
+	private static HttpHeaders rangeRequestHeaders() {
+		HttpHeaders requestHeaders = new HttpHeaders();
+		requestHeaders.setRange(List.of(HttpRange.createByteRange(0, 1)));
+		return requestHeaders;
+	}
+
+	private static List<HttpRange> resolveWithIfRange(String ifRange, String eTag) {
+		HttpHeaders requestHeaders = rangeRequestHeaders();
+		requestHeaders.set(HttpHeaders.IF_RANGE, ifRange);
+		HttpHeaders responseHeaders = new HttpHeaders();
+		responseHeaders.setETag(eTag);
+		return HttpRange.resolveRanges(requestHeaders, responseHeaders);
+	}
+
+	@Test
 	void parseRangesValidations() {
 
 		// 1. At limit..
@@ -170,7 +243,7 @@ class HttpRangeTests {
 	}
 
 	@Test // gh-23576
-	public void toResourceRegionStartingAtResourceByteCount() {
+	void toResourceRegionStartingAtResourceByteCount() {
 		byte[] bytes = "Spring Framework".getBytes(StandardCharsets.UTF_8);
 		ByteArrayResource resource = new ByteArrayResource(bytes);
 		HttpRange range = HttpRange.createByteRange(resource.contentLength());

@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2023 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -28,6 +28,8 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
+import org.jspecify.annotations.Nullable;
+
 import org.springframework.beans.BeanUtils;
 import org.springframework.core.MethodParameter;
 import org.springframework.core.convert.ConversionService;
@@ -35,6 +37,7 @@ import org.springframework.core.convert.TypeDescriptor;
 import org.springframework.core.convert.support.DefaultConversionService;
 import org.springframework.jdbc.support.JdbcUtils;
 import org.springframework.util.Assert;
+import org.springframework.util.ObjectUtils;
 import org.springframework.util.ReflectionUtils;
 
 /**
@@ -82,7 +85,7 @@ public class SimplePropertyRowMapper<T> implements RowMapper<T> {
 
 	private final Constructor<T> mappedConstructor;
 
-	private final String[] constructorParameterNames;
+	private final @Nullable String[] constructorParameterNames;
 
 	private final TypeDescriptor[] constructorParameterTypes;
 
@@ -122,18 +125,18 @@ public class SimplePropertyRowMapper<T> implements RowMapper<T> {
 
 	@Override
 	public T mapRow(ResultSet rs, int rowNumber) throws SQLException {
-		Object[] args = new Object[this.constructorParameterNames.length];
+		@Nullable Object[] args = new Object[this.constructorParameterNames.length];
 		Set<Integer> usedIndex = new HashSet<>();
 		for (int i = 0; i < args.length; i++) {
 			String name = this.constructorParameterNames[i];
 			int index;
 			try {
-				// Try direct name match first
-				index = rs.findColumn(name);
+				// Try common underscored name match first
+				index = rs.findColumn(JdbcUtils.convertPropertyNameToUnderscoreName(name));
 			}
 			catch (SQLException ex) {
-				// Try underscored name match instead
-				index = rs.findColumn(JdbcUtils.convertPropertyNameToUnderscoreName(name));
+				// Try direct name match (typically with camelCase) instead
+				index = rs.findColumn(name);
 			}
 			TypeDescriptor td = this.constructorParameterTypes[i];
 			Object value = JdbcUtils.getResultSetValue(rs, index, td.getType());
@@ -174,11 +177,12 @@ public class SimplePropertyRowMapper<T> implements RowMapper<T> {
 			// Try direct match first
 			PropertyDescriptor pd = BeanUtils.getPropertyDescriptor(this.mappedClass, name);
 			if (pd != null && pd.getWriteMethod() != null) {
-				return BeanUtils.getWriteMethodParameter(pd);
+				return (isMappedViaConstructor(pd.getName()) ? NO_DESCRIPTOR :
+						BeanUtils.getWriteMethodParameter(pd));
 			}
 			Field field = ReflectionUtils.findField(this.mappedClass, name);
 			if (field != null) {
-				return field;
+				return (isMappedViaConstructor(field.getName()) ? NO_DESCRIPTOR : field);
 			}
 
 			// Try de-underscored match instead
@@ -186,28 +190,39 @@ public class SimplePropertyRowMapper<T> implements RowMapper<T> {
 			if (!adaptedName.equals(name)) {
 				pd = BeanUtils.getPropertyDescriptor(this.mappedClass, adaptedName);
 				if (pd != null && pd.getWriteMethod() != null) {
-					return BeanUtils.getWriteMethodParameter(pd);
+					return (isMappedViaConstructor(pd.getName()) ? NO_DESCRIPTOR :
+							BeanUtils.getWriteMethodParameter(pd));
 				}
 				field = ReflectionUtils.findField(this.mappedClass, adaptedName);
 				if (field != null) {
-					return field;
+					return (isMappedViaConstructor(field.getName()) ? NO_DESCRIPTOR : field);
 				}
 			}
 
 			// Fallback: case-insensitive match
 			PropertyDescriptor[] pds = BeanUtils.getPropertyDescriptors(this.mappedClass);
 			for (PropertyDescriptor candidate : pds) {
-				if (name.equalsIgnoreCase(candidate.getName())) {
-					return BeanUtils.getWriteMethodParameter(candidate);
+				if (name.equalsIgnoreCase(candidate.getName()) && candidate.getWriteMethod() != null) {
+					return (isMappedViaConstructor(candidate.getName()) ? NO_DESCRIPTOR :
+							BeanUtils.getWriteMethodParameter(candidate));
 				}
 			}
 			field = ReflectionUtils.findFieldIgnoreCase(this.mappedClass, name);
 			if (field != null) {
-				return field;
+				return (isMappedViaConstructor(field.getName()) ? NO_DESCRIPTOR : field);
 			}
 
 			return NO_DESCRIPTOR;
 		});
+	}
+
+	/**
+	 * Determine whether the given property has been mapped via a constructor
+	 * argument already, for example when a column label occurs more than once
+	 * in the result set.
+	 */
+	private boolean isMappedViaConstructor(String propertyName) {
+		return ObjectUtils.containsElement(this.constructorParameterNames, propertyName);
 	}
 
 }

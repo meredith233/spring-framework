@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,28 +23,29 @@ import java.util.Set;
 import java.util.function.BiFunction;
 import java.util.function.Consumer;
 
-import org.springframework.lang.Nullable;
+import org.jspecify.annotations.Nullable;
 
 /**
- * Composite map that combines two other maps. This type is created via
+ * Composite map that combines two other maps.
+ *
+ * <p>This type is created via
  * {@link CollectionUtils#compositeMap(Map, Map, BiFunction, Consumer)}.
  *
  * @author Arjen Poutsma
+ * @author Yanming Zhou
  * @since 6.2
  * @param <K> the type of keys maintained by this map
  * @param <V> the type of mapped values
  */
-final class CompositeMap<K, V> implements Map<K, V> {
+final class CompositeMap<K, V extends @Nullable Object> implements Map<K, V> {
 
-	private final Map<K,V> first;
+	private final Map<K, V> first;
 
-	private final Map<K,V> second;
+	private final Map<K, V> second;
 
-	@Nullable
-	private final BiFunction<K,V,V> putFunction;
+	private final @Nullable BiFunction<K, V, V> putFunction;
 
-	@Nullable
-	private final Consumer<Map<K, V>> putAllFunction;
+	private final @Nullable Consumer<Map<K, V>> putAllFunction;
 
 
 	CompositeMap(Map<K, V> first, Map<K, V> second) {
@@ -53,12 +54,12 @@ final class CompositeMap<K, V> implements Map<K, V> {
 
 	CompositeMap(Map<K, V> first, Map<K, V> second,
 			@Nullable BiFunction<K, V, V> putFunction,
-			@Nullable Consumer<Map<K,V>> putAllFunction) {
+			@Nullable Consumer<Map<K, V>> putAllFunction) {
 
 		Assert.notNull(first, "First must not be null");
 		Assert.notNull(second, "Second must not be null");
 		this.first = first;
-		this.second = second;
+		this.second = new FilteredMap<>(second, key -> !this.first.containsKey(key));
 		this.putFunction = putFunction;
 		this.putAllFunction = putAllFunction;
 	}
@@ -76,27 +77,16 @@ final class CompositeMap<K, V> implements Map<K, V> {
 
 	@Override
 	public boolean containsKey(Object key) {
-		if (this.first.containsKey(key)) {
-			return true;
-		}
-		else {
-			return this.second.containsKey(key);
-		}
+		return this.first.containsKey(key) || this.second.containsKey(key);
 	}
 
 	@Override
 	public boolean containsValue(Object value) {
-		if (this.first.containsValue(value)) {
-			return true;
-		}
-		else {
-			return this.second.containsValue(value);
-		}
+		return this.first.containsValue(value) || this.second.containsValue(value);
 	}
 
 	@Override
-	@Nullable
-	public V get(Object key) {
+	public @Nullable V get(Object key) {
 		V firstResult = this.first.get(key);
 		if (firstResult != null) {
 			return firstResult;
@@ -107,7 +97,6 @@ final class CompositeMap<K, V> implements Map<K, V> {
 	}
 
 	@Override
-	@Nullable
 	public V put(K key, V value) {
 		if (this.putFunction == null) {
 			throw new UnsupportedOperationException();
@@ -118,8 +107,7 @@ final class CompositeMap<K, V> implements Map<K, V> {
 	}
 
 	@Override
-	@Nullable
-	public V remove(Object key) {
+	public @Nullable V remove(Object key) {
 		V firstResult = this.first.remove(key);
 		V secondResult = this.second.remove(key);
 		if (firstResult != null) {
@@ -165,6 +153,17 @@ final class CompositeMap<K, V> implements Map<K, V> {
 	}
 
 	@Override
+	public boolean equals(@Nullable Object other) {
+		return (this == other ||
+				other instanceof Map<?, ?> otherMap && entrySet().equals(otherMap.entrySet()));
+	}
+
+	@Override
+	public int hashCode() {
+		return entrySet().hashCode();
+	}
+
+	@Override
 	public String toString() {
 		Iterator<Entry<K, V>> i = entrySet().iterator();
 		if (!i.hasNext()) {
@@ -186,4 +185,5 @@ final class CompositeMap<K, V> implements Map<K, V> {
 			sb.append(',').append(' ');
 		}
 	}
+
 }

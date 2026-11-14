@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -36,7 +36,7 @@ class MethodExclusionMBeanInfoAssemblerComboTests extends AbstractJmxAssemblerTe
 	protected static final String OBJECT_NAME = "bean:name=testBean4";
 
 	@Test
-	void testGetAgeIsReadOnly() throws Exception {
+	void getAgeIsReadOnly() throws Exception {
 		ModelMBeanInfo info = getMBeanInfoFromAssembler();
 		ModelMBeanAttributeInfo attr = info.getAttribute(AGE_ATTRIBUTE);
 		assertThat(attr.isReadable()).as("Age is not readable").isTrue();
@@ -44,7 +44,7 @@ class MethodExclusionMBeanInfoAssemblerComboTests extends AbstractJmxAssemblerTe
 	}
 
 	@Test
-	void testNickNameIsExposed() throws Exception {
+	void nickNameIsExposed() throws Exception {
 		ModelMBeanInfo inf = (ModelMBeanInfo) getMBeanInfo();
 		MBeanAttributeInfo attr = inf.getAttribute("NickName");
 		assertThat(attr).as("Nick Name should not be null").isNotNull();

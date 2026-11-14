@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2022 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -41,11 +41,13 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * Test cases for {@link ResourceRegionEncoder} class.
+ *
  * @author Brian Clozel
  */
 class ResourceRegionEncoderTests extends AbstractLeakCheckingTests {
 
-	private ResourceRegionEncoder encoder = new ResourceRegionEncoder();
+	private final ResourceRegionEncoder encoder = new ResourceRegionEncoder();
+
 
 	@Test
 	void canEncode() {
@@ -116,7 +118,7 @@ class ResourceRegionEncoderTests extends AbstractLeakCheckingTests {
 				.verify();
 	}
 
-	@Test // gh-22107
+	@Test  // gh-22107
 	void cancelWithoutDemandForMultipleResourceRegions() {
 		Resource resource = new ClassPathResource("ResourceRegionEncoderTests.txt", getClass());
 		Flux<ResourceRegion> regions = Flux.just(
@@ -138,7 +140,7 @@ class ResourceRegionEncoderTests extends AbstractLeakCheckingTests {
 		subscriber.cancel();
 	}
 
-	@Test // gh-22107
+	@Test  // gh-22107
 	void cancelWithoutDemandForSingleResourceRegion() {
 		Resource resource = new ClassPathResource("ResourceRegionEncoderTests.txt", getClass());
 		Mono<ResourceRegion> regions = Mono.just(new ResourceRegion(resource, 0, 6));

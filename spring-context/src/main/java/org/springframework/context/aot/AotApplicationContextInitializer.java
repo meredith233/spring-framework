@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2022 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,13 +18,13 @@ package org.springframework.context.aot;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.jspecify.annotations.Nullable;
 
 import org.springframework.beans.BeanInstantiationException;
 import org.springframework.beans.BeanUtils;
 import org.springframework.context.ApplicationContextInitializer;
 import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.core.log.LogMessage;
-import org.springframework.lang.Nullable;
 import org.springframework.util.Assert;
 import org.springframework.util.ClassUtils;
 
@@ -63,13 +63,13 @@ public interface AotApplicationContextInitializer<C extends ConfigurableApplicat
 
 	private static <C extends ConfigurableApplicationContext> void initialize(
 			C applicationContext, String... initializerClassNames) {
+
 		Log logger = LogFactory.getLog(AotApplicationContextInitializer.class);
 		ClassLoader classLoader = applicationContext.getClassLoader();
 		logger.debug("Initializing ApplicationContext with AOT");
 		for (String initializerClassName : initializerClassNames) {
 			logger.trace(LogMessage.format("Applying %s", initializerClassName));
-			instantiateInitializer(initializerClassName, classLoader)
-					.initialize(applicationContext);
+			instantiateInitializer(initializerClassName, classLoader).initialize(applicationContext);
 		}
 	}
 

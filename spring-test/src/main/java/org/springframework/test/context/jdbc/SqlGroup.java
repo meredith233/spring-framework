@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2022 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -27,15 +27,14 @@ import java.lang.annotation.Target;
  * Container annotation that aggregates several {@link Sql @Sql} annotations.
  *
  * <p>Can be used natively, declaring several nested {@code @Sql} annotations.
- * Can also be used in conjunction with Java 8's support for repeatable
+ * Can also be used in conjunction with Java's support for repeatable
  * annotations, where {@code @Sql} can simply be declared several times on the
  * same class or method, implicitly generating this container annotation.
  *
  * <p>This annotation may be used as a <em>meta-annotation</em> to create custom
  * <em>composed annotations</em>.
  *
- * <p>As of Spring Framework 5.3, this annotation will be inherited from an
- * enclosing test class by default. See
+ * <p>This annotation will be inherited from an enclosing test class by default. See
  * {@link org.springframework.test.context.NestedTestConfiguration @NestedTestConfiguration}
  * for details.
  *

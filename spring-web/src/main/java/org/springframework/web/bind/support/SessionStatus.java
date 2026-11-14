@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2007 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,7 +19,7 @@ package org.springframework.web.bind.support;
 /**
  * Simple interface that can be injected into handler methods, allowing them to
  * signal that their session processing is complete. The handler invoker may
- * then follow up with appropriate cleanup, e.g. of session attributes which
+ * then follow up with appropriate cleanup, for example, of session attributes which
  * have been implicitly created during this handler's processing (according to
  * the
  * {@link org.springframework.web.bind.annotation.SessionAttributes @SessionAttributes}

@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -30,6 +30,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 
 import org.springframework.core.convert.ConversionFailedException;
@@ -41,7 +42,6 @@ import org.springframework.core.convert.converter.ConverterFactory;
 import org.springframework.core.convert.converter.GenericConverter;
 import org.springframework.core.io.DescriptiveResource;
 import org.springframework.core.io.Resource;
-import org.springframework.lang.Nullable;
 import org.springframework.util.StringUtils;
 
 import static java.util.Comparator.naturalOrder;
@@ -256,7 +256,7 @@ class GenericConversionServiceTests {
 	void interfaceToString() {
 		conversionService.addConverter(new MyBaseInterfaceToStringConverter());
 		conversionService.addConverter(new ObjectToStringConverter());
-		Object converted = conversionService.convert(new MyInterfaceImplementer(), String.class);
+		Object converted = conversionService.convert(new MyInterfaceImplementor(), String.class);
 		assertThat(converted).isEqualTo("RESULT");
 	}
 
@@ -264,7 +264,7 @@ class GenericConversionServiceTests {
 	void interfaceArrayToStringArray() {
 		conversionService.addConverter(new MyBaseInterfaceToStringConverter());
 		conversionService.addConverter(new ArrayToArrayConverter(conversionService));
-		String[] converted = conversionService.convert(new MyInterface[] {new MyInterfaceImplementer()}, String[].class);
+		String[] converted = conversionService.convert(new MyInterface[] {new MyInterfaceImplementor()}, String[].class);
 		assertThat(converted[0]).isEqualTo("RESULT");
 	}
 
@@ -272,7 +272,7 @@ class GenericConversionServiceTests {
 	void objectArrayToStringArray() {
 		conversionService.addConverter(new MyBaseInterfaceToStringConverter());
 		conversionService.addConverter(new ArrayToArrayConverter(conversionService));
-		String[] converted = conversionService.convert(new MyInterfaceImplementer[] {new MyInterfaceImplementer()}, String[].class);
+		String[] converted = conversionService.convert(new MyInterfaceImplementor[] {new MyInterfaceImplementor()}, String[].class);
 		assertThat(converted[0]).isEqualTo("RESULT");
 	}
 
@@ -335,7 +335,7 @@ class GenericConversionServiceTests {
 		TypeDescriptor sourceType = TypeDescriptor.forObject(list);
 		TypeDescriptor targetType = TypeDescriptor.valueOf(String[].class);
 		assertThat(conversionService.canConvert(sourceType, targetType)).isTrue();
-		assertThat(((String[]) conversionService.convert(list, sourceType, targetType))).isEmpty();
+		assertThat((String[]) conversionService.convert(list, sourceType, targetType)).isEmpty();
 	}
 
 	@Test
@@ -461,12 +461,12 @@ class GenericConversionServiceTests {
 		assertThat(converter.getSourceTypes().stream().allMatch(td -> Integer.class.equals(td.getType()))).isTrue();
 	}
 
-	@Test
+	@Test  // gh-14200, SPR-9566
 	void convertOptimizeArray() {
-		// SPR-9566
 		byte[] byteArray = new byte[] { 1, 2, 3 };
 		byte[] converted = conversionService.convert(byteArray, byte[].class);
 		assertThat(converted).isSameAs(byteArray);
+		assertThat(converted).containsExactly(1, 2, 3);
 	}
 
 	@Test
@@ -501,6 +501,20 @@ class GenericConversionServiceTests {
 		conversionService.addConverterFactory(new StringToEnumConverterFactory());
 		conversionService.addConverterFactory(new StringToMyEnumBaseInterfaceConverterFactory());
 		assertThat(conversionService.convert("base1", MyEnum.class)).isEqualTo(MyEnum.A);
+	}
+
+	@Test  // gh-34532
+	void canConvertToEnumDoesNotThrowForNonEnumTargetType() {
+		conversionService.addConverterFactory(new StringToEnumConverterFactory());
+		conversionService.addConverterFactory(new IntegerToEnumConverterFactory());
+
+		assertThat(conversionService.canConvert(String.class, Enum.class)).isFalse();
+		assertThat(conversionService.canConvert(Integer.class, Enum.class)).isFalse();
+
+		assertThat(conversionService.canConvert(String.class, MyEnum.class)).isTrue();
+		assertThat(conversionService.canConvert(Integer.class, MyEnum.class)).isTrue();
+		assertThat(conversionService.convert("A", MyEnum.class)).isEqualTo(MyEnum.A);
+		assertThat(conversionService.convert(0, MyEnum.class)).isEqualTo(MyEnum.A);
 	}
 
 	@Test
@@ -565,6 +579,35 @@ class GenericConversionServiceTests {
 		assertThat(conversionService.convert("test", TypeDescriptor.valueOf(String.class), new TypeDescriptor(getClass().getField("integerCollection")))).isEqualTo(Collections.singleton("testX"));
 	}
 
+	@Test
+	void stringListToListOfSubclassOfUnboundGenericClass() {
+		conversionService.addConverter(new StringListToAListConverter());
+		conversionService.addConverter(new StringListToBListConverter());
+
+		List<?> aList = (List<?>) conversionService.convert(List.of("foo"),
+				TypeDescriptor.collection(List.class, TypeDescriptor.valueOf(String.class)),
+				TypeDescriptor.collection(List.class, TypeDescriptor.valueOf(ARaw.class)));
+		assertThat(aList).allMatch(ARaw.class::isInstance);
+
+		List<?> bList = (List<?>) conversionService.convert(List.of("foo"),
+				TypeDescriptor.collection(List.class, TypeDescriptor.valueOf(String.class)),
+				TypeDescriptor.collection(List.class, TypeDescriptor.valueOf(BRaw.class)));
+		assertThat(bList).allMatch(BRaw.class::isInstance);
+	}
+
+	@Test
+	@SuppressWarnings("unchecked")
+	void stringToListOfMapConverterWithFallbackMatch() {
+		conversionService.addConverter(new StringToListOfMapConverter());
+
+		List<Map<String, Object>> result = (List<Map<String, Object>>) conversionService.convert("foo",
+				TypeDescriptor.valueOf(String.class),
+				TypeDescriptor.collection(List.class, TypeDescriptor.valueOf(Map.class))
+		);
+
+		assertThat("foo").isEqualTo(result.get(0).get("bar"));
+	}
+
 
 	@ExampleAnnotation(active = true)
 	public String annotatedString;
@@ -602,7 +645,7 @@ class GenericConversionServiceTests {
 	}
 
 
-	private static class MyInterfaceImplementer implements MyInterface {
+	private static class MyInterfaceImplementor implements MyInterface {
 	}
 
 
@@ -681,8 +724,7 @@ class GenericConversionServiceTests {
 		}
 
 		@Override
-		@Nullable
-		public Object convert(@Nullable Object source, TypeDescriptor sourceType, TypeDescriptor targetType) {
+		public @Nullable Object convert(@Nullable Object source, TypeDescriptor sourceType, TypeDescriptor targetType) {
 			return null;
 		}
 	}
@@ -704,8 +746,7 @@ class GenericConversionServiceTests {
 		}
 
 		@Override
-		@Nullable
-		public Object convert(@Nullable Object source, TypeDescriptor sourceType, TypeDescriptor targetType) {
+		public @Nullable Object convert(@Nullable Object source, TypeDescriptor sourceType, TypeDescriptor targetType) {
 			return null;
 		}
 
@@ -741,6 +782,7 @@ class GenericConversionServiceTests {
 			return converter.getMatchAttempts();
 		}
 	}
+
 
 	private interface MyEnumBaseInterface {
 		String getBaseCode();
@@ -923,4 +965,44 @@ class GenericConversionServiceTests {
 			return Color.decode(source.substring(0, 6));
 		}
 	}
+
+
+	private static class GenericBaseClass<T> {
+	}
+
+	@SuppressWarnings("rawtypes")
+	private static class ARaw extends GenericBaseClass {
+	}
+
+	@SuppressWarnings("rawtypes")
+	private static class BRaw extends GenericBaseClass {
+	}
+
+
+	private static class StringListToAListConverter implements Converter<List<String>, List<ARaw>> {
+
+		@Override
+		public List<ARaw> convert(List<String> source) {
+			return List.of(new ARaw());
+		}
+	}
+
+
+	private static class StringListToBListConverter implements Converter<List<String>, List<BRaw>> {
+
+		@Override
+		public List<BRaw> convert(List<String> source) {
+			return List.of(new BRaw());
+		}
+	}
+
+
+	private static class StringToListOfMapConverter implements Converter<String, List<? extends Map<String, ?>>> {
+
+		@Override
+		public List<? extends Map<String, ?>> convert(String source) {
+			return List.of(Map.of("bar", source));
+		}
+	}
+
 }

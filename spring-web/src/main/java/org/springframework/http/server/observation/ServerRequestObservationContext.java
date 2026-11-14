@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2022 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,11 +16,13 @@
 
 package org.springframework.http.server.observation;
 
+import java.util.Collections;
+
+import io.micrometer.observation.transport.Propagator;
 import io.micrometer.observation.transport.RequestReplyReceiverContext;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-
-import org.springframework.lang.Nullable;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Context that holds information for metadata collection regarding
@@ -33,21 +35,34 @@ import org.springframework.lang.Nullable;
  */
 public class ServerRequestObservationContext extends RequestReplyReceiverContext<HttpServletRequest, HttpServletResponse> {
 
-	@Nullable
-	private String pathPattern;
+	private static final HeaderGetter GETTER = new HeaderGetter();
+
+	private @Nullable String pathPattern;
 
 	public ServerRequestObservationContext(HttpServletRequest request, HttpServletResponse response) {
-		super(HttpServletRequest::getHeader);
+		super(GETTER);
 		setCarrier(request);
 		setResponse(response);
 	}
 
-	@Nullable
-	public String getPathPattern() {
+	public @Nullable String getPathPattern() {
 		return this.pathPattern;
 	}
 
 	public void setPathPattern(@Nullable String pathPattern) {
 		this.pathPattern = pathPattern;
 	}
+
+	static final class HeaderGetter implements Propagator.Getter<HttpServletRequest> {
+		@Override
+		public String get(HttpServletRequest carrier, String key) {
+			return carrier.getHeader(key);
+		}
+
+		@Override
+		public Iterable<String> getAll(HttpServletRequest carrier, String key) {
+			return Collections.list(carrier.getHeaders(key));
+		}
+	}
+
 }

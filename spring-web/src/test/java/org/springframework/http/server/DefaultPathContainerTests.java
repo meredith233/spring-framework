@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -119,25 +119,25 @@ class DefaultPathContainerTests {
 	@Test
 	void path() {
 		// basic
-		testPath("/a/b/c", "/a/b/c", "/", "a", "/", "b", "/", "c");
+		path("/a/b/c", "/a/b/c", "/", "a", "/", "b", "/", "c");
 
 		// root path
-		testPath("/", "/", "/");
+		path("/", "/", "/");
 
 		// empty path
-		testPath("", "");
-		testPath("%20%20", "%20%20", "%20%20");
+		path("", "");
+		path("%20%20", "%20%20", "%20%20");
 
 		// trailing slash
-		testPath("/a/b/", "/a/b/", "/", "a", "/", "b", "/");
-		testPath("/a/b//", "/a/b//", "/", "a", "/", "b", "/", "/");
+		path("/a/b/", "/a/b/", "/", "a", "/", "b", "/");
+		path("/a/b//", "/a/b//", "/", "a", "/", "b", "/", "/");
 
 		// extra slashes and spaces
-		testPath("/%20", "/%20", "/", "%20");
-		testPath("//%20/%20", "//%20/%20", "/", "/", "%20", "/", "%20");
+		path("/%20", "/%20", "/", "%20");
+		path("//%20/%20", "//%20/%20", "/", "/", "%20", "/", "%20");
 	}
 
-	private void testPath(String input, String value, String... expectedElements) {
+	private void path(String input, String value, String... expectedElements) {
 		PathContainer path = PathContainer.parsePath(input, Options.HTTP_PATH);
 
 		assertThat(path.value()).as("value: '" + input + "'").isEqualTo(value);

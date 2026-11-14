@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -95,7 +95,7 @@ class DefaultServletHandlerConfigurerTests {
 	}
 
 	@Test // gh-30113
-	public void handleIncludeRequest() throws Exception {
+	void handleIncludeRequest() throws Exception {
 		configurer.enable();
 		SimpleUrlHandlerMapping mapping = configurer.buildHandlerMapping();
 		HttpRequestHandler handler = (DefaultServletHttpRequestHandler) mapping.getUrlMap().get("/**");

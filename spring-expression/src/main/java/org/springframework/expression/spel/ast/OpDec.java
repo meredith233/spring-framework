@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -53,6 +53,10 @@ public class OpDec extends Operator {
 
 	@Override
 	public TypedValue getValueInternal(ExpressionState state) throws EvaluationException {
+		if (!state.getEvaluationContext().isAssignmentEnabled()) {
+			throw new SpelEvaluationException(getStartPosition(), SpelMessage.OPERAND_NOT_DECREMENTABLE, toStringAST());
+		}
+
 		SpelNodeImpl operand = getLeftOperand();
 
 		// The operand is going to be read and then assigned to, we don't want to evaluate it twice.
@@ -64,6 +68,7 @@ public class OpDec extends Operator {
 		TypedValue newValue = null;
 
 		if (operandValue instanceof Number op1) {
+			state.trackOperation();
 			if (op1 instanceof BigDecimal bigDecimal) {
 				newValue = new TypedValue(bigDecimal.subtract(BigDecimal.ONE), operandTypedValue.getTypeDescriptor());
 			}
@@ -110,12 +115,13 @@ public class OpDec extends Operator {
 			}
 		}
 
-		// set the new value
+		state.trackOperation();
 		try {
+			// set the new value
 			lvalue.setValue(newValue.getValue());
 		}
 		catch (SpelEvaluationException see) {
-			// if unable to set the value the operand is not writable (e.g. 1-- )
+			// if unable to set the value the operand is not writable (for example, 1-- )
 			if (see.getMessageCode() == SpelMessage.SETVALUE_NOT_SUPPORTED) {
 				throw new SpelEvaluationException(operand.getStartPosition(),
 						SpelMessage.OPERAND_NOT_DECREMENTABLE);

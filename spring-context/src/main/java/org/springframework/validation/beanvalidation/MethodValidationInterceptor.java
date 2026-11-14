@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -30,6 +30,7 @@ import jakarta.validation.Validator;
 import jakarta.validation.ValidatorFactory;
 import org.aopalliance.intercept.MethodInterceptor;
 import org.aopalliance.intercept.MethodInvocation;
+import org.jspecify.annotations.Nullable;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
@@ -40,12 +41,12 @@ import org.springframework.core.MethodParameter;
 import org.springframework.core.ReactiveAdapter;
 import org.springframework.core.ReactiveAdapterRegistry;
 import org.springframework.core.annotation.AnnotationUtils;
-import org.springframework.lang.Nullable;
 import org.springframework.util.Assert;
 import org.springframework.util.ClassUtils;
 import org.springframework.validation.BeanPropertyBindingResult;
 import org.springframework.validation.Errors;
 import org.springframework.validation.annotation.Validated;
+import org.springframework.validation.annotation.ValidationAnnotationUtils;
 import org.springframework.validation.method.MethodValidationException;
 import org.springframework.validation.method.MethodValidationResult;
 import org.springframework.validation.method.ParameterErrors;
@@ -59,7 +60,7 @@ import org.springframework.validation.method.ParameterValidationResult;
  * their parameters and/or on their return value (in the latter case specified at
  * the method level, typically as inline annotation).
  *
- * <p>E.g.: {@code public @NotNull Object myValidMethod(@NotNull String arg1, @Max(10) int arg2)}
+ * <p>For example: {@code public @NotNull Object myValidMethod(@NotNull String arg1, @Max(10) int arg2)}
  *
  * <p>In case of validation errors, the interceptor can raise
  * {@link ConstraintViolationException}, or adapt the violations to
@@ -69,8 +70,6 @@ import org.springframework.validation.method.ParameterValidationResult;
  * at the type level of the containing target class, applying to all public service methods
  * of that class. By default, JSR-303 will validate against its default group only.
  *
- * <p>As of Spring 5.0, this functionality requires a Bean Validation 1.1+ provider.
- *
  * @author Juergen Hoeller
  * @author Rossen Stoyanchev
  * @since 3.1
@@ -79,7 +78,7 @@ import org.springframework.validation.method.ParameterValidationResult;
  */
 public class MethodValidationInterceptor implements MethodInterceptor {
 
-	private static final boolean reactorPresent = ClassUtils.isPresent(
+	private static final boolean REACTOR_PRESENT = ClassUtils.isPresent(
 			"reactor.core.publisher.Mono", MethodValidationInterceptor.class.getClassLoader());
 
 
@@ -141,8 +140,7 @@ public class MethodValidationInterceptor implements MethodInterceptor {
 
 
 	@Override
-	@Nullable
-	public Object invoke(MethodInvocation invocation) throws Throwable {
+	public @Nullable Object invoke(MethodInvocation invocation) throws Throwable {
 		// Avoid Validator invocation on FactoryBean.getObjectType/isSingleton
 		if (isFactoryBeanMetadataMethod(invocation.getMethod())) {
 			return invocation.proceed();
@@ -150,10 +148,10 @@ public class MethodValidationInterceptor implements MethodInterceptor {
 
 		Object target = getTarget(invocation);
 		Method method = invocation.getMethod();
-		Object[] arguments = invocation.getArguments();
+		@Nullable Object[] arguments = invocation.getArguments();
 		Class<?>[] groups = determineValidationGroups(invocation);
 
-		if (reactorPresent) {
+		if (REACTOR_PRESENT) {
 			arguments = ReactorValidationHelper.insertAsyncValidation(
 					this.validationAdapter.getSpringValidatorAdapter(), this.adaptViolations,
 					target, method, arguments);
@@ -174,7 +172,7 @@ public class MethodValidationInterceptor implements MethodInterceptor {
 		Object returnValue = invocation.proceed();
 
 		if (this.adaptViolations) {
-			this.validationAdapter.applyReturnValueValidation(target, method, null, arguments, groups);
+			this.validationAdapter.applyReturnValueValidation(target, method, null, returnValue, groups);
 		}
 		else {
 			violations = this.validationAdapter.invokeValidatorForReturnValue(target, method, returnValue, groups);
@@ -227,7 +225,7 @@ public class MethodValidationInterceptor implements MethodInterceptor {
 	 */
 	protected Class<?>[] determineValidationGroups(MethodInvocation invocation) {
 		Object target = getTarget(invocation);
-		return this.validationAdapter.determineValidationGroups(target, invocation.getMethod());
+		return ValidationAnnotationUtils.determineValidationGroups(target, invocation.getMethod());
 	}
 
 
@@ -240,9 +238,9 @@ public class MethodValidationInterceptor implements MethodInterceptor {
 				ReactiveAdapterRegistry.getSharedInstance();
 
 
-		static Object[] insertAsyncValidation(
+		static @Nullable Object[] insertAsyncValidation(
 				Supplier<SpringValidatorAdapter> validatorAdapterSupplier, boolean adaptViolations,
-				Object target, Method method, Object[] arguments) {
+				Object target, Method method, @Nullable Object[] arguments) {
 
 			for (int i = 0; i < method.getParameterCount(); i++) {
 				if (arguments[i] == null) {
@@ -268,8 +266,7 @@ public class MethodValidationInterceptor implements MethodInterceptor {
 			return arguments;
 		}
 
-		@Nullable
-		private static Class<?>[] determineValidationGroups(Parameter parameter) {
+		private static Class<?> @Nullable [] determineValidationGroups(Parameter parameter) {
 			Validated validated = AnnotationUtils.findAnnotation(parameter, Validated.class);
 			if (validated != null) {
 				return validated.value();

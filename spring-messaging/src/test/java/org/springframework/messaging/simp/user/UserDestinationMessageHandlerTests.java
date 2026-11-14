@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,18 +17,20 @@
 package org.springframework.messaging.simp.user;
 
 import java.nio.charset.StandardCharsets;
+import java.util.Set;
 
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mockito;
 
 import org.springframework.core.testfixture.security.TestPrincipal;
-import org.springframework.lang.Nullable;
 import org.springframework.messaging.Message;
 import org.springframework.messaging.StubMessageChannel;
 import org.springframework.messaging.SubscribableChannel;
 import org.springframework.messaging.simp.SimpMessageHeaderAccessor;
 import org.springframework.messaging.simp.SimpMessageType;
+import org.springframework.messaging.simp.stomp.StompBrokerRelayMessageHandler;
 import org.springframework.messaging.simp.stomp.StompCommand;
 import org.springframework.messaging.simp.stomp.StompHeaderAccessor;
 import org.springframework.messaging.support.MessageBuilder;
@@ -100,6 +102,26 @@ class UserDestinationMessageHandlerTests {
 
 	@Test
 	@SuppressWarnings("rawtypes")
+	void handleMessageWithoutSessionIds() {
+		UserDestinationResolver resolver = mock();
+		Message message = createWith(SimpMessageType.MESSAGE, "joe", null, "/user/joe/queue/foo");
+		UserDestinationResult result = new UserDestinationResult("/queue/foo-user123", Set.of("/queue/foo-user123"), "/user/queue/foo", "joe");
+		given(resolver.resolveDestination(message)).willReturn(result);
+
+		given(this.brokerChannel.send(Mockito.any(Message.class))).willReturn(true);
+		UserDestinationMessageHandler handler = new UserDestinationMessageHandler(new StubMessageChannel(), this.brokerChannel, resolver);
+		handler.handleMessage(message);
+
+		ArgumentCaptor<Message> captor = ArgumentCaptor.forClass(Message.class);
+		Mockito.verify(this.brokerChannel).send(captor.capture());
+
+		SimpMessageHeaderAccessor accessor = SimpMessageHeaderAccessor.wrap(captor.getValue());
+		assertThat(accessor.getDestination()).isEqualTo("/queue/foo-user123");
+		assertThat(accessor.getFirstNativeHeader(ORIGINAL_DESTINATION)).isEqualTo("/user/queue/foo");
+	}
+
+	@Test
+	@SuppressWarnings("rawtypes")
 	void handleMessageWithoutActiveSession() {
 		this.handler.setBroadcastDestination("/topic/unresolved");
 		given(this.brokerChannel.send(Mockito.any(Message.class))).willReturn(true);
@@ -130,7 +152,7 @@ class UserDestinationMessageHandlerTests {
 		given(this.brokerChannel.send(Mockito.any(Message.class))).willReturn(true);
 
 		StompHeaderAccessor accessor = StompHeaderAccessor.create(StompCommand.MESSAGE);
-		accessor.setSessionId("system123");
+		accessor.setSessionId(StompBrokerRelayMessageHandler.SYSTEM_SESSION_ID);
 		accessor.setDestination("/topic/unresolved");
 		accessor.setNativeHeader(ORIGINAL_DESTINATION, "/user/joe/queue/foo");
 		accessor.setNativeHeader("customHeader", "customHeaderValue");
@@ -154,7 +176,7 @@ class UserDestinationMessageHandlerTests {
 		given(this.brokerChannel.send(Mockito.any(Message.class))).willReturn(true);
 
 		StompHeaderAccessor accessor = StompHeaderAccessor.create(StompCommand.MESSAGE);
-		accessor.setSessionId("system123");
+		accessor.setSessionId(StompBrokerRelayMessageHandler.SYSTEM_SESSION_ID);
 		accessor.setDestination("/topic/unresolved");
 		accessor.setNativeHeader(ORIGINAL_DESTINATION, "/user/joe/queue/foo");
 		accessor.setLeaveMutable(true);

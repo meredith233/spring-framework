@@ -14,7 +14,6 @@ the `Last-Modified` header.
 This section describes the HTTP caching-related options that are available in Spring Web MVC.
 
 
-
 [[mvc-caching-cachecontrol]]
 == `CacheControl`
 [.small]#xref:web/webflux/caching.adoc#webflux-caching-cachecontrol[See equivalent in the Reactive stack]#
@@ -25,8 +24,8 @@ in a number of places:
 
 * {spring-framework-api}/web/servlet/mvc/WebContentInterceptor.html[`WebContentInterceptor`]
 * {spring-framework-api}/web/servlet/support/WebContentGenerator.html[`WebContentGenerator`]
-* xref:web/webmvc/mvc-caching.adoc#mvc-caching-etag-lastmodified[Controllers]
-* xref:web/webmvc/mvc-caching.adoc#mvc-caching-static-resources[Static Resources]
+* <<mvc-caching-etag-lastmodified,Controllers>>
+* <<mvc-caching-static-resources,Static Resources>>
 
 While {rfc-site}/rfc7234#section-5.2.2[RFC 7234] describes all possible
 directives for the `Cache-Control` response header, the `CacheControl` type takes a
@@ -36,7 +35,7 @@ use case-oriented approach that focuses on the common scenarios:
 ======
 Java::
 +
-[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+[source,java,indent=0,subs="verbatim,quotes"]
 ----
 	// Cache for an hour - "Cache-Control: max-age=3600"
 	CacheControl ccCacheOneHour = CacheControl.maxAge(1, TimeUnit.HOURS);
@@ -52,7 +51,7 @@ Java::
 
 Kotlin::
 +
-[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+[source,kotlin,indent=0,subs="verbatim,quotes"]
 ----
 	// Cache for an hour - "Cache-Control: max-age=3600"
 	val ccCacheOneHour = CacheControl.maxAge(1, TimeUnit.HOURS)
@@ -76,7 +75,6 @@ works as follows:
 `'Cache-Control: max-age=n'` directive.
 
 
-
 [[mvc-caching-etag-lastmodified]]
 == Controllers
 [.small]#xref:web/webflux/caching.adoc#webflux-caching-etag-lastmodified[See equivalent in the Reactive stack]#
@@ -91,7 +89,7 @@ settings to a `ResponseEntity`, as the following example shows:
 ======
 Java::
 +
-[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+[source,java,indent=0,subs="verbatim,quotes"]
 ----
 	@GetMapping("/book/{id}")
 	public ResponseEntity<Book> showBook(@PathVariable Long id) {
@@ -109,7 +107,7 @@ Java::
 
 Kotlin::
 +
-[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+[source,kotlin,indent=0,subs="verbatim,quotes"]
 ----
 	@GetMapping("/book/{id}")
 	fun showBook(@PathVariable id: Long): ResponseEntity<Book> {
@@ -139,7 +137,7 @@ as the following example shows:
 ======
 Java::
 +
-[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+[source,java,indent=0,subs="verbatim,quotes"]
 ----
 	@RequestMapping
 	public String myHandleMethod(WebRequest request, Model model) {
@@ -160,7 +158,7 @@ Java::
 
 Kotlin::
 +
-[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+[source,kotlin,indent=0,subs="verbatim,quotes"]
 ----
 	@RequestMapping
 	fun myHandleMethod(request: WebRequest, model: Model): String? {
@@ -181,12 +179,10 @@ Kotlin::
 ======
 --
 
-
 There are three variants for checking conditional requests against `eTag` values, `lastModified`
 values, or both. For conditional `GET` and `HEAD` requests, you can set the response to
 304 (NOT_MODIFIED). For conditional `POST`, `PUT`, and `DELETE`, you can instead set the response
 to 412 (PRECONDITION_FAILED), to prevent concurrent modification.
-
 
 
 [[mvc-caching-static-resources]]
@@ -197,10 +193,8 @@ You should serve static resources with a `Cache-Control` and conditional respons
 for optimal performance. See the section on configuring xref:web/webmvc/mvc-config/static-resources.adoc[Static Resources].
 
 
-
 [[mvc-httpcaching-shallowetag]]
 == `ETag` Filter
 
 You can use the `ShallowEtagHeaderFilter` to add "`shallow`" `eTag` values that are computed from the
 response content and, thus, save bandwidth but not CPU time. See xref:web/webmvc/filters.adoc#filters-shallow-etag[Shallow ETag].
-

@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2023 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -341,6 +341,18 @@ import org.springframework.stereotype.Component;
  * with the {@code @Profile} annotation to provide two options of the same bean to the
  * enclosing {@code @Configuration} class.
  *
+ * <p>A {@link Conditional @Conditional} annotation declared on an enclosing
+ * {@code @Configuration} class is only applied to the registration of a nested
+ * {@code @Configuration} class if the nested class is reached through the parser's
+ * recursion from its enclosing class, or via {@link Import @Import}. If a nested
+ * class is discovered independently of its enclosing class &mdash; for example,
+ * via {@link ComponentScan @ComponentScan} or by directly registering it against
+ * the application context &mdash; it is processed using only its own
+ * {@code @Conditional} annotations. Thus, if you wish to ensure that the same
+ * {@code @Conditional} annotations apply in such scenarios, you must redeclare
+ * the relevant annotations on the nested class, or extract them into a composed
+ * annotation which you apply to both the enclosing class and the nested class.
+ *
  * <h2>Configuring lazy initialization</h2>
  *
  * <p>By default, {@code @Bean} methods will be <em>eagerly instantiated</em> at container
@@ -437,20 +449,22 @@ public @interface Configuration {
 	 * <p>Alias for {@link Component#value}.
 	 * @return the explicit component name, if any (or empty String otherwise)
 	 * @see AnnotationBeanNameGenerator
+	 * @see FullyQualifiedAnnotationBeanNameGenerator
+	 * @see FullyQualifiedConfigurationBeanNameGenerator
 	 */
 	@AliasFor(annotation = Component.class)
 	String value() default "";
 
 	/**
 	 * Specify whether {@code @Bean} methods should get proxied in order to enforce
-	 * bean lifecycle behavior, e.g. to return shared singleton bean instances even
+	 * bean lifecycle behavior, for example, to return shared singleton bean instances even
 	 * in case of direct {@code @Bean} method calls in user code. This feature
 	 * requires method interception, implemented through a runtime-generated CGLIB
 	 * subclass which comes with limitations such as the configuration class and
 	 * its methods not being allowed to declare {@code final}.
 	 * <p>The default is {@code true}, allowing for 'inter-bean references' via direct
 	 * method calls within the configuration class as well as for external calls to
-	 * this configuration's {@code @Bean} methods, e.g. from another configuration class.
+	 * this configuration's {@code @Bean} methods, for example, from another configuration class.
 	 * If this is not needed since each of this particular configuration's {@code @Bean}
 	 * methods is self-contained and designed as a plain factory method for container use,
 	 * switch this flag to {@code false} in order to avoid CGLIB subclass processing.
@@ -471,7 +485,10 @@ public @interface Configuration {
 	 * Switch this flag to {@code false} in order to allow for method overloading
 	 * according to those semantics, accepting the risk for accidental overlaps.
 	 * @since 6.0
+	 * @deprecated as of 7.0, always relying on {@code @Bean} unique methods,
+	 * just possibly with {@code Optional}/{@code ObjectProvider} arguments
 	 */
+	@Deprecated(since = "7.0")
 	boolean enforceUniqueMethods() default true;
 
 }

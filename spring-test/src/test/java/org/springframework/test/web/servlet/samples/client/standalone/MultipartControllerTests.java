@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -36,6 +36,7 @@ import org.springframework.http.client.MultipartBodyBuilder;
 import org.springframework.stereotype.Controller;
 import org.springframework.test.web.reactive.server.WebTestClient;
 import org.springframework.test.web.servlet.client.MockMvcWebTestClient;
+import org.springframework.util.CollectionUtils;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -51,13 +52,13 @@ import static org.assertj.core.api.Assertions.assertThat;
  *
  * @author Rossen Stoyanchev
  */
-public class MultipartControllerTests {
+class MultipartControllerTests {
 
 	private final WebTestClient testClient = MockMvcWebTestClient.bindToController(new MultipartController()).build();
 
 
 	@Test
-	public void multipartRequestWithSingleFile() {
+	void multipartRequestWithSingleFile() {
 
 		byte[] fileContent = "bar".getBytes(StandardCharsets.UTF_8);
 		Map<String, String> json = Collections.singletonMap("name", "yeeeah");
@@ -81,14 +82,14 @@ public class MultipartControllerTests {
 	}
 
 	@Test
-	public void multipartRequestWithSingleFileNotPresent() {
+	void multipartRequestWithSingleFileNotPresent() {
 		testClient.post().uri("/multipartfile")
 				.exchange()
 				.expectStatus().isFound();
 	}
 
 	@Test
-	public void multipartRequestWithFileArray() {
+	void multipartRequestWithFileArray() {
 		byte[] fileContent = "bar".getBytes(StandardCharsets.UTF_8);
 		Map<String, String> json = Collections.singletonMap("name", "yeeeah");
 
@@ -105,14 +106,14 @@ public class MultipartControllerTests {
 	}
 
 	@Test
-	public void multipartRequestWithFileArrayNoMultipart() {
+	void multipartRequestWithFileArrayNoMultipart() {
 		testClient.post().uri("/multipartfilearray")
 				.exchange()
 				.expectStatus().isFound();
 	}
 
 	@Test
-	public void multipartRequestWithOptionalFile() {
+	void multipartRequestWithOptionalFile() {
 		byte[] fileContent = "bar".getBytes(StandardCharsets.UTF_8);
 		Map<String, String> json = Collections.singletonMap("name", "yeeeah");
 
@@ -128,7 +129,7 @@ public class MultipartControllerTests {
 	}
 
 	@Test
-	public void multipartRequestWithOptionalFileNotPresent() {
+	void multipartRequestWithOptionalFileNotPresent() {
 		Map<String, String> json = Collections.singletonMap("name", "yeeeah");
 
 		MultipartBodyBuilder bodyBuilder = new MultipartBodyBuilder();
@@ -142,7 +143,7 @@ public class MultipartControllerTests {
 	}
 
 	@Test
-	public void multipartRequestWithOptionalFileArray() {
+	void multipartRequestWithOptionalFileArray() {
 		byte[] fileContent = "bar".getBytes(StandardCharsets.UTF_8);
 		Map<String, String> json = Collections.singletonMap("name", "yeeeah");
 
@@ -159,7 +160,7 @@ public class MultipartControllerTests {
 	}
 
 	@Test
-	public void multipartRequestWithOptionalFileArrayNotPresent() {
+	void multipartRequestWithOptionalFileArrayNotPresent() {
 		Map<String, String> json = Collections.singletonMap("name", "yeeeah");
 
 		MultipartBodyBuilder bodyBuilder = new MultipartBodyBuilder();
@@ -173,7 +174,7 @@ public class MultipartControllerTests {
 	}
 
 	@Test
-	public void multipartRequestWithOptionalFileList() {
+	void multipartRequestWithOptionalFileList() {
 		byte[] fileContent = "bar".getBytes(StandardCharsets.UTF_8);
 		Map<String, String> json = Collections.singletonMap("name", "yeeeah");
 
@@ -190,7 +191,7 @@ public class MultipartControllerTests {
 	}
 
 	@Test
-	public void multipartRequestWithOptionalFileListNotPresent() {
+	void multipartRequestWithOptionalFileListNotPresent() {
 		Map<String, String> json = Collections.singletonMap("name", "yeeeah");
 
 		MultipartBodyBuilder bodyBuilder = new MultipartBodyBuilder();
@@ -204,7 +205,7 @@ public class MultipartControllerTests {
 	}
 
 	@Test
-	public void multipartRequestWithServletParts() {
+	void multipartRequestWithServletParts() {
 		byte[] fileContent = "bar".getBytes(StandardCharsets.UTF_8);
 		Map<String, String> json = Collections.singletonMap("name", "yeeeah");
 
@@ -220,7 +221,7 @@ public class MultipartControllerTests {
 	}
 
 	@Test
-	public void multipartRequestWrapped() {
+	void multipartRequestWrapped() {
 		Map<String, String> json = Collections.singletonMap("name", "yeeeah");
 
 		MultipartBodyBuilder bodyBuilder = new MultipartBodyBuilder();
@@ -271,7 +272,7 @@ public class MultipartControllerTests {
 		public String processMultipartFileList(@RequestParam(required = false) List<MultipartFile> file,
 				@RequestPart(required = false) Map<String, String> json) throws IOException {
 
-			if (file != null && !file.isEmpty()) {
+			if (!CollectionUtils.isEmpty(file)) {
 				byte[] content = file.get(0).getBytes();
 				assertThat(file.get(1).getBytes()).isEqualTo(content);
 			}

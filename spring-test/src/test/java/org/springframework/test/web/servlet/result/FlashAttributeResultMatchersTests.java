@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -26,26 +26,26 @@ import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 /**
  * @author Craig Walls
  */
-public class FlashAttributeResultMatchersTests {
+class FlashAttributeResultMatchersTests {
 
 	@Test
-	public void attributeExists() throws Exception {
+	void attributeExists() throws Exception {
 		new FlashAttributeResultMatchers().attributeExists("good").match(getStubMvcResult());
 	}
 
 	@Test
-	public void attributeExists_DoesNotExist() {
+	void attributeExists_DoesNotExist() {
 		assertThatExceptionOfType(AssertionError.class).isThrownBy(() ->
 				new FlashAttributeResultMatchers().attributeExists("bad").match(getStubMvcResult()));
 	}
 
 	@Test
-	public void attribute() throws Exception {
+	void attribute() throws Exception {
 		new FlashAttributeResultMatchers().attribute("good", "good").match(getStubMvcResult());
 	}
 
 	@Test
-	public void attribute_incorrectValue() {
+	void attribute_incorrectValue() {
 		assertThatExceptionOfType(AssertionError.class).isThrownBy(() ->
 				new FlashAttributeResultMatchers().attribute("good", "not good").match(getStubMvcResult()));
 	}

@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2022 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -31,7 +31,12 @@ public enum EmbeddedDatabaseType {
 	/** The <a href="https://h2database.com">H2</a> Embedded Java SQL Database Engine. */
 	H2,
 
-	/** The <a href="https://db.apache.org/derby">Apache Derby</a> Embedded SQL Database. */
+	/**
+	 * The <a href="https://db.apache.org/derby">Apache Derby</a> Embedded SQL Database.
+	 *
+	 * @deprecated Apache Derby is retired, switch to HSQLDB or H2
+	 */
+	@Deprecated(forRemoval = true, since = "7.1")
 	DERBY
 
 }

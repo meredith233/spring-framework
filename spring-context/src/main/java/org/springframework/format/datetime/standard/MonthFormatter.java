@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2018 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -34,7 +34,7 @@ class MonthFormatter implements Formatter<Month> {
 
 	@Override
 	public Month parse(String text, Locale locale) throws ParseException {
-		return Month.valueOf(text.toUpperCase());
+		return Month.valueOf(text.toUpperCase(Locale.ROOT));
 	}
 
 	@Override

@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2023 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -115,6 +115,16 @@ class NumberUtilsTests {
 		assertIntegerEquals(anInteger);
 		assertLongEquals(aLong);
 		assertThat(NumberUtils.parseNumber("0x" + aReallyBigInt, BigInteger.class)).as("BigInteger did not parse").isEqualTo(new BigInteger(aReallyBigInt, 16));
+	}
+
+	@Test  // gh-37434
+	void parseNumberAsPositiveHex() {
+		assertThat(NumberUtils.parseNumber("+0x7f", Byte.class)).isEqualTo((byte) 127);
+		assertThat(NumberUtils.parseNumber("+0X7fff", Short.class)).isEqualTo((short) 32767);
+		assertThat(NumberUtils.parseNumber("+#2a", Integer.class)).isEqualTo(42);
+		assertThat(NumberUtils.parseNumber("+0x2a", Long.class)).isEqualTo(42L);
+		assertThat(NumberUtils.parseNumber("+0xFEBD4E677898DFEBFFEE44", BigInteger.class))
+				.isEqualTo(new BigInteger("FEBD4E677898DFEBFFEE44", 16));
 	}
 
 	@Test
@@ -364,6 +374,51 @@ class NumberUtilsTests {
 		assertToNumberOverflow(BigInteger.valueOf(Long.MAX_VALUE).add(BigInteger.ONE), Long.class);
 		assertToNumberOverflow(BigInteger.valueOf(Long.MIN_VALUE).subtract(BigInteger.ONE), Long.class);
 		assertToNumberOverflow(new BigDecimal("18446744073709551611"), Long.class);
+	}
+
+	@Test  // gh-37586
+	void convertFloatingPointToLong() {
+		assertThat(NumberUtils.convertNumberToTargetClass(-1.5d, Long.class)).isEqualTo(Long.valueOf(-1));
+		assertThat(NumberUtils.convertNumberToTargetClass(1.5f, Long.class)).isEqualTo(Long.valueOf(1));
+		assertThat(NumberUtils.convertNumberToTargetClass((double) Long.MIN_VALUE, Long.class)).isEqualTo(Long.valueOf(Long.MIN_VALUE));
+		assertThat(NumberUtils.convertNumberToTargetClass(Math.nextDown(0x1p63), Long.class)).isEqualTo(Long.valueOf(0x7FFFFFFFFFFFFC00L));
+
+		assertToNumberOverflow(0x1p63, Long.class);
+		assertToNumberOverflow(1e20d, Long.class);
+		assertToNumberOverflow(-1e20d, Long.class);
+		assertToNumberOverflow(1e20f, Long.class);
+		assertToNumberOverflow(Double.POSITIVE_INFINITY, Long.class);
+		assertToNumberOverflow(Double.NEGATIVE_INFINITY, Long.class);
+		assertToNumberOverflow(Float.POSITIVE_INFINITY, Long.class);
+		assertToNumberOverflow(Float.NEGATIVE_INFINITY, Long.class);
+		assertToNumberOverflow(Double.NaN, Long.class);
+		assertToNumberOverflow(Float.NaN, Long.class);
+		assertToNumberOverflow(Double.NaN, Integer.class);
+		assertToNumberOverflow(Double.NaN, Short.class);
+		assertToNumberOverflow(Double.NaN, Byte.class);
+	}
+
+	@Test  // gh-37586
+	void convertFloatingPointToBigInteger() {
+		assertThat(NumberUtils.convertNumberToTargetClass(-1.5d, BigInteger.class)).isEqualTo(BigInteger.valueOf(-1));
+		assertThat(NumberUtils.convertNumberToTargetClass(1.5f, BigInteger.class)).isEqualTo(BigInteger.valueOf(1));
+		assertThat(NumberUtils.convertNumberToTargetClass(1e20d, BigInteger.class)).isEqualTo(new BigInteger("100000000000000000000"));
+		assertThat(NumberUtils.convertNumberToTargetClass(-1e20d, BigInteger.class)).isEqualTo(new BigInteger("-100000000000000000000"));
+		assertThat(NumberUtils.convertNumberToTargetClass(1e20f, BigInteger.class)).isEqualTo(new BigInteger("100000002004087734272"));
+
+		assertThat(NumberUtils.convertNumberToTargetClass(0x1p40f, BigInteger.class)).isEqualTo(new BigInteger("1099511627776"));
+		assertThat(NumberUtils.convertNumberToTargetClass(0x1p60, BigInteger.class)).isEqualTo(new BigInteger("1152921504606846976"));
+		assertThat(NumberUtils.convertNumberToTargetClass(0x1p40f, BigInteger.class))
+				.isEqualTo(BigInteger.valueOf(NumberUtils.convertNumberToTargetClass(0x1p40f, Long.class)));
+		assertThat(NumberUtils.convertNumberToTargetClass(0x1p60, BigInteger.class))
+				.isEqualTo(BigInteger.valueOf(NumberUtils.convertNumberToTargetClass(0x1p60, Long.class)));
+
+		assertToNumberOverflow(Double.NaN, BigInteger.class);
+		assertToNumberOverflow(Float.NaN, BigInteger.class);
+		assertToNumberOverflow(Double.POSITIVE_INFINITY, BigInteger.class);
+		assertToNumberOverflow(Double.NEGATIVE_INFINITY, BigInteger.class);
+		assertToNumberOverflow(Float.POSITIVE_INFINITY, BigInteger.class);
+		assertToNumberOverflow(Float.NEGATIVE_INFINITY, BigInteger.class);
 	}
 
 

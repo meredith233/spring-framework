@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2020 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,6 +18,7 @@ package org.springframework.test.web.servlet.result
 
 import org.hamcrest.Matcher
 import org.springframework.http.MediaType
+import org.springframework.test.json.JsonCompareMode
 import org.springframework.test.web.servlet.ResultActions
 import org.w3c.dom.Node
 import javax.xml.transform.Source
@@ -70,7 +71,7 @@ class ContentResultMatchersDsl internal constructor (private val actions: Result
 	/**
 	 * @see ContentResultMatchers.string
 	 */
-	fun string(matcher: Matcher<String>) {
+	fun string(matcher: Matcher<in String>) {
 		actions.andExpect(matchers.string(matcher))
 	}
 
@@ -98,21 +99,30 @@ class ContentResultMatchersDsl internal constructor (private val actions: Result
 	/**
 	 * @see ContentResultMatchers.node
 	 */
-	fun node(matcher: Matcher<Node>) {
+	fun node(matcher: Matcher<in Node>) {
 		actions.andExpect(matchers.node(matcher))
 	}
 
 	/**
 	 * @see ContentResultMatchers.source
 	 */
-	fun source(matcher: Matcher<Source>) {
+	fun source(matcher: Matcher<in Source>) {
 		actions.andExpect(matchers.source(matcher))
 	}
 
 	/**
 	 * @see ContentResultMatchers.json
 	 */
-	fun json(jsonContent: String, strict: Boolean = false) {
-		actions.andExpect(matchers.json(jsonContent, strict))
+	@Deprecated(message = "Use JsonCompare mode instead")
+	fun json(jsonContent: String, strict: Boolean) {
+		val compareMode = (if (strict) JsonCompareMode.STRICT else JsonCompareMode.LENIENT)
+		actions.andExpect(matchers.json(jsonContent, compareMode))
+	}
+
+	/**
+	 * @see ContentResultMatchers.json
+	 */
+	fun json(jsonContent: String, compareMode: JsonCompareMode = JsonCompareMode.LENIENT) {
+		actions.andExpect(matchers.json(jsonContent, compareMode))
 	}
 }

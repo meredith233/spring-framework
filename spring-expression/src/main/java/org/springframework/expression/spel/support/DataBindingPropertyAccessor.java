@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -28,6 +28,16 @@ import java.lang.reflect.Method;
  * <p>This accessor is explicitly designed for user-declared properties and does not
  * resolve technical properties on {@code java.lang.Object} or {@code java.lang.Class}.
  * For unrestricted resolution, choose {@link ReflectivePropertyAccessor} instead.
+ *
+ * <p><strong>WARNING</strong>: Configuring this accessor for read-only access &mdash;
+ * for example, via {@link #forReadOnlyAccess()} or
+ * {@link SimpleEvaluationContext#forReadOnlyDataBinding()} &mdash; disallows
+ * <em>assignment</em> to a property but does not verify that reading a property is
+ * free of side effects. See the
+ * <a href="https://docs.spring.io/spring-framework/reference/core/expressions/evaluation.html#expressions-evaluation-context-security"
+ * >Security Considerations</a> section of the Spring Framework reference
+ * documentation, as well as the class-level documentation for
+ * {@link ReflectivePropertyAccessor}, for details.
  *
  * @author Juergen Hoeller
  * @since 4.3.15

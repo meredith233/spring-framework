@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -29,13 +29,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.jspecify.annotations.Nullable;
 
 import org.springframework.core.io.support.SpringFactoriesLoader;
-import org.springframework.lang.Nullable;
 import org.springframework.util.ClassUtils;
 import org.springframework.util.ConcurrentReferenceHashMap;
 import org.springframework.util.StringUtils;
@@ -92,22 +91,20 @@ public final class CachedIntrospectionResults {
 	 * Map keyed by Class containing CachedIntrospectionResults, strongly held.
 	 * This variant is being used for cache-safe bean classes.
 	 */
-	static final ConcurrentMap<Class<?>, CachedIntrospectionResults> strongClassCache =
-			new ConcurrentHashMap<>(64);
+	static final Map<Class<?>, CachedIntrospectionResults> strongClassCache = new ConcurrentHashMap<>(64);
 
 	/**
 	 * Map keyed by Class containing CachedIntrospectionResults, softly held.
 	 * This variant is being used for non-cache-safe bean classes.
 	 */
-	static final ConcurrentMap<Class<?>, CachedIntrospectionResults> softClassCache =
-			new ConcurrentReferenceHashMap<>(64);
+	static final Map<Class<?>, CachedIntrospectionResults> softClassCache = new ConcurrentReferenceHashMap<>(64);
 
 
 	/**
 	 * Accept the given ClassLoader as cache-safe, even if its classes would
 	 * not qualify as cache-safe in this CachedIntrospectionResults class.
 	 * <p>This configuration method is only relevant in scenarios where the Spring
-	 * classes reside in a 'common' ClassLoader (e.g. the system ClassLoader)
+	 * classes reside in a 'common' ClassLoader (for example, the system ClassLoader)
 	 * whose lifecycle is not coupled to the application. In such a scenario,
 	 * CachedIntrospectionResults would by default not cache any of the application's
 	 * classes, since they would create a leak in the common ClassLoader.
@@ -153,7 +150,7 @@ public final class CachedIntrospectionResults {
 		}
 
 		results = new CachedIntrospectionResults(beanClass);
-		ConcurrentMap<Class<?>, CachedIntrospectionResults> classCacheToUse;
+		Map<Class<?>, CachedIntrospectionResults> classCacheToUse;
 
 		if (ClassUtils.isCacheSafe(beanClass, CachedIntrospectionResults.class.getClassLoader()) ||
 				isClassLoaderAccepted(beanClass.getClassLoader())) {
@@ -283,14 +280,14 @@ public final class CachedIntrospectionResults {
 			}
 
 			// Explicitly check implemented interfaces for setter/getter methods as well,
-			// in particular for Java 8 default methods...
+			// in particular for interface default methods.
 			Class<?> currClass = beanClass;
 			while (currClass != null && currClass != Object.class) {
 				introspectInterfaces(beanClass, currClass, readMethodNames);
 				currClass = currClass.getSuperclass();
 			}
 
-			// Check for record-style accessors without prefix: e.g. "lastName()"
+			// Check for record-style accessors without prefix: for example, "lastName()"
 			// - accessor method directly referring to instance field of same name
 			// - same convention for component accessors of Java 15 record classes
 			introspectPlainAccessors(beanClass, readMethodNames);
@@ -375,8 +372,7 @@ public final class CachedIntrospectionResults {
 		return this.beanInfo.getBeanDescriptor().getBeanClass();
 	}
 
-	@Nullable
-	PropertyDescriptor getPropertyDescriptor(String name) {
+	@Nullable PropertyDescriptor getPropertyDescriptor(String name) {
 		PropertyDescriptor pd = this.propertyDescriptors.get(name);
 		if (pd == null && StringUtils.hasLength(name)) {
 			// Same lenient fallback checking as in Property...

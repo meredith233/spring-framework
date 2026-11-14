@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2019 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -55,7 +55,7 @@ public class SynthesizingMethodParameter extends MethodParameter {
 	 * return type; 0 for the first method parameter; 1 for the second method
 	 * parameter, etc.
 	 * @param nestingLevel the nesting level of the target type
-	 * (typically 1; e.g. in case of a List of Lists, 1 would indicate the
+	 * (typically 1; for example, in case of a List of Lists, 1 would indicate the
 	 * nested List, whereas 2 would indicate the element of the nested List)
 	 */
 	public SynthesizingMethodParameter(Method method, int parameterIndex, int nestingLevel) {
@@ -77,7 +77,7 @@ public class SynthesizingMethodParameter extends MethodParameter {
 	 * @param constructor the Constructor to specify a parameter for
 	 * @param parameterIndex the index of the parameter
 	 * @param nestingLevel the nesting level of the target type
-	 * (typically 1; e.g. in case of a List of Lists, 1 would indicate the
+	 * (typically 1; for example, in case of a List of Lists, 1 would indicate the
 	 * nested List, whereas 2 would indicate the element of the nested List)
 	 */
 	public SynthesizingMethodParameter(Constructor<?> constructor, int parameterIndex, int nestingLevel) {
@@ -87,7 +87,7 @@ public class SynthesizingMethodParameter extends MethodParameter {
 	/**
 	 * Copy constructor, resulting in an independent {@code SynthesizingMethodParameter}
 	 * based on the same metadata and cache state that the original object was in.
-	 * @param original the original SynthesizingMethodParameter object to copy from
+	 * @param original the original {@code SynthesizingMethodParameter} object to copy from
 	 */
 	protected SynthesizingMethodParameter(SynthesizingMethodParameter original) {
 		super(original);
@@ -111,12 +111,14 @@ public class SynthesizingMethodParameter extends MethodParameter {
 
 
 	/**
-	 * Create a new SynthesizingMethodParameter for the given method or constructor.
-	 * <p>This is a convenience factory method for scenarios where a
-	 * Method or Constructor reference is treated in a generic fashion.
-	 * @param executable the Method or Constructor to specify a parameter for
+	 * Create a new {@code SynthesizingMethodParameter} for the given method or
+	 * constructor.
+	 * <p>This is a convenience factory method for scenarios where a {@link Method}
+	 * or {@link Constructor} reference is treated in a generic fashion.
+	 * @param executable the {@code Method} or {@code Constructor} to specify a
+	 * parameter for
 	 * @param parameterIndex the index of the parameter
-	 * @return the corresponding SynthesizingMethodParameter instance
+	 * @return the corresponding {@code SynthesizingMethodParameter} instance
 	 * @since 5.0
 	 */
 	public static SynthesizingMethodParameter forExecutable(Executable executable, int parameterIndex) {
@@ -132,11 +134,12 @@ public class SynthesizingMethodParameter extends MethodParameter {
 	}
 
 	/**
-	 * Create a new SynthesizingMethodParameter for the given parameter descriptor.
-	 * <p>This is a convenience factory method for scenarios where a
-	 * Java 8 {@link Parameter} descriptor is already available.
+	 * Create a new {@code SynthesizingMethodParameter} for the given parameter
+	 * descriptor.
+	 * <p>This is a convenience factory method for scenarios where a Java
+	 * {@link Parameter} descriptor is already available.
 	 * @param parameter the parameter descriptor
-	 * @return the corresponding SynthesizingMethodParameter instance
+	 * @return the corresponding {@code SynthesizingMethodParameter} instance
 	 * @since 5.0
 	 */
 	public static SynthesizingMethodParameter forParameter(Parameter parameter) {

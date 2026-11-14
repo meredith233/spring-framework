@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -146,7 +146,7 @@ class RedirectViewTests {
 		assertThat(response.getHeader("Location")).isEqualTo("https://url.somewhere.com/path?id=1");
 
 		assertThat(flashMap.getTargetRequestPath()).isEqualTo("/path");
-		assertThat(flashMap.getTargetRequestParams().toSingleValueMap()).isEqualTo(model);
+		assertThat(flashMap.getTargetRequestParams().asSingleValueMap()).isEqualTo(model);
 	}
 
 	@Test
@@ -196,7 +196,7 @@ class RedirectViewTests {
 	}
 
 	@Test // SPR-13693
-	public void remoteHost() {
+	void remoteHost() {
 		RedirectView rv = new RedirectView();
 
 		assertThat(rv.isRemoteHost("https://url.somewhere.com")).isFalse();
@@ -211,7 +211,7 @@ class RedirectViewTests {
 	}
 
 	@Test // SPR-16752
-	public void contextRelativeWithValidatedContextPath() throws Exception {
+	void contextRelativeWithValidatedContextPath() throws Exception {
 		String url = "/myUrl";
 
 		this.request.setContextPath("//context");
@@ -364,7 +364,7 @@ class RedirectViewTests {
 		 */
 		@Override
 		protected Map<String, Object> queryProperties(Map<String, Object> model) {
-			assertThat(this.expectedModel.equals(model)).as("Map and model must be equal.").isTrue();
+			assertThat(this.expectedModel).as("Map and model must be equal.").isEqualTo(model);
 			this.queryPropertiesCalled = true;
 			return super.queryProperties(model);
 		}

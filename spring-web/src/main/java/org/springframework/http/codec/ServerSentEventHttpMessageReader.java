@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2022 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,6 +22,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
+import org.jspecify.annotations.Nullable;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
@@ -34,7 +35,6 @@ import org.springframework.core.io.buffer.DataBufferLimitException;
 import org.springframework.core.io.buffer.DefaultDataBufferFactory;
 import org.springframework.http.MediaType;
 import org.springframework.http.ReactiveHttpInputMessage;
-import org.springframework.lang.Nullable;
 
 /**
  * Reader that supports a stream of {@link ServerSentEvent ServerSentEvents} and also plain
@@ -50,8 +50,7 @@ public class ServerSentEventHttpMessageReader implements HttpMessageReader<Objec
 	private static final ResolvableType STRING_TYPE = ResolvableType.forClass(String.class);
 
 
-	@Nullable
-	private final Decoder<?> decoder;
+	private final @Nullable Decoder<?> decoder;
 
 	private final StringDecoder lineDecoder = StringDecoder.textPlainOnly();
 
@@ -76,8 +75,7 @@ public class ServerSentEventHttpMessageReader implements HttpMessageReader<Objec
 	/**
 	 * Return the configured {@code Decoder}.
 	 */
-	@Nullable
-	public Decoder<?> getDecoder() {
+	public @Nullable Decoder<?> getDecoder() {
 		return this.decoder;
 	}
 
@@ -137,9 +135,8 @@ public class ServerSentEventHttpMessageReader implements HttpMessageReader<Objec
 				});
 	}
 
-	@Nullable
-	@SuppressWarnings("NullAway")
-	private Object buildEvent(List<String> lines, ResolvableType valueType, boolean shouldWrap,
+	@SuppressWarnings("NullAway") // Dataflow analysis limitation
+	private @Nullable Object buildEvent(List<String> lines, ResolvableType valueType, boolean shouldWrap,
 			Map<String, Object> hints) {
 
 		ServerSentEvent.Builder<Object> sseBuilder = (shouldWrap ? ServerSentEvent.builder() : null);
@@ -148,15 +145,15 @@ public class ServerSentEventHttpMessageReader implements HttpMessageReader<Objec
 
 		for (String line : lines) {
 			if (line.startsWith("data:")) {
+				data = (data != null ? data : new StringBuilder());
 				int length = line.length();
 				if (length > 5) {
 					int index = (line.charAt(5) != ' ' ? 5 : 6);
 					if (length > index) {
-						data = (data != null ? data : new StringBuilder());
 						data.append(line, index, line.length());
-						data.append('\n');
 					}
 				}
+				data.append('\n');
 			}
 			else if (shouldWrap) {
 				if (line.startsWith("id:")) {
@@ -166,7 +163,10 @@ public class ServerSentEventHttpMessageReader implements HttpMessageReader<Objec
 					sseBuilder.event(line.substring(6).trim());
 				}
 				else if (line.startsWith("retry:")) {
-					sseBuilder.retry(Duration.ofMillis(Long.parseLong(line.substring(6).trim())));
+					Long retry = parseRetry(line.substring(6).trim());
+					if (retry != null) {
+						sseBuilder.retry(Duration.ofMillis(retry));
+					}
 				}
 				else if (line.startsWith(":")) {
 					comment = (comment != null ? comment : new StringBuilder());
@@ -191,8 +191,35 @@ public class ServerSentEventHttpMessageReader implements HttpMessageReader<Objec
 		}
 	}
 
-	@Nullable
-	private Object decodeData(StringBuilder data, ResolvableType dataType, Map<String, Object> hints) {
+	/**
+	 * Parse the value of a {@code retry} field, which is to be ignored unless it
+	 * consists solely of ASCII digits and fits into a {@code long}.
+	 * @return the reconnection time in milliseconds, or {@code null} to ignore the field
+	 * @see <a href="https://html.spec.whatwg.org/multipage/server-sent-events.html#event-stream-interpretation">
+	 * HTML Living Standard: interpreting an event stream</a>
+	 */
+	private static @Nullable Long parseRetry(String value) {
+		// Long#parseLong is more lenient than the spec: it accepts a leading sign and
+		// non-ASCII digits, so "-1", "+5000" and "\u0665\u0660\u0660\u0660" would all parse.
+		if (value.isEmpty()) {
+			return null;
+		}
+		for (int i = 0; i < value.length(); i++) {
+			char ch = value.charAt(i);
+			if (ch < '0' || ch > '9') {
+				return null;
+			}
+		}
+		try {
+			return Long.parseLong(value);
+		}
+		catch (NumberFormatException ex) {
+			// Too large for a long: ignore the field rather than failing the stream.
+			return null;
+		}
+	}
+
+	private @Nullable Object decodeData(StringBuilder data, ResolvableType dataType, Map<String, Object> hints) {
 		if (String.class == dataType.resolve()) {
 			return data.substring(0, data.length() - 1);
 		}

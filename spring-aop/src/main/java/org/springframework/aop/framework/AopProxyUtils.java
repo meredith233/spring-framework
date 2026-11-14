@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2023 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,6 +16,7 @@
 
 package org.springframework.aop.framework;
 
+import java.io.Closeable;
 import java.lang.reflect.Array;
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
@@ -23,13 +24,17 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
+import org.jspecify.annotations.Nullable;
+
 import org.springframework.aop.SpringProxy;
 import org.springframework.aop.TargetClassAware;
 import org.springframework.aop.TargetSource;
 import org.springframework.aop.support.AopUtils;
 import org.springframework.aop.target.SingletonTargetSource;
+import org.springframework.beans.factory.Aware;
+import org.springframework.beans.factory.DisposableBean;
+import org.springframework.beans.factory.InitializingBean;
 import org.springframework.core.DecoratingProxy;
-import org.springframework.lang.Nullable;
 import org.springframework.util.Assert;
 import org.springframework.util.ClassUtils;
 import org.springframework.util.ObjectUtils;
@@ -58,8 +63,7 @@ public abstract class AopProxyUtils {
 	 * @see Advised#getTargetSource()
 	 * @see SingletonTargetSource#getTarget()
 	 */
-	@Nullable
-	public static Object getSingletonTarget(Object candidate) {
+	public static @Nullable Object getSingletonTarget(Object candidate) {
 		if (candidate instanceof Advised advised) {
 			TargetSource targetSource = advised.getTargetSource();
 			if (targetSource instanceof SingletonTargetSource singleTargetSource) {
@@ -67,6 +71,29 @@ public abstract class AopProxyUtils {
 			}
 		}
 		return null;
+	}
+
+	/**
+	 * Obtain the ultimate singleton target object behind the given proxy,
+	 * even for a nested proxy scenario where the immediate singleton target
+	 * is yet another proxy.
+	 * @param candidate the (potential) proxy to check
+	 * @return the singleton target object managed in a {@link SingletonTargetSource},
+	 * or the original candidate if not a proxy or not an existing singleton target
+	 * @since 7.0.10
+	 * @see Advised#getTargetSource()
+	 * @see SingletonTargetSource#getTarget()
+	 */
+	public static Object ultimateSingletonTarget(Object candidate) {
+		Object current = candidate;
+		while (current instanceof Advised advised) {
+			TargetSource targetSource = advised.getTargetSource();
+			if (!(targetSource instanceof SingletonTargetSource singleTargetSource)) {
+				break;
+			}
+			current = singleTargetSource.getTarget();
+		}
+		return current;
 	}
 
 	/**
@@ -253,7 +280,7 @@ public abstract class AopProxyUtils {
 	 * @return a cloned argument array, or the original if no adaptation is needed
 	 * @since 4.2.3
 	 */
-	static Object[] adaptArgumentsIfNecessary(Method method, @Nullable Object[] arguments) {
+	static @Nullable Object[] adaptArgumentsIfNecessary(Method method, @Nullable Object[] arguments) {
 		if (ObjectUtils.isEmpty(arguments)) {
 			return new Object[0];
 		}
@@ -276,6 +303,18 @@ public abstract class AopProxyUtils {
 			}
 		}
 		return arguments;
+	}
+
+	/**
+	 * Determine whether the given interface is a Spring configuration callback
+	 * interface (i.e. {@link InitializingBean}, {@link DisposableBean},
+	 * {@link Closeable}/{@link AutoCloseable}, or an {@link Aware} sub-interface).
+	 * @since 7.1
+	 */
+	static boolean isConfigurationCallbackInterface(Class<?> ifc) {
+		return (InitializingBean.class == ifc || DisposableBean.class == ifc ||
+				Closeable.class == ifc || AutoCloseable.class == ifc ||
+				ObjectUtils.containsElement(ifc.getInterfaces(), Aware.class));
 	}
 
 }

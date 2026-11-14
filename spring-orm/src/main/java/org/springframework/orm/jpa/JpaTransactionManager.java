@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -28,6 +28,7 @@ import jakarta.persistence.EntityManagerFactory;
 import jakarta.persistence.EntityTransaction;
 import jakarta.persistence.PersistenceException;
 import jakarta.persistence.RollbackException;
+import org.jspecify.annotations.Nullable;
 
 import org.springframework.beans.BeansException;
 import org.springframework.beans.factory.BeanFactory;
@@ -40,7 +41,6 @@ import org.springframework.jdbc.datasource.ConnectionHandle;
 import org.springframework.jdbc.datasource.ConnectionHolder;
 import org.springframework.jdbc.datasource.JdbcTransactionObjectSupport;
 import org.springframework.jdbc.datasource.TransactionAwareDataSourceProxy;
-import org.springframework.lang.Nullable;
 import org.springframework.transaction.CannotCreateTransactionException;
 import org.springframework.transaction.IllegalTransactionStateException;
 import org.springframework.transaction.NestedTransactionNotSupportedException;
@@ -93,11 +93,11 @@ import org.springframework.util.CollectionUtils;
  *
  * <p>This transaction manager supports nested transactions via JDBC Savepoints.
  * The {@link #setNestedTransactionAllowed "nestedTransactionAllowed"} flag defaults
- * to {@code false} though, since nested transactions will just apply to the JDBC
- * Connection, not to the JPA EntityManager and its cached entity objects and related
- * context. You can manually set the flag to {@code true} if you want to use nested
- * transactions for JDBC access code which participates in JPA transactions (provided
- * that your JDBC driver supports Savepoints). <i>Note that JPA itself does not support
+ * to "false", though, as nested transactions will just apply to the JDBC Connection,
+ * not to the JPA EntityManager and its cached entity objects and related context.
+ * You can manually set the flag to "true" if you want to use nested transactions
+ * for JDBC access code which participates in JPA transactions (provided that your
+ * JDBC driver supports savepoints). <i>Note that JPA itself does not support
  * nested transactions! Hence, do not expect JPA access code to semantically
  * participate in a nested transaction.</i>
  *
@@ -117,21 +117,17 @@ import org.springframework.util.CollectionUtils;
 public class JpaTransactionManager extends AbstractPlatformTransactionManager
 		implements ResourceTransactionManager, BeanFactoryAware, InitializingBean {
 
-	@Nullable
-	private EntityManagerFactory entityManagerFactory;
+	private @Nullable EntityManagerFactory entityManagerFactory;
 
-	@Nullable
-	private String persistenceUnitName;
+	private @Nullable String persistenceUnitName;
 
 	private final Map<String, Object> jpaPropertyMap = new HashMap<>();
 
-	@Nullable
-	private DataSource dataSource;
+	private @Nullable DataSource dataSource;
 
 	private JpaDialect jpaDialect = new DefaultJpaDialect();
 
-	@Nullable
-	private Consumer<EntityManager> entityManagerInitializer;
+	private @Nullable Consumer<EntityManager> entityManagerInitializer;
 
 
 	/**
@@ -140,7 +136,6 @@ public class JpaTransactionManager extends AbstractPlatformTransactionManager
 	 * @see #setEntityManagerFactory
 	 */
 	public JpaTransactionManager() {
-		setNestedTransactionAllowed(true);
 	}
 
 	/**
@@ -148,7 +143,6 @@ public class JpaTransactionManager extends AbstractPlatformTransactionManager
 	 * @param emf the EntityManagerFactory to manage transactions for
 	 */
 	public JpaTransactionManager(EntityManagerFactory emf) {
-		this();
 		this.entityManagerFactory = emf;
 		afterPropertiesSet();
 	}
@@ -168,8 +162,7 @@ public class JpaTransactionManager extends AbstractPlatformTransactionManager
 	/**
 	 * Return the EntityManagerFactory that this instance should manage transactions for.
 	 */
-	@Nullable
-	public EntityManagerFactory getEntityManagerFactory() {
+	public @Nullable EntityManagerFactory getEntityManagerFactory() {
 		return this.entityManagerFactory;
 	}
 
@@ -200,8 +193,7 @@ public class JpaTransactionManager extends AbstractPlatformTransactionManager
 	/**
 	 * Return the name of the persistence unit to manage transactions for, if any.
 	 */
-	@Nullable
-	public String getPersistenceUnitName() {
+	public @Nullable String getPersistenceUnitName() {
 		return this.persistenceUnitName;
 	}
 
@@ -276,8 +268,7 @@ public class JpaTransactionManager extends AbstractPlatformTransactionManager
 	/**
 	 * Return the JDBC DataSource that this instance manages transactions for.
 	 */
-	@Nullable
-	public DataSource getDataSource() {
+	public @Nullable DataSource getDataSource() {
 		return this.dataSource;
 	}
 
@@ -396,11 +387,11 @@ public class JpaTransactionManager extends AbstractPlatformTransactionManager
 		JpaTransactionObject txObject = (JpaTransactionObject) transaction;
 
 		if (txObject.hasConnectionHolder() && !txObject.getConnectionHolder().isSynchronizedWithTransaction()) {
-			throw new IllegalTransactionStateException(
-					"Pre-bound JDBC Connection found! JpaTransactionManager does not support " +
-					"running within DataSourceTransactionManager if told to manage the DataSource itself. " +
-					"It is recommended to use a single JpaTransactionManager for all transactions " +
-					"on a single DataSource, no matter whether JPA or JDBC access.");
+			throw new IllegalTransactionStateException("""
+					Pre-bound JDBC Connection found! JpaTransactionManager does not support running within \
+					another transaction manager that exposes a JDBC Connection for the same DataSource \
+					(or after a leaked Connection binding) if told to manage the DataSource itself. \
+					Use a single JpaTransactionManager for all transactions on a single DataSource.""");
 		}
 
 		try {
@@ -484,8 +475,7 @@ public class JpaTransactionManager extends AbstractPlatformTransactionManager
 			em = emfInfo.createNativeEntityManager(properties);
 		}
 		else {
-			em = (!CollectionUtils.isEmpty(properties) ?
-					emf.createEntityManager(properties) : emf.createEntityManager());
+			em = EntityManagerFactoryUtils.createEntityManager(emf, properties);
 		}
 		if (this.entityManagerInitializer != null) {
 			this.entityManagerInitializer.accept(em);
@@ -499,7 +489,7 @@ public class JpaTransactionManager extends AbstractPlatformTransactionManager
 	 * @param txObject the current transaction
 	 */
 	protected void closeEntityManagerAfterFailedBegin(JpaTransactionObject txObject) {
-		if (txObject.isNewEntityManagerHolder()) {
+		if (txObject.isNewEntityManagerHolder() && txObject.getEntityManagerHolder().hasEntityManager()) {
 			EntityManager em = txObject.getEntityManagerHolder().getEntityManager();
 			try {
 				if (em.getTransaction().isActive()) {
@@ -647,11 +637,8 @@ public class JpaTransactionManager extends AbstractPlatformTransactionManager
 
 		// Remove the entity manager holder from the thread.
 		if (txObject.isNewEntityManagerHolder()) {
-			EntityManager em = txObject.getEntityManagerHolder().getEntityManager();
-			if (logger.isDebugEnabled()) {
-				logger.debug("Closing JPA EntityManager [" + em + "] after transaction");
-			}
-			EntityManagerFactoryUtils.closeEntityManager(em);
+			logger.debug("Closing JPA EntityManager after transaction");
+			txObject.getEntityManagerHolder().closeAll();
 		}
 		else {
 			logger.debug("Not closing pre-bound JPA EntityManager after transaction");
@@ -665,13 +652,11 @@ public class JpaTransactionManager extends AbstractPlatformTransactionManager
 	 */
 	private class JpaTransactionObject extends JdbcTransactionObjectSupport {
 
-		@Nullable
-		private EntityManagerHolder entityManagerHolder;
+		private @Nullable EntityManagerHolder entityManagerHolder;
 
 		private boolean newEntityManagerHolder;
 
-		@Nullable
-		private Object transactionData;
+		private @Nullable Object transactionData;
 
 		public void setEntityManagerHolder(
 				@Nullable EntityManagerHolder entityManagerHolder, boolean newEntityManagerHolder) {
@@ -705,8 +690,7 @@ public class JpaTransactionManager extends AbstractPlatformTransactionManager
 			}
 		}
 
-		@Nullable
-		public Object getTransactionData() {
+		public @Nullable Object getTransactionData() {
 			return this.transactionData;
 		}
 
@@ -808,8 +792,7 @@ public class JpaTransactionManager extends AbstractPlatformTransactionManager
 
 		private final EntityManagerHolder entityManagerHolder;
 
-		@Nullable
-		private final ConnectionHolder connectionHolder;
+		private final @Nullable ConnectionHolder connectionHolder;
 
 		private SuspendedResourcesHolder(EntityManagerHolder emHolder, @Nullable ConnectionHolder conHolder) {
 			this.entityManagerHolder = emHolder;
@@ -820,8 +803,7 @@ public class JpaTransactionManager extends AbstractPlatformTransactionManager
 			return this.entityManagerHolder;
 		}
 
-		@Nullable
-		private ConnectionHolder getConnectionHolder() {
+		private @Nullable ConnectionHolder getConnectionHolder() {
 			return this.connectionHolder;
 		}
 	}

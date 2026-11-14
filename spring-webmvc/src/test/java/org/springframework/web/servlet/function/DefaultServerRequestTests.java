@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -48,7 +48,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.converter.HttpMessageConverter;
 import org.springframework.http.converter.StringHttpMessageConverter;
-import org.springframework.http.converter.json.MappingJackson2HttpMessageConverter;
+import org.springframework.http.converter.json.JacksonJsonHttpMessageConverter;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 import org.springframework.validation.BindException;
@@ -64,7 +64,7 @@ import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
 
 /**
- * Tests for {@link DefaultServerRequest}.
+ * Unit tests for {@link DefaultServerRequest}.
  * @author Arjen Poutsma
  */
 class DefaultServerRequestTests {
@@ -165,6 +165,20 @@ class DefaultServerRequestTests {
 		DefaultServerRequest request = new DefaultServerRequest(servletRequest, this.messageConverters);
 
 		assertThat(request.param("foo")).contains("bar");
+	}
+
+	@Test  // gh-36966
+	void paramsEntrySetPreservesOrder() {
+		MockHttpServletRequest servletRequest = PathPatternsTestUtils.initRequest("GET", "/", true);
+		servletRequest.setParameter("charlie", "3");
+		servletRequest.setParameter("alpha", "1");
+		servletRequest.setParameter("bravo", "2");
+
+		DefaultServerRequest request = new DefaultServerRequest(servletRequest, this.messageConverters);
+
+		assertThat(request.params().entrySet())
+				.extracting(Map.Entry::getKey)
+				.containsExactly("charlie", "alpha", "bravo");
 	}
 
 	@Test
@@ -305,7 +319,7 @@ class DefaultServerRequestTests {
 		servletRequest.setContent("[\"foo\",\"bar\"]".getBytes(UTF_8));
 
 		DefaultServerRequest request = new DefaultServerRequest(servletRequest,
-				List.of(new MappingJackson2HttpMessageConverter()));
+				List.of(new JacksonJsonHttpMessageConverter()));
 
 		List<String> result = request.body(new ParameterizedTypeReference<>() {});
 		assertThat(result).containsExactly("foo", "bar");
@@ -349,7 +363,7 @@ class DefaultServerRequestTests {
 	void bindToConstructor() throws BindException {
 		MockHttpServletRequest servletRequest = PathPatternsTestUtils.initRequest("GET", "/", true);
 		servletRequest.addParameter("foo", "FOO");
-		servletRequest.addParameter("bar", "BAR");
+		servletRequest.addHeader("bar", "BAR");
 
 		DefaultServerRequest request = new DefaultServerRequest(servletRequest, this.messageConverters);
 
@@ -362,7 +376,7 @@ class DefaultServerRequestTests {
 	void bindToProperties() throws BindException {
 		MockHttpServletRequest servletRequest = PathPatternsTestUtils.initRequest("GET", "/", true);
 		servletRequest.addParameter("foo", "FOO");
-		servletRequest.addParameter("bar", "BAR");
+		servletRequest.addHeader("bar", "BAR");
 
 		DefaultServerRequest request = new DefaultServerRequest(servletRequest, this.messageConverters);
 
@@ -375,7 +389,7 @@ class DefaultServerRequestTests {
 	void bindToMixed() throws BindException {
 		MockHttpServletRequest servletRequest = PathPatternsTestUtils.initRequest("GET", "/", true);
 		servletRequest.addParameter("foo", "FOO");
-		servletRequest.addParameter("bar", "BAR");
+		servletRequest.addHeader("bar", "BAR");
 
 		DefaultServerRequest request = new DefaultServerRequest(servletRequest, this.messageConverters);
 
@@ -408,7 +422,6 @@ class DefaultServerRequestTests {
 			request.bind(ErrorInjection.class)
 		);
 	}
-
 
 	@ParameterizedHttpMethodTest
 	void checkNotModifiedTimestamp(String method) {

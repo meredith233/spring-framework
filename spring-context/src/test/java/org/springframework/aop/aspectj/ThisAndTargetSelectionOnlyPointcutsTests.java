@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -41,6 +41,7 @@ class ThisAndTargetSelectionOnlyPointcutsTests {
 	private Counter targetAsInterfaceCounter;
 	private Counter thisAsClassAndTargetAsClassCounter;
 	private Counter thisAsInterfaceAndTargetAsInterfaceCounter;
+	private Counter thisAsInterfaceAndTargetAsClassCounter;
 
 
 	@BeforeEach
@@ -53,6 +54,7 @@ class ThisAndTargetSelectionOnlyPointcutsTests {
 		targetAsInterfaceCounter = ctx.getBean("targetAsInterfaceCounter", Counter.class);
 		thisAsClassAndTargetAsClassCounter = ctx.getBean("thisAsClassAndTargetAsClassCounter", Counter.class);
 		thisAsInterfaceAndTargetAsInterfaceCounter = ctx.getBean("thisAsInterfaceAndTargetAsInterfaceCounter", Counter.class);
+		thisAsInterfaceAndTargetAsClassCounter = ctx.getBean("thisAsInterfaceAndTargetAsClassCounter", Counter.class);
 	}
 
 	@AfterEach
@@ -100,7 +102,7 @@ class ThisAndTargetSelectionOnlyPointcutsTests {
 	@Test
 	void thisAsInterfaceAndTargetAsClassCounterMatch() {
 		testBean.doIt();
-		assertThat(thisAsInterfaceAndTargetAsInterfaceCounter.getCount()).isEqualTo(1);
+		assertThat(thisAsInterfaceAndTargetAsClassCounter.getCount()).isEqualTo(1);
 	}
 
 }

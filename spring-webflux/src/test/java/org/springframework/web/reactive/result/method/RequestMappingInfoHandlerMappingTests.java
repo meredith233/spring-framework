@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -27,6 +27,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.function.Consumer;
 
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import reactor.core.publisher.Mono;
@@ -38,7 +39,6 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.http.server.reactive.observation.ServerRequestObservationContext;
-import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Controller;
 import org.springframework.util.ClassUtils;
 import org.springframework.util.MultiValueMap;
@@ -195,6 +195,10 @@ class RequestMappingInfoHandlerMappingTests {
 		testHttpOptions("/something", Set.of(HttpMethod.PUT, HttpMethod.POST), null);
 		testHttpOptions("/qux", Set.of(HttpMethod.PATCH,HttpMethod.GET,HttpMethod.HEAD,HttpMethod.OPTIONS),
 				new MediaType("foo", "bar"));
+		testHttpOptions("/quid", Set.of(HttpMethod.QUERY, HttpMethod.HEAD, HttpMethod.OPTIONS),
+				new MediaType("application", "json"));
+		testHttpHeadQuery("/quid", Set.of(HttpMethod.QUERY, HttpMethod.HEAD, HttpMethod.OPTIONS),
+				new MediaType("application", "json"));
 	}
 
 	@Test
@@ -377,7 +381,7 @@ class RequestMappingInfoHandlerMappingTests {
 				.isEqualTo(Collections.singletonList(new MediaType("application", "xml"))));
 	}
 
-	private void testHttpOptions(String requestURI, Set<HttpMethod> allowedMethods, @Nullable MediaType acceptPatch) {
+	private void testHttpOptions(String requestURI, Set<HttpMethod> allowedMethods, @Nullable MediaType acceptMediaType) {
 		ServerWebExchange exchange = MockServerWebExchange.from(MockServerHttpRequest.options(requestURI));
 		HandlerMethod handlerMethod = (HandlerMethod) this.handlerMapping.getHandler(exchange).block();
 
@@ -395,8 +399,36 @@ class RequestMappingInfoHandlerMappingTests {
 		HttpHeaders headers = (HttpHeaders) value;
 		assertThat(headers.getAllow()).hasSameElementsAs(allowedMethods);
 
-		if (acceptPatch != null && headers.getAllow().contains(HttpMethod.PATCH) ) {
-			assertThat(headers.getAcceptPatch()).containsExactly(acceptPatch);
+		if (acceptMediaType != null) {
+			if (headers.getAllow().contains(HttpMethod.PATCH)) {
+				assertThat(headers.getAcceptPatch()).containsExactly(acceptMediaType);
+			}
+			if (headers.getAllow().contains(HttpMethod.QUERY)) {
+				assertThat(headers.getAcceptQuery()).containsExactly(acceptMediaType);
+			}
+		}
+	}
+
+	private void testHttpHeadQuery(String requestURI, Set<HttpMethod> allowedMethods, @Nullable MediaType acceptMediaType) {
+		ServerWebExchange exchange = MockServerWebExchange.from(MockServerHttpRequest.head(requestURI));
+		HandlerMethod handlerMethod = (HandlerMethod) this.handlerMapping.getHandler(exchange).block();
+
+		BindingContext bindingContext = new BindingContext();
+		InvocableHandlerMethod invocable = new InvocableHandlerMethod(handlerMethod);
+		Mono<HandlerResult> mono = invocable.invoke(exchange, bindingContext);
+
+		HandlerResult result = mono.block();
+		assertThat(result).isNotNull();
+
+		Object value = result.getReturnValue();
+		assertThat(value).isNotNull();
+		assertThat(value.getClass()).isEqualTo(HttpHeaders.class);
+
+		HttpHeaders headers = (HttpHeaders) value;
+		assertThat(headers.getAllow()).hasSameElementsAs(allowedMethods);
+
+		if (acceptMediaType != null) {
+			assertThat(headers.getAcceptQuery()).containsExactly(acceptMediaType);
 		}
 	}
 
@@ -490,6 +522,11 @@ class RequestMappingInfoHandlerMappingTests {
 
 		@RequestMapping(value = "/qux", method = RequestMethod.PATCH, consumes = "foo/bar")
 		public void patchBaz(String value) {
+		}
+
+		@RequestMapping(value = "/quid", method = RequestMethod.QUERY, consumes = "application/json", produces = "application/json")
+		public String query(@RequestBody String body) {
+			return "{}";
 		}
 
 

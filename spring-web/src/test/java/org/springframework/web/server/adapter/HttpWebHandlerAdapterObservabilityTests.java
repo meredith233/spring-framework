@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2023 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,7 +17,9 @@
 package org.springframework.web.server.adapter;
 
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import io.micrometer.observation.Observation;
@@ -82,6 +84,24 @@ class HttpWebHandlerAdapterObservabilityTests {
 	}
 
 	@Test
+	void handlerShouldReportRecordedHandledException() {
+		IllegalStateException handled = new IllegalStateException("handled");
+		WebHandler targetHandler = exchange -> {
+			ServerRequestObservationContext.recordHandledException(exchange.getAttributes(), handled);
+			return exchange.getResponse().setComplete();
+		};
+		createWebHandler(targetHandler).handle(this.request, this.response).block();
+		assertThatHttpObservation().hasError(handled).hasBeenStopped();
+	}
+
+	@Test
+	void recordHandledExceptionShouldBeNoOpWithoutObservation() {
+		Map<String, Object> attributes = new HashMap<>();
+		ServerRequestObservationContext.recordHandledException(attributes, new IllegalStateException());
+		assertThat(attributes).isEmpty();
+	}
+
+	@Test
 	void handlerShouldRecordObservationWhenCancelled() {
 		HttpStatusSuccessStubWebHandler targetHandler = new HttpStatusSuccessStubWebHandler(HttpStatus.OK);
 		StepVerifier.create(createWebHandler(targetHandler).handle(this.request, this.response)).thenCancel().verify();
@@ -95,8 +115,7 @@ class HttpWebHandlerAdapterObservabilityTests {
 	}
 
 	private TestObservationRegistryAssert.TestObservationRegistryAssertReturningObservationContextAssert assertThatHttpObservation() {
-		return TestObservationRegistryAssert.assertThat(this.observationRegistry)
-				.hasObservationWithNameEqualTo("http.server.requests").that();
+		return assertThat(this.observationRegistry).hasObservationWithNameEqualTo("http.server.requests").that();
 	}
 
 

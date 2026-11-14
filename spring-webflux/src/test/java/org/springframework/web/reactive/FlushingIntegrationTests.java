@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2023 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -127,7 +127,7 @@ class FlushingIntegrationTests extends AbstractHttpHandlerIntegrationTests {
 			String path = request.getURI().getPath();
 			return switch (path) {
 				case "/write-and-flush" -> response.writeAndFlushWith(
-						testInterval(Duration.ofMillis(50), 2)
+						testInterval(Duration.ofMillis(1), 2)
 								.map(longValue -> wrap("data" + longValue + "\n", response))
 								.map(Flux::just)
 								.mergeWith(Flux.never()));

@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -175,14 +175,14 @@ class MultipartHttpMessageWriterTests extends AbstractLeakCheckingTests {
 		part = requestParts.getFirst("filePublisher");
 		assertThat(part).isNotNull();
 		assertThat(part.name()).isEqualTo("filePublisher");
-		assertThat(part.headers()).containsEntry("foo", Collections.singletonList("bar"));
+		assertThat(part.headers().hasHeaderValues("foo", Collections.singletonList("bar"))).isTrue();
 		assertThat(((FilePart) part).filename()).isEqualTo("file.txt");
 		value = decodeToString(part);
 		assertThat(value).isEqualTo("AaBbCc");
 	}
 
 	@Test  // gh-24582
-	public void writeMultipartRelated() {
+	void writeMultipartRelated() {
 		MediaType mediaType = MediaType.parseMediaType("multipart/related;type=foo");
 
 		MultipartBodyBuilder bodyBuilder = new MultipartBodyBuilder();
@@ -215,7 +215,7 @@ class MultipartHttpMessageWriterTests extends AbstractLeakCheckingTests {
 	}
 
 	@Test  // SPR-16402
-	public void singleSubscriberWithResource() throws IOException {
+	void singleSubscriberWithResource() throws IOException {
 		Sinks.Many<Resource> sink = Sinks.many().unicast().onBackpressureBuffer();
 		Resource logo = new ClassPathResource("/org/springframework/http/converter/logo.jpg");
 		sink.tryEmitNext(logo);
@@ -240,7 +240,7 @@ class MultipartHttpMessageWriterTests extends AbstractLeakCheckingTests {
 	}
 
 	@Test // SPR-16402
-	public void singleSubscriberWithStrings() {
+	void singleSubscriberWithStrings() {
 		AtomicBoolean subscribed = new AtomicBoolean();
 		Flux<String> publisher = Flux.just("foo", "bar", "baz")
 				.doOnSubscribe(subscription ->
@@ -259,7 +259,7 @@ class MultipartHttpMessageWriterTests extends AbstractLeakCheckingTests {
 	}
 
 	@Test  // SPR-16376
-	public void customContentDisposition() throws IOException {
+	void customContentDisposition() throws IOException {
 		Resource logo = new ClassPathResource("/org/springframework/http/converter/logo.jpg");
 		Flux<DataBuffer> buffers = DataBufferUtils.read(logo, DefaultDataBufferFactory.sharedInstance, 1024);
 		long contentLength = logo.contentLength();

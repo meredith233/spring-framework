@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,11 +16,12 @@
 
 package org.springframework.test.context.aot;
 
-import org.springframework.aot.generate.ClassNameGenerator;
+import org.jspecify.annotations.Nullable;
+
 import org.springframework.aot.generate.DefaultGenerationContext;
 import org.springframework.aot.generate.GeneratedFiles;
+import org.springframework.aot.generate.NameGenerator;
 import org.springframework.aot.hint.RuntimeHints;
-import org.springframework.lang.Nullable;
 
 /**
  * Extension of {@link DefaultGenerationContext} with a custom implementation of
@@ -31,22 +32,22 @@ import org.springframework.lang.Nullable;
  */
 class TestContextGenerationContext extends DefaultGenerationContext {
 
-	@Nullable
-	private final String featureName;
+	private final @Nullable String featureName;
 
 
 	/**
 	 * Create a new {@link TestContextGenerationContext} instance backed by the
-	 * specified {@link ClassNameGenerator}, {@link GeneratedFiles}, and
+	 * specified {@link NameGenerator}, {@link GeneratedFiles}, and
 	 * {@link RuntimeHints}.
-	 * @param classNameGenerator the naming convention to use for generated class names
+	 * @param nameGenerator the naming convention to use for generated classes
+	 * and resources
 	 * @param generatedFiles the generated files
 	 * @param runtimeHints the runtime hints
 	 */
 	TestContextGenerationContext(
-			ClassNameGenerator classNameGenerator, GeneratedFiles generatedFiles, RuntimeHints runtimeHints) {
+			NameGenerator nameGenerator, GeneratedFiles generatedFiles, RuntimeHints runtimeHints) {
 
-		super(classNameGenerator, generatedFiles, runtimeHints);
+		super(nameGenerator, generatedFiles, runtimeHints);
 		this.featureName = null;
 	}
 

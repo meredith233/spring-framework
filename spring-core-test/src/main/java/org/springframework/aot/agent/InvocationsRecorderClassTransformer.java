@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2022 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,8 +21,9 @@ import java.lang.instrument.IllegalClassFormatException;
 import java.security.ProtectionDomain;
 import java.util.Arrays;
 
+import org.jspecify.annotations.Nullable;
+
 import org.springframework.asm.ClassReader;
-import org.springframework.lang.Nullable;
 import org.springframework.util.Assert;
 
 /**
@@ -43,6 +44,7 @@ class InvocationsRecorderClassTransformer implements ClassFileTransformer {
 
 	private final String[] ignoredPackages;
 
+
 	public InvocationsRecorderClassTransformer(String[] instrumentedPackages, String[] ignoredPackages) {
 		Assert.notNull(instrumentedPackages, "instrumentedPackages must not be null");
 		Assert.notNull(ignoredPackages, "ignoredPackages must not be null");
@@ -54,6 +56,7 @@ class InvocationsRecorderClassTransformer implements ClassFileTransformer {
 		return Arrays.stream(packages).map(pack -> pack.replace('.', '/'))
 				.toArray(String[]::new);
 	}
+
 
 	@Override
 	public byte[] transform(@Nullable ClassLoader classLoader, String className, Class<?> classBeingRedefined,
@@ -101,7 +104,7 @@ class InvocationsRecorderClassTransformer implements ClassFileTransformer {
 			fileReader.accept(classVisitor, 0);
 		}
 		catch (Exception ex) {
-			ex.printStackTrace();
+			System.err.println("Failed to transform class: " + ex);
 			return classfileBuffer;
 		}
 		if (classVisitor.isTransformed()) {
@@ -109,4 +112,5 @@ class InvocationsRecorderClassTransformer implements ClassFileTransformer {
 		}
 		return classfileBuffer;
 	}
+
 }

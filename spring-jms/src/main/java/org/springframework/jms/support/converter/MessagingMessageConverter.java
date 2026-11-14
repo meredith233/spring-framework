@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2023 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,11 +20,11 @@ import java.util.Map;
 
 import jakarta.jms.JMSException;
 import jakarta.jms.Session;
+import org.jspecify.annotations.Nullable;
 
 import org.springframework.beans.factory.InitializingBean;
 import org.springframework.jms.support.JmsHeaderMapper;
 import org.springframework.jms.support.SimpleJmsHeaderMapper;
-import org.springframework.lang.Nullable;
 import org.springframework.messaging.Message;
 import org.springframework.messaging.MessageHeaders;
 import org.springframework.messaging.core.AbstractMessageSendingTemplate;
@@ -117,6 +117,9 @@ public class MessagingMessageConverter implements MessageConverter, Initializing
 	public Object fromMessage(jakarta.jms.Message message) throws JMSException, MessageConversionException {
 		Map<String, Object> mappedHeaders = extractHeaders(message);
 		Object convertedObject = extractPayload(message);
+		if (convertedObject == null) {
+			throw new MessageConversionException("Cannot convert JMS message with no body to a Message with a payload");
+		}
 		MessageBuilder<Object> builder = (convertedObject instanceof org.springframework.messaging.Message springMessage ?
 				MessageBuilder.fromMessage(springMessage) : MessageBuilder.withPayload(convertedObject));
 		return builder.copyHeadersIfAbsent(mappedHeaders).build();
@@ -124,15 +127,16 @@ public class MessagingMessageConverter implements MessageConverter, Initializing
 
 	/**
 	 * Extract the payload of the specified {@link jakarta.jms.Message}.
+	 * @return the extracted payload, or {@code null} if the message has no body
 	 */
-	protected Object extractPayload(jakarta.jms.Message message) throws JMSException {
+	protected @Nullable Object extractPayload(jakarta.jms.Message message) throws JMSException {
 		return this.payloadConverter.fromMessage(message);
 	}
 
 	/**
 	 * Create a JMS message for the specified payload and conversionHint.
 	 * The conversion hint is an extra object passed to the {@link MessageConverter},
-	 * e.g. the associated {@code MethodParameter} (may be {@code null}}.
+	 * for example, the associated {@code MethodParameter} (may be {@code null}).
 	 * @since 4.3
 	 * @see MessageConverter#toMessage(Object, Session)
 	 */

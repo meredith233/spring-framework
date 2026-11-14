@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2023 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -30,19 +30,18 @@ import jakarta.persistence.EntityManagerFactory;
 import jakarta.persistence.EntityTransaction;
 import jakarta.persistence.TransactionRequiredException;
 import jakarta.persistence.spi.PersistenceUnitInfo;
-import jakarta.persistence.spi.PersistenceUnitTransactionType;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.jspecify.annotations.Nullable;
 
 import org.springframework.core.Ordered;
 import org.springframework.dao.DataAccessException;
 import org.springframework.dao.support.PersistenceExceptionTranslator;
-import org.springframework.lang.Nullable;
+import org.springframework.orm.jpa.persistenceunit.SmartPersistenceUnitInfo;
 import org.springframework.transaction.support.ResourceHolderSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.util.Assert;
 import org.springframework.util.ClassUtils;
-import org.springframework.util.CollectionUtils;
 import org.springframework.util.ConcurrentReferenceHashMap;
 
 /**
@@ -174,8 +173,7 @@ public abstract class ExtendedEntityManagerCreator {
 			return createProxy(rawEntityManager, emfInfo, true, synchronizedWithTransaction);
 		}
 		else {
-			EntityManager rawEntityManager = (!CollectionUtils.isEmpty(properties) ?
-					emf.createEntityManager(properties) : emf.createEntityManager());
+			EntityManager rawEntityManager = EntityManagerFactoryUtils.createEntityManager(emf, properties);
 			return createProxy(rawEntityManager, null, null, null, null, true, synchronizedWithTransaction);
 		}
 	}
@@ -198,7 +196,7 @@ public abstract class ExtendedEntityManagerCreator {
 		Assert.notNull(emfInfo, "EntityManagerFactoryInfo must not be null");
 		JpaDialect jpaDialect = emfInfo.getJpaDialect();
 		PersistenceUnitInfo pui = emfInfo.getPersistenceUnitInfo();
-		Boolean jta = (pui != null ? pui.getTransactionType() == PersistenceUnitTransactionType.JTA : null);
+		Boolean jta = (pui instanceof SmartPersistenceUnitInfo spui ? spui.isConfiguredForJta() : null);
 		return createProxy(rawEntityManager, emfInfo.getEntityManagerInterface(),
 				emfInfo.getBeanClassLoader(), jpaDialect, jta, containerManaged, synchronizedWithTransaction);
 	}
@@ -260,8 +258,7 @@ public abstract class ExtendedEntityManagerCreator {
 
 		private final EntityManager target;
 
-		@Nullable
-		private final PersistenceExceptionTranslator exceptionTranslator;
+		private final @Nullable PersistenceExceptionTranslator exceptionTranslator;
 
 		private final boolean jta;
 
@@ -292,8 +289,7 @@ public abstract class ExtendedEntityManagerCreator {
 		}
 
 		@Override
-		@Nullable
-		public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {
+		public @Nullable Object invoke(Object proxy, Method method, Object[] args) throws Throwable {
 			// Invocation on EntityManager interface coming in...
 
 			switch (method.getName()) {
@@ -438,8 +434,7 @@ public abstract class ExtendedEntityManagerCreator {
 
 		private final EntityManager entityManager;
 
-		@Nullable
-		private final PersistenceExceptionTranslator exceptionTranslator;
+		private final @Nullable PersistenceExceptionTranslator exceptionTranslator;
 
 		public volatile boolean closeOnCompletion;
 

@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -90,7 +90,7 @@ class RequestPartServletServerHttpRequestTests {
 	}
 
 	@Test  // SPR-13317
-	public void getBodyWithWrappedRequest() throws Exception {
+	void getBodyWithWrappedRequest() throws Exception {
 		byte[] bytes = "content".getBytes(StandardCharsets.UTF_8);
 		MultipartFile part = new MockMultipartFile("part", "", "application/json", bytes);
 		this.mockRequest.addFile(part);
@@ -102,7 +102,7 @@ class RequestPartServletServerHttpRequestTests {
 	}
 
 	@Test  // SPR-13096
-	public void getBodyViaRequestParameter() throws Exception {
+	void getBodyViaRequestParameter() throws Exception {
 		MockMultipartHttpServletRequest mockRequest = new MockMultipartHttpServletRequest() {
 			@Override
 			public HttpHeaders getMultipartHeaders(String paramOrFileName) {
@@ -139,7 +139,7 @@ class RequestPartServletServerHttpRequestTests {
 	}
 
 	@Test  // gh-25829
-	public void getBodyViaRequestPart() throws Exception {
+	void getBodyViaRequestPart() throws Exception {
 		byte[] bytes = "content".getBytes(StandardCharsets.UTF_8);
 		MockPart mockPart = new MockPart("part", bytes);
 		mockPart.getHeaders().setContentType(MediaType.APPLICATION_JSON);

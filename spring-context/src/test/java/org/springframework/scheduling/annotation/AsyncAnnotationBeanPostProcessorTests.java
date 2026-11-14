@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -188,7 +188,7 @@ class AsyncAnnotationBeanPostProcessorTests {
 
 	@Test
 	@SuppressWarnings("resource")
-	public void handleExceptionWithFuture() {
+	void handleExceptionWithFuture() {
 		ConfigurableApplicationContext context =
 				new AnnotationConfigApplicationContext(ConfigWithExceptionHandler.class);
 		ITestBean testBean = context.getBean("target", ITestBean.class);
@@ -197,20 +197,6 @@ class AsyncAnnotationBeanPostProcessorTests {
 				context.getBean("exceptionHandler", TestableAsyncUncaughtExceptionHandler.class);
 		assertThat(exceptionHandler.isCalled()).as("handler should not have been called yet").isFalse();
 		Future<Object> result = testBean.failWithFuture();
-		assertFutureWithException(result, exceptionHandler);
-	}
-
-	@Test
-	@SuppressWarnings("resource")
-	public void handleExceptionWithListenableFuture() {
-		ConfigurableApplicationContext context =
-				new AnnotationConfigApplicationContext(ConfigWithExceptionHandler.class);
-		ITestBean testBean = context.getBean("target", ITestBean.class);
-
-		TestableAsyncUncaughtExceptionHandler exceptionHandler =
-				context.getBean("exceptionHandler", TestableAsyncUncaughtExceptionHandler.class);
-		assertThat(exceptionHandler.isCalled()).as("handler should not have been called yet").isFalse();
-		Future<Object> result = testBean.failWithListenableFuture();
 		assertFutureWithException(result, exceptionHandler);
 	}
 
@@ -275,9 +261,6 @@ class AsyncAnnotationBeanPostProcessorTests {
 
 		Future<Object> failWithFuture();
 
-		@SuppressWarnings("deprecation")
-		org.springframework.util.concurrent.ListenableFuture<Object> failWithListenableFuture();
-
 		void failWithVoid();
 
 		void await(long timeout);
@@ -306,13 +289,6 @@ class AsyncAnnotationBeanPostProcessorTests {
 		@Override
 		public Future<Object> failWithFuture() {
 			throw new UnsupportedOperationException("failWithFuture");
-		}
-
-		@Async
-		@Override
-		@SuppressWarnings("deprecation")
-		public org.springframework.util.concurrent.ListenableFuture<Object> failWithListenableFuture() {
-			throw new UnsupportedOperationException("failWithListenableFuture");
 		}
 
 		@Async

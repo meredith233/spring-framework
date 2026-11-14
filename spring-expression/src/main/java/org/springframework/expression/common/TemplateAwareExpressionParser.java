@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,16 +21,20 @@ import java.util.ArrayList;
 import java.util.Deque;
 import java.util.List;
 
+import org.jspecify.annotations.Nullable;
+
 import org.springframework.expression.Expression;
 import org.springframework.expression.ExpressionParser;
 import org.springframework.expression.ParseException;
 import org.springframework.expression.ParserContext;
-import org.springframework.lang.Nullable;
 import org.springframework.util.Assert;
 
 /**
- * An expression parser that understands templates. It can be subclassed by expression
- * parsers that do not offer first class support for templating.
+ * Abstract base class for {@linkplain ExpressionParser expression parsers} that
+ * support templates.
+ *
+ * <p>Can be subclassed by expression parsers that offer first class support for
+ * templating.
  *
  * @author Keith Donald
  * @author Juergen Hoeller
@@ -39,6 +43,9 @@ import org.springframework.util.Assert;
  * @since 3.0
  */
 public abstract class TemplateAwareExpressionParser implements ExpressionParser {
+
+	private static final Expression[] EMPTY_EXPRESSION_ARRAY = new Expression[0];
+
 
 	@Override
 	public Expression parseExpression(String expressionString) throws ParseException {
@@ -88,7 +95,7 @@ public abstract class TemplateAwareExpressionParser implements ExpressionParser 
 	 * single quote '.
 	 * @param expressionString the expression string
 	 * @return the parsed expressions
-	 * @throws ParseException when the expressions cannot be parsed
+	 * @throws ParseException if the expressions cannot be parsed
 	 */
 	private Expression[] parseExpressions(String expressionString, ParserContext context) throws ParseException {
 		List<Expression> expressions = new ArrayList<>();
@@ -132,7 +139,7 @@ public abstract class TemplateAwareExpressionParser implements ExpressionParser 
 			}
 		}
 
-		return expressions.toArray(new Expression[0]);
+		return expressions.toArray(EMPTY_EXPRESSION_ARRAY);
 	}
 
 	/**
@@ -229,7 +236,7 @@ public abstract class TemplateAwareExpressionParser implements ExpressionParser 
 	 * @param expressionString the raw expression string to parse
 	 * @param context a context for influencing this expression parsing routine (optional)
 	 * @return an evaluator for the parsed expression
-	 * @throws ParseException an exception occurred during parsing
+	 * @throws ParseException if an exception occurred during parsing
 	 */
 	protected abstract Expression doParseExpression(String expressionString, @Nullable ParserContext context)
 			throws ParseException;

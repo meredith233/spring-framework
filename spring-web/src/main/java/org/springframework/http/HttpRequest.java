@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2023 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,6 +17,7 @@
 package org.springframework.http;
 
 import java.net.URI;
+import java.util.Map;
 
 /**
  * Represents an HTTP request message, consisting of a
@@ -40,5 +41,11 @@ public interface HttpRequest extends HttpMessage {
 	 * @return the URI of the request (never {@code null})
 	 */
 	URI getURI();
+
+	/**
+	 * Return a mutable map of request attributes for this request.
+	 * @since 6.2
+	 */
+	Map<String, Object> getAttributes();
 
 }

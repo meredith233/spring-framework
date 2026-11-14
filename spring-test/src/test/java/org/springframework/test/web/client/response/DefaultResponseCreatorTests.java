@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2023 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -77,9 +77,8 @@ class DefaultResponseCreatorTests {
 	@ParameterizedTest(name = "setBodyFromStringWithCharset [{0}]")
 	@ValueSource(strings = {"Cp1047", "UTF-8", "UTF-16", "US-ASCII", "ISO-8859-1"})
 	void setBodyFromStringWithCharset(String charset) throws IOException {
-
 		assumeThat(Charset.isSupported(charset))
-				.overridingErrorMessage("charset %s is not supported by this JVM", charset)
+				.as("charset %s is not supported by this JVM", charset)
 				.isTrue();
 
 		Charset charsetObj = Charset.forName(charset);

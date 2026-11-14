@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2023 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -30,10 +30,11 @@ import jakarta.xml.bind.annotation.XmlRootElement;
 import jakarta.xml.bind.annotation.XmlSchema;
 import jakarta.xml.bind.annotation.XmlSeeAlso;
 import jakarta.xml.bind.annotation.XmlType;
+import org.jspecify.annotations.Nullable;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.SynchronousSink;
 
-import org.springframework.lang.Nullable;
+import org.springframework.core.io.buffer.DataBufferLimitException;
 import org.springframework.util.Assert;
 import org.springframework.util.ClassUtils;
 
@@ -141,8 +142,10 @@ abstract class Jaxb2Helper {
 	 * </li>
 	 * </ol>
 	 */
-	public static Flux<List<XMLEvent>> split(Flux<XMLEvent> xmlEventFlux, Set<QName> names) {
-		return xmlEventFlux.handle(new SplitHandler(names));
+	public static Flux<List<XMLEvent>> split(
+			Flux<XMLEvent> xmlEventFlux, Set<QName> names, XmlEventDecoder.@Nullable ReceivedByteTracker byteTracker) {
+
+		return xmlEventFlux.handle(new SplitHandler(names, byteTracker));
 	}
 
 
@@ -150,15 +153,17 @@ abstract class Jaxb2Helper {
 
 		private final Set<QName> names;
 
-		@Nullable
-		private List<XMLEvent> events;
+		private final XmlEventDecoder.ReceivedByteTracker byteTracker;
+
+		private @Nullable List<XMLEvent> events;
 
 		private int elementDepth = 0;
 
 		private int barrier = Integer.MAX_VALUE;
 
-		public SplitHandler(Set<QName> names) {
+		public SplitHandler(Set<QName> names, XmlEventDecoder.@Nullable ReceivedByteTracker byteTracker) {
 			this.names = names;
+			this.byteTracker = (byteTracker != null ? byteTracker : XmlEventDecoder.ReceivedByteTracker.NO_OP);
 		}
 
 		@Override
@@ -180,10 +185,18 @@ abstract class Jaxb2Helper {
 			if (event.isEndElement()) {
 				this.elementDepth--;
 				if (this.elementDepth == this.barrier) {
-					this.barrier = Integer.MAX_VALUE;
 					Assert.state(this.events != null, "No XMLEvent List");
 					sink.next(this.events);
+					this.barrier = Integer.MAX_VALUE;
+					this.events = null;
 				}
+			}
+			if (this.events == null) {
+				this.byteTracker.reset();
+			}
+			else if (this.byteTracker.isMaxInMemorySizeExceeded()) {
+				throw new DataBufferLimitException(
+						"Exceeded limit on max bytes per XML node: " + this.byteTracker.getMaxInMemorySize());
 			}
 		}
 	}

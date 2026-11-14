@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,6 +16,7 @@
 
 package org.springframework.scheduling.support;
 
+import java.time.ZonedDateTime;
 import java.util.Arrays;
 
 import org.assertj.core.api.Condition;
@@ -29,6 +30,7 @@ import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException
  *
  * @author Arjen Poutsma
  * @author Sam Brannen
+ * @author Brian Clozel
  */
 class BitsCronFieldTests {
 
@@ -53,6 +55,7 @@ class BitsCronFieldTests {
 		assertThat(BitsCronField.parseDaysOfWeek("0")).has(set(7, 7)).has(clearRange(0, 6));
 		assertThat(BitsCronField.parseDaysOfWeek("7-5")).has(clear(0)).has(setRange(1, 5))
 				.has(clear(6)).has(set(7));
+		assertThat(BitsCronField.parseDaysOfWeek("7-7")).has(clearRange(0, 6)).has(set(7));
 	}
 
 	@Test
@@ -106,10 +109,28 @@ class BitsCronFieldTests {
 
 	@Test
 	void names() {
-		assertThat(((BitsCronField)CronField.parseMonth("JAN,FEB,MAR,APR,MAY,JUN,JUL,AUG,SEP,OCT,NOV,DEC")))
+		assertThat((BitsCronField)CronField.parseMonth("JAN,FEB,MAR,APR,MAY,JUN,JUL,AUG,SEP,OCT,NOV,DEC"))
 				.has(clear(0)).has(setRange(1, 12));
-		assertThat(((BitsCronField)CronField.parseDaysOfWeek("SUN,MON,TUE,WED,THU,FRI,SAT")))
+		assertThat((BitsCronField)CronField.parseDaysOfWeek("SUN,MON,TUE,WED,THU,FRI,SAT"))
 				.has(clear(0)).has(setRange(1, 7));
+	}
+
+	@Test
+	void nextOrSameWithMidnightGap() {
+		BitsCronField field = BitsCronField.parseHours("0-23/2");
+		ZonedDateTime last = ZonedDateTime.parse("2025-04-24T23:00:00+02:00[Africa/Cairo]");
+		ZonedDateTime expected = ZonedDateTime.parse("2025-04-25T02:00:00+03:00[Africa/Cairo]");
+		ZonedDateTime actual = field.nextOrSame(last);
+		assertThat(actual).isEqualTo(expected);
+	}
+
+	@Test
+	void nextOrSameWithGapAfterRollForward() {
+		BitsCronField field = BitsCronField.parseHours("0,2");
+		ZonedDateTime last = ZonedDateTime.parse("2026-03-08T01:00:00-05:00[America/New_York]");
+		ZonedDateTime expected = ZonedDateTime.parse("2026-03-09T00:00:00-04:00[America/New_York]");
+		ZonedDateTime actual = field.nextOrSame(last);
+		assertThat(actual).isEqualTo(expected);
 	}
 
 

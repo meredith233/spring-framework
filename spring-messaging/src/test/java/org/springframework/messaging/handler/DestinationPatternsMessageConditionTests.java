@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -43,7 +43,7 @@ class DestinationPatternsMessageConditionTests {
 				new DestinationPatternsMessageCondition(new String[] {"foo"}, new AntPathMatcher("."));
 
 		assertThat(c.getPatterns())
-				.as("Pre-pending should be disabled when not using '/' as path separator")
+				.as("Prepending should be disabled when not using '/' as path separator")
 				.containsExactly("foo");
 	}
 

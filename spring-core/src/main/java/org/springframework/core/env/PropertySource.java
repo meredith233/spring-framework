@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2023 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,8 +20,8 @@ import java.util.Objects;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.jspecify.annotations.Nullable;
 
-import org.springframework.lang.Nullable;
 import org.springframework.util.Assert;
 import org.springframework.util.ObjectUtils;
 
@@ -125,8 +125,7 @@ public abstract class PropertySource<T> {
 	 * @param name the property to find
 	 * @see PropertyResolver#getRequiredProperty(String)
 	 */
-	@Nullable
-	public abstract Object getProperty(String name);
+	public abstract @Nullable Object getProperty(String name);
 
 
 	/**
@@ -153,23 +152,16 @@ public abstract class PropertySource<T> {
 	}
 
 	/**
-	 * Produce concise output (type and name) if the current log level does not include
-	 * debug. If debug is enabled, produce verbose output including the hash code of the
-	 * PropertySource instance and every name/value property pair.
-	 * <p>This variable verbosity is useful as a property source such as system properties
-	 * or environment variables may contain an arbitrary number of property pairs,
-	 * potentially leading to difficulties to read exception and log messages.
-	 * @see Log#isDebugEnabled()
+	 * Produce concise output consisting of the simple class name and the
+	 * {@linkplain #getName() name} of this {@code PropertySource}.
+	 * <p>The {@linkplain #getSource() source object} is not included, since a
+	 * property source such as system properties or environment variables may
+	 * contain an arbitrary number of properties, potentially leading to
+	 * difficulties reading exception and log messages.
 	 */
 	@Override
 	public String toString() {
-		if (logger.isDebugEnabled()) {
-			return getClass().getSimpleName() + "@" + System.identityHashCode(this) +
-					" {name='" + getName() + "', properties=" + getSource() + "}";
-		}
-		else {
-			return getClass().getSimpleName() + " {name='" + getName() + "'}";
-		}
+		return getClass().getSimpleName() + " {name='" + getName() + "'}";
 	}
 
 
@@ -218,8 +210,7 @@ public abstract class PropertySource<T> {
 		 * Always returns {@code null}.
 		 */
 		@Override
-		@Nullable
-		public String getProperty(String name) {
+		public @Nullable String getProperty(String name) {
 			return null;
 		}
 	}
@@ -251,8 +242,7 @@ public abstract class PropertySource<T> {
 		}
 
 		@Override
-		@Nullable
-		public String getProperty(String name) {
+		public @Nullable String getProperty(String name) {
 			throw new UnsupportedOperationException(USAGE_ERROR);
 		}
 	}

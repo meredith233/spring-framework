@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2022 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -39,7 +39,7 @@ import static org.assertj.core.api.Assertions.fail;
  *
  * @author Rossen Stoyanchev
  */
-public class StatusResultMatchersTests {
+class StatusResultMatchersTests {
 
 	private final StatusResultMatchers matchers = new StatusResultMatchers();
 
@@ -47,7 +47,7 @@ public class StatusResultMatchersTests {
 
 
 	@Test
-	public void testHttpStatusCodeResultMatchers() throws Exception {
+	void httpStatusCodeResultMatchers() throws Exception {
 		List<AssertionError> failures = new ArrayList<>();
 		for (HttpStatus status : HttpStatus.values()) {
 			MockHttpServletResponse response = new MockHttpServletResponse();
@@ -79,7 +79,7 @@ public class StatusResultMatchersTests {
 	}
 
 	@Test
-	public void statusRanges() throws Exception {
+	void statusRanges() throws Exception {
 		for (HttpStatus status : HttpStatus.values()) {
 			MockHttpServletResponse response = new MockHttpServletResponse();
 			response.setStatus(status.value());

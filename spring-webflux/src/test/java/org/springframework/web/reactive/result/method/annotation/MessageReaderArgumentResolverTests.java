@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -32,6 +32,7 @@ import io.reactivex.rxjava3.core.Maybe;
 import io.reactivex.rxjava3.core.Observable;
 import io.reactivex.rxjava3.core.Single;
 import jakarta.xml.bind.annotation.XmlRootElement;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import reactor.core.publisher.Flux;
@@ -44,14 +45,14 @@ import org.springframework.core.codec.Decoder;
 import org.springframework.http.MediaType;
 import org.springframework.http.codec.DecoderHttpMessageReader;
 import org.springframework.http.codec.HttpMessageReader;
-import org.springframework.http.codec.json.Jackson2JsonDecoder;
-import org.springframework.lang.Nullable;
+import org.springframework.http.codec.json.JacksonJsonDecoder;
 import org.springframework.validation.Errors;
 import org.springframework.validation.Validator;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.support.ConfigurableWebBindingInitializer;
 import org.springframework.web.method.HandlerMethod;
 import org.springframework.web.reactive.BindingContext;
+import org.springframework.web.server.ContentTooLargeException;
 import org.springframework.web.server.ServerWebExchange;
 import org.springframework.web.server.ServerWebInputException;
 import org.springframework.web.server.UnsupportedMediaTypeStatusException;
@@ -70,7 +71,7 @@ import static org.springframework.web.testfixture.http.server.reactive.MockServe
  */
 class MessageReaderArgumentResolverTests {
 
-	private AbstractMessageReaderArgumentResolver resolver = resolver(new Jackson2JsonDecoder());
+	private AbstractMessageReaderArgumentResolver resolver = resolver(new JacksonJsonDecoder());
 
 	private BindingContext bindingContext;
 
@@ -101,7 +102,7 @@ class MessageReaderArgumentResolverTests {
 	// More extensive "empty body" tests in RequestBody- and HttpEntityArgumentResolverTests
 
 	@Test @SuppressWarnings("unchecked") // SPR-9942
-	public void emptyBody() {
+	void emptyBody() {
 		MockServerHttpRequest request = post("/path").contentType(MediaType.APPLICATION_JSON).build();
 		ServerWebExchange exchange = MockServerWebExchange.from(request);
 		ResolvableType type = forClassWithGenerics(Mono.class, TestBean.class);
@@ -110,6 +111,24 @@ class MessageReaderArgumentResolverTests {
 				param, true, this.bindingContext, exchange).block();
 
 		StepVerifier.create(result).expectError(ServerWebInputException.class).verify();
+	}
+
+	@Test @SuppressWarnings("unchecked")
+	void tooLargeBody() {
+		StringBuilder bodyBuilder = new StringBuilder();
+		while (bodyBuilder.toString().getBytes().length < 256 * 1024) {
+			bodyBuilder.append("The default maximum input length is 256kb.");
+		}
+		String body = "{\"bar\":\"BARBAR\",\"foo\":\"" + bodyBuilder + "\"}";
+
+		MockServerHttpRequest request = post("/path").contentType(MediaType.APPLICATION_JSON).body(body);
+		ServerWebExchange exchange = MockServerWebExchange.from(request);
+		ResolvableType type = forClassWithGenerics(Mono.class, TestBean.class);
+		MethodParameter param = this.testMethod.arg(type);
+		Mono<TestBean> result = (Mono<TestBean>) this.resolver.readBody(
+				param, true, this.bindingContext, exchange).block();
+
+		StepVerifier.create(result).expectError(ContentTooLargeException.class).verify();
 	}
 
 	@Test
@@ -183,7 +202,7 @@ class MessageReaderArgumentResolverTests {
 	}
 
 	@Test
-	void testBean() {
+	void bean() {
 		String body = "{\"bar\":\"b1\",\"foo\":\"f1\"}";
 		MethodParameter param = this.testMethod.arg(TestBean.class);
 		TestBean value = resolveValue(param, body);
@@ -258,7 +277,7 @@ class MessageReaderArgumentResolverTests {
 	}
 
 	@Test  // SPR-9964
-	public void parameterizedMethodArgument() throws Exception {
+	void parameterizedMethodArgument() throws Exception {
 		Method method = AbstractParameterizedController.class.getMethod("handleDto", Identifiable.class);
 		HandlerMethod handlerMethod = new HandlerMethod(new ConcreteParameterizedController(), method);
 		MethodParameter methodParam = handlerMethod.getMethodParameters()[0];
@@ -275,8 +294,7 @@ class MessageReaderArgumentResolverTests {
 		Mono<Object> result = this.resolver.readBody(param, true, this.bindingContext, exchange);
 		Object value = result.block(Duration.ofSeconds(5));
 
-		assertThat(value).isNotNull();
-		assertThat(param.getParameterType().isAssignableFrom(value.getClass())).as("Unexpected return value type: " + value).isTrue();
+		assertThat(value).isInstanceOf(param.getParameterType());
 
 		return (T) value;
 	}

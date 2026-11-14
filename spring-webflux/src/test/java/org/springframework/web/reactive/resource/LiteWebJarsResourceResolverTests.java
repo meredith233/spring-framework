@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -29,6 +29,8 @@ import org.springframework.web.testfixture.http.server.reactive.MockServerHttpRe
 import org.springframework.web.testfixture.server.MockServerWebExchange;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -36,7 +38,7 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
 /**
- * Tests for {@link WebJarsResourceResolver}.
+ * Tests for {@link LiteWebJarsResourceResolver}.
  *
  * @author Sebastien Deleuze
  */
@@ -80,8 +82,8 @@ class LiteWebJarsResourceResolverTests {
 
 	@Test
 	void resolveUrlWebJarResource() {
-		String file = "underscorejs/underscore.js";
-		String expected = "underscorejs/1.8.3/underscore.js";
+		String file = "momentjs/momentjs.js";
+		String expected = "momentjs/2.29.4/momentjs.js";
 		given(this.chain.resolveUrlPath(file, this.locations)).willReturn(Mono.empty());
 		given(this.chain.resolveUrlPath(expected, this.locations)).willReturn(Mono.just(expected));
 
@@ -93,9 +95,23 @@ class LiteWebJarsResourceResolverTests {
 	}
 
 	@Test
+	void resolveUrlWebJarDirectory() {
+		String folder = "momentjs/locale/";
+		String expected = "momentjs/2.29.4/locale/";
+		given(this.chain.resolveUrlPath(folder, this.locations)).willReturn(Mono.empty());
+		given(this.chain.resolveUrlPath(expected, this.locations)).willReturn(Mono.empty());
+
+		String actual = this.resolver.resolveUrlPath(folder, this.locations, this.chain).block(TIMEOUT);
+
+		assertThat(actual).isEqualTo(expected);
+		verify(this.chain, times(1)).resolveUrlPath(folder, this.locations);
+		verify(this.chain, times(1)).resolveUrlPath(expected, this.locations);
+	}
+
+	@Test
 	void resolveUrlWebJarResourceNotFound() {
-		String file = "something/something.js";
-		given(this.chain.resolveUrlPath(file, this.locations)).willReturn(Mono.empty());
+		String file = "momentjs/locale/unknown.js";
+		given(this.chain.resolveUrlPath(anyString(), eq(this.locations))).willReturn(Mono.empty());
 
 		String actual = this.resolver.resolveUrlPath(file, this.locations, this.chain).block(TIMEOUT);
 
@@ -134,11 +150,11 @@ class LiteWebJarsResourceResolverTests {
 
 	@Test
 	void resolveResourceWebJar() {
-		String file = "underscorejs/underscore.js";
+		String file = "momentjs/momentjs.js";
 		given(this.chain.resolveResource(this.exchange, file, this.locations)).willReturn(Mono.empty());
 
 		Resource expected = mock();
-		String expectedPath = "underscorejs/1.8.3/underscore.js";
+		String expectedPath = "momentjs/2.29.4/momentjs.js";
 		given(this.chain.resolveResource(this.exchange, expectedPath, this.locations))
 				.willReturn(Mono.just(expected));
 

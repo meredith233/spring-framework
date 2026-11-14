@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -29,10 +29,10 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import org.jspecify.annotations.Nullable;
 
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatusCode;
-import org.springframework.lang.Nullable;
 import org.springframework.util.ClassUtils;
 import org.springframework.util.MultiValueMap;
 import org.springframework.web.context.request.async.AsyncWebRequest;
@@ -49,13 +49,12 @@ import org.springframework.web.servlet.ModelAndView;
  */
 final class DefaultAsyncServerResponse extends ErrorHandlingServerResponse implements AsyncServerResponse {
 
-	static final boolean reactiveStreamsPresent = ClassUtils.isPresent(
+	static final boolean REACTIVE_STREAMS_PRESENT = ClassUtils.isPresent(
 			"org.reactivestreams.Publisher", DefaultAsyncServerResponse.class.getClassLoader());
 
 	private final CompletableFuture<ServerResponse> futureResponse;
 
-	@Nullable
-	private final Duration timeout;
+	private final @Nullable Duration timeout;
 
 
 	DefaultAsyncServerResponse(CompletableFuture<ServerResponse> futureResponse, @Nullable Duration timeout) {
@@ -63,10 +62,13 @@ final class DefaultAsyncServerResponse extends ErrorHandlingServerResponse imple
 		this.timeout = timeout;
 	}
 
+
 	@Override
 	public ServerResponse block() {
 		try {
-			if (this.timeout != null) {
+			// Consistent with DeferredResult and the Servlet AsyncContext,
+			// a timeout of zero or less specifies an infinite timeout.
+			if (this.timeout != null && this.timeout.toMillis() > 0) {
 				return this.futureResponse.get(this.timeout.toMillis(), TimeUnit.MILLISECONDS);
 			}
 			else {
@@ -81,12 +83,6 @@ final class DefaultAsyncServerResponse extends ErrorHandlingServerResponse imple
 	@Override
 	public HttpStatusCode statusCode() {
 		return delegate(ServerResponse::statusCode);
-	}
-
-	@Override
-	@Deprecated
-	public int rawStatusCode() {
-		return delegate(ServerResponse::rawStatusCode);
 	}
 
 	@Override
@@ -109,9 +105,8 @@ final class DefaultAsyncServerResponse extends ErrorHandlingServerResponse imple
 		}
 	}
 
-	@Nullable
 	@Override
-	public ModelAndView writeTo(HttpServletRequest request, HttpServletResponse response, Context context)
+	public @Nullable ModelAndView writeTo(HttpServletRequest request, HttpServletResponse response, Context context)
 			throws ServletException, IOException {
 
 		writeAsync(request, response, createDeferredResult(request));
@@ -122,8 +117,13 @@ final class DefaultAsyncServerResponse extends ErrorHandlingServerResponse imple
 			throws ServletException, IOException {
 
 		WebAsyncManager asyncManager = WebAsyncUtils.getAsyncManager(request);
-		AsyncWebRequest asyncWebRequest = WebAsyncUtils.createAsyncWebRequest(request, response);
-		asyncManager.setAsyncWebRequest(asyncWebRequest);
+		AsyncWebRequest asyncWebRequest = asyncManager.getAsyncWebRequest();
+		// defensive check as asyncWebRequest should not be null,
+		// should have been set already in HandlerFunctionAdapter#getWebAsyncManager
+		if (asyncWebRequest == null) {
+			asyncWebRequest = WebAsyncUtils.createAsyncWebRequest(request, response);
+			asyncManager.setAsyncWebRequest(asyncWebRequest);
+		}
 		try {
 			asyncManager.startDeferredResultProcessing(deferredResult);
 		}
@@ -163,4 +163,5 @@ final class DefaultAsyncServerResponse extends ErrorHandlingServerResponse imple
 		});
 		return result;
 	}
+
 }

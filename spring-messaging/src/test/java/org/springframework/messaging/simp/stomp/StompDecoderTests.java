@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -160,7 +160,7 @@ class StompDecoderTests {
 	}
 
 	@Test // gh-27722
-	public void decodeFrameWithHeaderWithBackslashValue() {
+	void decodeFrameWithHeaderWithBackslashValue() {
 		String accept = "accept-version:1.1\n";
 		String keyAndValueWithBackslash = "key:\\value\n";
 
@@ -183,7 +183,7 @@ class StompDecoderTests {
 	}
 
 	@Test // gh-23713
-	public void decodeFramesWithExtraNewLines() {
+	void decodeFramesWithExtraNewLines() {
 		String frame1 = "SEND\ndestination:test\n\nbody\0\n\n\n";
 		ByteBuffer buffer = ByteBuffer.wrap((frame1).getBytes());
 
@@ -207,7 +207,7 @@ class StompDecoderTests {
 	}
 
 	@Test // SPR-13111
-	public void decodeFrameWithHeaderWithEmptyValue() {
+	void decodeFrameWithHeaderWithEmptyValue() {
 		String accept = "accept-version:1.1\n";
 		String valuelessKey = "key:\n";
 

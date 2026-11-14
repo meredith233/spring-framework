@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2023 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -28,7 +28,6 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
 
 import jakarta.jms.Connection;
 import jakarta.jms.ConnectionFactory;
@@ -42,8 +41,8 @@ import jakarta.jms.TemporaryQueue;
 import jakarta.jms.TemporaryTopic;
 import jakarta.jms.Topic;
 import jakarta.jms.TopicSession;
+import org.jspecify.annotations.Nullable;
 
-import org.springframework.lang.Nullable;
 import org.springframework.util.Assert;
 import org.springframework.util.ClassUtils;
 import org.springframework.util.ObjectUtils;
@@ -106,7 +105,7 @@ public class CachingConnectionFactory extends SingleConnectionFactory {
 
 	private volatile boolean active = true;
 
-	private final ConcurrentMap<Integer, Deque<Session>> cachedSessions = new ConcurrentHashMap<>();
+	private final Map<Integer, Deque<Session>> cachedSessions = new ConcurrentHashMap<>();
 
 
 	/**
@@ -114,7 +113,6 @@ public class CachingConnectionFactory extends SingleConnectionFactory {
 	 * @see #setTargetConnectionFactory
 	 */
 	public CachingConnectionFactory() {
-		super();
 		setReconnectOnException(true);
 	}
 
@@ -240,13 +238,12 @@ public class CachingConnectionFactory extends SingleConnectionFactory {
 	 * Checks for a cached Session for the given mode.
 	 */
 	@Override
-	@Nullable
-	protected Session getSession(Connection con, Integer mode) throws JMSException {
+	protected @Nullable Session getSession(Connection con, Integer mode) throws JMSException {
 		if (!this.active) {
 			return null;
 		}
 
-		Deque<Session> sessionList = this.cachedSessions.computeIfAbsent(mode, k -> new ArrayDeque<>());
+		Deque<Session> sessionList = this.cachedSessions.computeIfAbsent(mode, key -> new ArrayDeque<>());
 		Session session = null;
 		synchronized (sessionList) {
 			if (!sessionList.isEmpty()) {
@@ -312,8 +309,7 @@ public class CachingConnectionFactory extends SingleConnectionFactory {
 		}
 
 		@Override
-		@Nullable
-		public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {
+		public @Nullable Object invoke(Object proxy, Method method, Object[] args) throws Throwable {
 			String methodName = method.getName();
 			if (methodName.equals("equals")) {
 				// Only consider equal when proxies are identical.
@@ -538,8 +534,7 @@ public class CachingConnectionFactory extends SingleConnectionFactory {
 
 		private final Destination destination;
 
-		@Nullable
-		private String destinationString;
+		private @Nullable String destinationString;
 
 		public DestinationCacheKey(Destination destination) {
 			Assert.notNull(destination, "Destination must not be null");
@@ -592,14 +587,11 @@ public class CachingConnectionFactory extends SingleConnectionFactory {
 	 */
 	private static class ConsumerCacheKey extends DestinationCacheKey {
 
-		@Nullable
-		private final String selector;
+		private final @Nullable String selector;
 
-		@Nullable
-		private final Boolean noLocal;
+		private final @Nullable Boolean noLocal;
 
-		@Nullable
-		private final String subscription;
+		private final @Nullable String subscription;
 
 		private final boolean durable;
 

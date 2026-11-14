@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2023 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -26,7 +26,8 @@ import java.sql.Statement;
 
 import javax.sql.DataSource;
 
-import org.springframework.lang.Nullable;
+import org.jspecify.annotations.Nullable;
+
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 /**
@@ -180,8 +181,7 @@ public class TransactionAwareDataSourceProxy extends DelegatingDataSource {
 
 		private final DataSource targetDataSource;
 
-		@Nullable
-		private Connection target;
+		private @Nullable Connection target;
 
 		private boolean closed = false;
 
@@ -190,8 +190,7 @@ public class TransactionAwareDataSourceProxy extends DelegatingDataSource {
 		}
 
 		@Override
-		@Nullable
-		public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {
+		public @Nullable Object invoke(Object proxy, Method method, Object[] args) throws Throwable {
 			// Invocation on ConnectionProxy interface coming in...
 
 			switch (method.getName()) {
@@ -210,13 +209,23 @@ public class TransactionAwareDataSourceProxy extends DelegatingDataSource {
 						sb.append('[').append(this.target).append(']');
 					}
 					else {
-						sb.append(" from DataSource [").append(this.targetDataSource).append(']');
+						sb.append("from DataSource [").append(this.targetDataSource).append(']');
 					}
 					return sb.toString();
 				}
 				case "close" -> {
 					// Handle close method: only close if not within a transaction.
-					DataSourceUtils.doReleaseConnection(this.target, this.targetDataSource);
+					if (this.target != null) {
+						ConnectionHolder conHolder = (ConnectionHolder)
+								TransactionSynchronizationManager.getResource(this.targetDataSource);
+						if (conHolder != null && conHolder.hasConnection() && conHolder.getConnection() == this.target) {
+							// It's the transactional Connection: Don't close it.
+							conHolder.released();
+						}
+						else {
+							DataSourceUtils.doCloseConnection(this.target, this.targetDataSource);
+						}
+					}
 					this.closed = true;
 					return null;
 				}
@@ -237,7 +246,7 @@ public class TransactionAwareDataSourceProxy extends DelegatingDataSource {
 
 			if (this.target == null) {
 				if (method.getName().equals("getWarnings") || method.getName().equals("clearWarnings")) {
-					// Avoid creation of target Connection on pre-close cleanup (e.g. Hibernate Session)
+					// Avoid creation of target Connection on pre-close cleanup (for example, Hibernate Session)
 					return null;
 				}
 				if (this.closed) {

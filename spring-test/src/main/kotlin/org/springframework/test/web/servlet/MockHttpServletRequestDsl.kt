@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -25,6 +25,7 @@ import org.springframework.util.MultiValueMap
 import java.security.Principal
 import java.util.*
 import jakarta.servlet.http.Cookie
+import org.springframework.test.web.servlet.request.AbstractMockHttpServletRequestBuilder
 
 /**
  * Provide a [MockHttpServletRequestBuilder] Kotlin DSL in order to be able to write idiomatic Kotlin code.
@@ -40,7 +41,7 @@ import jakarta.servlet.http.Cookie
  * @author Sebastien Deleuze
  * @since 5.2
  */
-open class MockHttpServletRequestDsl internal constructor (private val builder: MockHttpServletRequestBuilder) {
+open class MockHttpServletRequestDsl(private val builder: AbstractMockHttpServletRequestBuilder<*>) {
 
 	/**
 	 * @see [MockHttpServletRequestBuilder.contextPath]
@@ -129,6 +130,20 @@ open class MockHttpServletRequestDsl internal constructor (private val builder: 
 	var queryParams: MultiValueMap<String, String>? = null
 
 	/**
+	 * @since 6.2.3
+	 * @see [MockHttpServletRequestBuilder.formField]
+	 */
+	fun formField(name: String, vararg values: String) {
+		builder.formField(name, *values)
+	}
+
+	/**
+	 * @since 6.2.3
+	 * @see [MockHttpServletRequestBuilder.formFields]
+	 */
+	var formFields: MultiValueMap<String, String>? = null
+
+	/**
 	 * @see [MockHttpServletRequestBuilder.cookie]
 	 */
 	fun cookie(vararg cookies: Cookie) {
@@ -214,6 +229,7 @@ open class MockHttpServletRequestDsl internal constructor (private val builder: 
 		contentType?.also { builder.contentType(it) }
 		params?.also { builder.params(it) }
 		queryParams?.also { builder.queryParams(it) }
+		formFields?.also { builder.formFields(it) }
 		sessionAttrs?.also { builder.sessionAttrs(it) }
 		flashAttrs?.also { builder.flashAttrs(it) }
 		session?.also { builder.session(it) }

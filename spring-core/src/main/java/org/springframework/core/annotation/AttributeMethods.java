@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,13 +17,16 @@
 package org.springframework.core.annotation;
 
 import java.lang.annotation.Annotation;
+import java.lang.reflect.AnnotatedElement;
 import java.lang.reflect.Method;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.Map;
 
-import org.springframework.lang.Nullable;
+import org.jspecify.annotations.Nullable;
+
 import org.springframework.util.Assert;
+import org.springframework.util.ClassUtils;
 import org.springframework.util.ConcurrentReferenceHashMap;
 import org.springframework.util.ReflectionUtils;
 
@@ -37,6 +40,8 @@ import org.springframework.util.ReflectionUtils;
  */
 final class AttributeMethods {
 
+	private static final IntrospectionFailureLogger failureLogger = IntrospectionFailureLogger.WARN;
+
 	static final AttributeMethods NONE = new AttributeMethods(null, new Method[0]);
 
 	static final Map<Class<? extends Annotation>, AttributeMethods> cache = new ConcurrentReferenceHashMap<>();
@@ -49,8 +54,7 @@ final class AttributeMethods {
 	};
 
 
-	@Nullable
-	private final Class<? extends Annotation> annotationType;
+	private final @Nullable Class<? extends Annotation> annotationType;
 
 	private final Method[] attributeMethods;
 
@@ -77,7 +81,8 @@ final class AttributeMethods {
 				foundNestedAnnotation = true;
 			}
 			ReflectionUtils.makeAccessible(method);
-			this.canThrowTypeNotPresentException[i] = (type == Class.class || type == Class[].class || type.isEnum());
+			this.canThrowTypeNotPresentException[i] = (type == Class.class || type == Class[].class ||
+					type.isEnum() || (type.isArray() && type.componentType().isEnum()));
 		}
 		this.hasDefaultValueMethod = foundDefaultValueMethod;
 		this.hasNestedAnnotation = foundNestedAnnotation;
@@ -91,10 +96,11 @@ final class AttributeMethods {
 	 * exceptions for {@code Class} values (instead of the more typical early
 	 * {@code Class.getAnnotations() failure} on a regular JVM).
 	 * @param annotation the annotation to check
+	 * @param source the element that the supplied annotation is declared on
 	 * @return {@code true} if all values are present
 	 * @see #validate(Annotation)
 	 */
-	boolean canLoad(Annotation annotation) {
+	boolean canLoad(Annotation annotation, AnnotatedElement source) {
 		assertAnnotation(annotation);
 		for (int i = 0; i < size(); i++) {
 			if (canThrowTypeNotPresentException(i)) {
@@ -107,6 +113,10 @@ final class AttributeMethods {
 				}
 				catch (Throwable ex) {
 					// TypeNotPresentException etc. -> annotation type not actually loadable.
+					if (failureLogger.isEnabled()) {
+						failureLogger.log("Failed to introspect meta-annotation @" +
+								annotation.annotationType().getSimpleName(), source, ex);
+					}
 					return false;
 				}
 			}
@@ -122,7 +132,7 @@ final class AttributeMethods {
 	 * {@code Class.getAnnotations() failure} on a regular JVM).
 	 * @param annotation the annotation to validate
 	 * @throws IllegalStateException if a declared {@code Class} attribute could not be read
-	 * @see #canLoad(Annotation)
+	 * @see #canLoad(Annotation, AnnotatedElement)
 	 */
 	void validate(Annotation annotation) {
 		assertAnnotation(annotation);
@@ -135,8 +145,9 @@ final class AttributeMethods {
 					throw ex;
 				}
 				catch (Throwable ex) {
-					throw new IllegalStateException("Could not obtain annotation attribute value for " +
-							get(i).getName() + " declared on @" + getName(annotation.annotationType()), ex);
+					throw new IllegalStateException(
+							"Could not obtain annotation attribute value for " + get(i).getName() +
+							" declared on @" + ClassUtils.getCanonicalName(annotation.annotationType()), ex);
 				}
 			}
 		}
@@ -155,8 +166,7 @@ final class AttributeMethods {
 	 * @param name the attribute name to find
 	 * @return the attribute method or {@code null}
 	 */
-	@Nullable
-	Method get(String name) {
+	@Nullable Method get(String name) {
 		int index = indexOf(name);
 		return (index != -1 ? this.attributeMethods[index] : null);
 	}
@@ -251,11 +261,13 @@ final class AttributeMethods {
 		return cache.computeIfAbsent(annotationType, AttributeMethods::compute);
 	}
 
+	@SuppressWarnings("NullAway") // Dataflow analysis limitation
 	private static AttributeMethods compute(Class<? extends Annotation> annotationType) {
 		Method[] methods = annotationType.getDeclaredMethods();
 		int size = methods.length;
 		for (int i = 0; i < methods.length; i++) {
 			if (!isAttributeMethod(methods[i])) {
+				//noinspection DataFlowIssue
 				methods[i] = null;
 				size--;
 			}
@@ -296,13 +308,8 @@ final class AttributeMethods {
 		if (attributeName == null) {
 			return "(none)";
 		}
-		String in = (annotationType != null ? " in annotation [" + annotationType.getName() + "]" : "");
+		String in = (annotationType != null ? " in annotation [" + ClassUtils.getCanonicalName(annotationType) + "]" : "");
 		return "attribute '" + attributeName + "'" + in;
-	}
-
-	private static String getName(Class<?> clazz) {
-		String canonicalName = clazz.getCanonicalName();
-		return (canonicalName != null ? canonicalName : clazz.getName());
 	}
 
 }

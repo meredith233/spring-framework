@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2022 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -33,10 +33,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  *
  * @author Rossen Stoyanchev
  */
-public class FormContentTests {
+class FormContentTests {
 
 	@Test // SPR-15753
-	public void formContentIsNotDuplicated() throws Exception {
+	void formContentIsNotDuplicated() throws Exception {
 
 		MockMvc mockMvc = MockMvcBuilders.standaloneSetup(new Spr15753Controller())
 				.addFilter(new FormContentFilter())

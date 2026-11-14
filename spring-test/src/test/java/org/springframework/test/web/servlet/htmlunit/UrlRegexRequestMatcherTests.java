@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -25,10 +25,10 @@ import org.junit.jupiter.api.Test;
  * @author Sam Brannen
  * @since 4.2
  */
-public class UrlRegexRequestMatcherTests extends AbstractWebRequestMatcherTests {
+class UrlRegexRequestMatcherTests extends AbstractWebRequestMatcherTests {
 
 	@Test
-	public void verifyExampleInClassLevelJavadoc() throws Exception {
+	void verifyExampleInClassLevelJavadoc() throws Exception {
 		WebRequestMatcher cdnMatcher = new UrlRegexRequestMatcher(".*?//code.jquery.com/.*");
 		assertMatches(cdnMatcher, "https://code.jquery.com/jquery-1.11.0.min.js");
 		assertDoesNotMatch(cdnMatcher, "http://localhost/jquery-1.11.0.min.js");

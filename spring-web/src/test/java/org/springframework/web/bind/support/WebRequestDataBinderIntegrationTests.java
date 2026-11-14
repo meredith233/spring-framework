@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2023 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -25,8 +25,8 @@ import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.Part;
-import org.eclipse.jetty.ee10.servlet.ServletContextHandler;
-import org.eclipse.jetty.ee10.servlet.ServletHolder;
+import org.eclipse.jetty.ee11.servlet.ServletContextHandler;
+import org.eclipse.jetty.ee11.servlet.ServletHolder;
 import org.eclipse.jetty.server.Connector;
 import org.eclipse.jetty.server.NetworkConnector;
 import org.eclipse.jetty.server.Server;
@@ -38,11 +38,12 @@ import org.junit.jupiter.api.TestInstance.Lifecycle;
 
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.core.io.Resource;
+import org.springframework.http.MediaType;
 import org.springframework.http.client.HttpComponentsClientHttpRequestFactory;
 import org.springframework.util.FileSystemUtils;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
-import org.springframework.web.client.RestTemplate;
+import org.springframework.web.client.RestClient;
 import org.springframework.web.context.request.ServletWebRequest;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -58,11 +59,9 @@ class WebRequestDataBinderIntegrationTests {
 
 	private final PartListServlet partListServlet = new PartListServlet();
 
-	private final RestTemplate template = new RestTemplate(new HttpComponentsClientHttpRequestFactory());
+	private RestClient restClient;
 
 	private Server jettyServer;
-
-	private String baseUrl;
 
 	private Path tempDirectory;
 
@@ -91,7 +90,8 @@ class WebRequestDataBinderIntegrationTests {
 
 		Connector[] connectors = jettyServer.getConnectors();
 		NetworkConnector connector = (NetworkConnector) connectors[0];
-		baseUrl = "http://localhost:" + connector.getLocalPort();
+		this.restClient = RestClient.builder().baseUrl("http://localhost:" + connector.getLocalPort())
+				.requestFactory(new HttpComponentsClientHttpRequestFactory()).build();
 	}
 
 	@AfterAll
@@ -117,7 +117,9 @@ class WebRequestDataBinderIntegrationTests {
 		parts.add("firstPart", firstPart);
 		parts.add("secondPart", "secondValue");
 
-		template.postForLocation(baseUrl + "/parts", parts);
+		this.restClient.post().uri("/parts")
+				.contentType(MediaType.MULTIPART_FORM_DATA).body(parts)
+				.retrieve().toBodilessEntity();
 
 		assertThat(bean.getFirstPart()).isNotNull();
 		assertThat(bean.getSecondPart()).isNotNull();
@@ -134,7 +136,9 @@ class WebRequestDataBinderIntegrationTests {
 		Resource logo = new ClassPathResource("/org/springframework/http/converter/logo.jpg");
 		parts.add("partList", logo);
 
-		template.postForLocation(baseUrl + "/partlist", parts);
+		this.restClient.post().uri("/partlist")
+				.contentType(MediaType.MULTIPART_FORM_DATA).body(parts)
+				.retrieve().toBodilessEntity();
 
 		assertThat(bean.getPartList()).isNotNull();
 		assertThat(bean.getPartList()).hasSize(parts.get("partList").size());

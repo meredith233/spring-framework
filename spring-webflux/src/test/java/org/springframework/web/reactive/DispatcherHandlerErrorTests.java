@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -72,7 +72,7 @@ import static org.springframework.http.MediaType.APPLICATION_JSON;
  * @author Rossen Stoyanchev
  */
 @SuppressWarnings({"ThrowableResultOfMethodCallIgnored", "ThrowableInstanceNeverThrown"})
-public class DispatcherHandlerErrorTests {
+class DispatcherHandlerErrorTests {
 
 	private static final IllegalStateException EXCEPTION = new IllegalStateException("boo");
 
@@ -121,11 +121,10 @@ public class DispatcherHandlerErrorTests {
 		assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
 		assertThat(response.getHeaders().getContentType()).isEqualTo(MediaType.APPLICATION_PROBLEM_JSON);
 		assertThat(response.getBodyAsString().block()).isEqualTo("""
-				{"type":"about:blank",\
-				"title":"Not Found",\
-				"status":404,\
+				{\
 				"detail":"No static resource non-existing.",\
-				"instance":"/resources/non-existing"}\
+				"status":404,\
+				"title":"Not Found"}\
 				""");
 	}
 
@@ -211,12 +210,12 @@ public class DispatcherHandlerErrorTests {
 	static class TestConfig {
 
 		@Bean
-		public RequestMappingHandlerMapping handlerMapping() {
+		RequestMappingHandlerMapping handlerMapping() {
 			return new RequestMappingHandlerMapping();
 		}
 
 		@Bean
-		public RequestMappingHandlerAdapter handlerAdapter() {
+		RequestMappingHandlerAdapter handlerAdapter() {
 			return new RequestMappingHandlerAdapter();
 		}
 
@@ -228,7 +227,7 @@ public class DispatcherHandlerErrorTests {
 		}
 
 		@Bean
-		public TestController testController() {
+		public TestController controller() {
 			return new TestController();
 		}
 	}

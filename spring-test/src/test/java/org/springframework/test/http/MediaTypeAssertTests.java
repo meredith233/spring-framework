@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,11 +16,10 @@
 
 package org.springframework.test.http;
 
-
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 
 import org.springframework.http.MediaType;
-import org.springframework.lang.Nullable;
 
 import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 
@@ -43,19 +42,34 @@ class MediaTypeAssertTests {
 	}
 
 	@Test
-	void isEqualWhenSameShouldPass() {
+	void isEqualWhenActualIsNullStringShouldFail() {
+		assertThatExceptionOfType(AssertionError.class)
+				.isThrownBy(() -> assertThat(null).isEqualTo("text/html"))
+				.withMessageContaining("Media type");
+	}
+
+	@Test
+	void isEqualWhenSameStringShouldPass() {
 		assertThat(mediaType("application/json")).isEqualTo("application/json");
 	}
 
 	@Test
-	void isEqualWhenDifferentShouldFail() {
+	void isEqualWhenDifferentStringShouldFail() {
 		assertThatExceptionOfType(AssertionError.class)
 				.isThrownBy(() -> assertThat(mediaType("application/json")).isEqualTo("text/html"))
 				.withMessageContaining("Media type");
 	}
 
 	@Test
-	void isEqualWhenActualIsNullShouldFail() {
+	void isEqualInvalidStringShouldFail() {
+		assertThatExceptionOfType(AssertionError.class)
+				.isThrownBy(() -> assertThat(mediaType("application/json")).isEqualTo("example of a bad value"))
+				.withMessageContainingAll("[Media type]", "To be a valid media type but got:",
+						"\"Invalid mime type \"example of a bad value\": does not contain '/'\"");
+	}
+
+	@Test
+	void isEqualWhenActualIsNullTypeShouldFail() {
 		assertThatExceptionOfType(AssertionError.class)
 				.isThrownBy(() -> assertThat(null).isEqualTo(MediaType.APPLICATION_JSON))
 				.withMessageContaining("Media type");
@@ -70,6 +84,48 @@ class MediaTypeAssertTests {
 	void isEqualWhenDifferentTypeShouldFail() {
 		assertThatExceptionOfType(AssertionError.class)
 				.isThrownBy(() -> assertThat(mediaType("application/json")).isEqualTo(MediaType.TEXT_HTML))
+				.withMessageContaining("Media type");
+	}
+
+	@Test
+	void isNotEqualWhenActualIsNullStringShouldPass() {
+		assertThat(null).isNotEqualTo("application/json");
+	}
+
+	@Test
+	void isNotEqualWhenDifferentStringShouldPass() {
+		assertThat(mediaType("application/json")).isNotEqualTo("text/html");
+	}
+
+	@Test
+	void isNotEqualWhenSameStringShouldFail() {
+		assertThatExceptionOfType(AssertionError.class)
+				.isThrownBy(() -> assertThat(mediaType("application/json")).isNotEqualTo("application/json"))
+				.withMessageContaining("Media type");
+	}
+
+	@Test
+	void isNotEqualInvalidStringShouldFail() {
+		assertThatExceptionOfType(AssertionError.class)
+				.isThrownBy(() -> assertThat(mediaType("application/json")).isNotEqualTo("example of a bad value"))
+				.withMessageContainingAll("[Media type]", "To be a valid media type but got:",
+						"\"Invalid mime type \"example of a bad value\": does not contain '/'\"");
+	}
+
+	@Test
+	void isNotEqualWhenActualIsNullTypeShouldPass() {
+		assertThat(null).isNotEqualTo(MediaType.APPLICATION_JSON);
+	}
+
+	@Test
+	void isNotEqualWhenDifferentTypeShouldPass() {
+		assertThat(mediaType("application/json")).isNotEqualTo(MediaType.TEXT_HTML);
+	}
+
+	@Test
+	void isNotEqualWhenSameTypeShouldFail() {
+		assertThatExceptionOfType(AssertionError.class)
+				.isThrownBy(() -> assertThat(mediaType("application/json")).isNotEqualTo(MediaType.APPLICATION_JSON))
 				.withMessageContaining("Media type");
 	}
 
@@ -109,7 +165,7 @@ class MediaTypeAssertTests {
 	void isCompatibleWithStringAndEmptyExpected() {
 		assertThatExceptionOfType(AssertionError.class)
 				.isThrownBy(() -> assertThat(mediaType("application/json")).isCompatibleWith(""))
-				.withMessageContainingAll("Expecting:", "", "To be a valid media type but got:",
+				.withMessageContainingAll("Expecting:", "To be a valid media type but got:",
 						"'mimeType' must not be empty");
 	}
 
@@ -145,8 +201,7 @@ class MediaTypeAssertTests {
 	}
 
 
-	@Nullable
-	private static MediaType mediaType(@Nullable String mediaType) {
+	private static @Nullable MediaType mediaType(@Nullable String mediaType) {
 		return (mediaType != null ? MediaType.parseMediaType(mediaType) : null);
 	}
 

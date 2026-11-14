@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2022 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -26,9 +26,9 @@ import java.lang.annotation.Target;
 import org.springframework.core.annotation.AliasFor;
 
 /**
- * {@code TestExecutionListeners} defines class-level metadata for configuring
- * which {@link TestExecutionListener TestExecutionListeners} should be
- * registered with a {@link TestContextManager}.
+ * {@code @TestExecutionListeners} is an annotation that can be applied to a test
+ * class to configure which {@link TestExecutionListener TestExecutionListeners}
+ * should be registered with a {@link TestContextManager}.
  *
  * <p>{@code @TestExecutionListeners} is used to register listeners for a
  * particular test class, its subclasses, and its nested classes. If you wish to
@@ -36,8 +36,8 @@ import org.springframework.core.annotation.AliasFor;
  * mechanism described in {@link TestExecutionListener}.
  *
  * <p>This annotation may be used as a <em>meta-annotation</em> to create custom
- * <em>composed annotations</em>. As of Spring Framework 5.3, this annotation will
- * be inherited from an enclosing test class by default. See
+ * <em>composed annotations</em>. In addition, this annotation will be inherited
+ * from an enclosing test class by default. See
  * {@link NestedTestConfiguration @NestedTestConfiguration} for details.
  *
  * <h3>Switching to default {@code TestExecutionListener} implementations</h3>
@@ -82,11 +82,14 @@ public @interface TestExecutionListeners {
 	 * @see org.springframework.test.context.web.ServletTestExecutionListener
 	 * @see org.springframework.test.context.support.DirtiesContextBeforeModesTestExecutionListener
 	 * @see org.springframework.test.context.event.ApplicationEventsTestExecutionListener
+	 * @see org.springframework.test.context.bean.override.BeanOverrideTestExecutionListener
 	 * @see org.springframework.test.context.support.DependencyInjectionTestExecutionListener
 	 * @see org.springframework.test.context.support.DirtiesContextTestExecutionListener
+	 * @see org.springframework.test.context.support.CommonCachesTestExecutionListener
 	 * @see org.springframework.test.context.transaction.TransactionalTestExecutionListener
 	 * @see org.springframework.test.context.jdbc.SqlScriptsTestExecutionListener
 	 * @see org.springframework.test.context.event.EventPublishingTestExecutionListener
+	 * @see org.springframework.test.context.bean.override.mockito.MockitoResetTestExecutionListener
 	 */
 	@AliasFor("value")
 	Class<? extends TestExecutionListener>[] listeners() default {};

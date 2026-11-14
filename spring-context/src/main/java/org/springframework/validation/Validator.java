@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2023 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -96,7 +96,7 @@ public interface Validator {
 	 * Validate the given {@code target} object individually.
 	 * <p>Delegates to the common {@link #validate(Object, Errors)} method.
 	 * The returned {@link Errors errors} instance can be used to report
-	 * any resulting validation errors for the specific target object, e.g.
+	 * any resulting validation errors for the specific target object, for example,
 	 * {@code if (validator.validateObject(target).hasErrors()) ...} or
 	 * {@code validator.validateObject(target).failOnError(IllegalStateException::new));}.
 	 * <p>Note: This validation call comes with limitations in the {@link Errors}

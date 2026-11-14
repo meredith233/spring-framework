@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -79,8 +79,7 @@ class ResourceHandlerFunctionTests {
 
 		Mono<Void> result = responseMono.flatMap(response -> {
 			assertThat(response.statusCode()).isEqualTo(HttpStatus.OK);
-			boolean condition = response instanceof EntityResponse;
-			assertThat(condition).isTrue();
+			assertThat(response).isInstanceOf(EntityResponse.class);
 			@SuppressWarnings("unchecked")
 					EntityResponse<Resource> entityResponse = (EntityResponse<Resource>) response;
 			assertThat(entityResponse.entity()).isEqualTo(this.resource);
@@ -116,8 +115,7 @@ class ResourceHandlerFunctionTests {
 
 		Mono<Void> result = responseMono.flatMap(response -> {
 			assertThat(response.statusCode()).isEqualTo(HttpStatus.OK);
-			boolean condition = response instanceof EntityResponse;
-			assertThat(condition).isTrue();
+			assertThat(response).isInstanceOf(EntityResponse.class);
 			@SuppressWarnings("unchecked")
 			EntityResponse<Resource> entityResponse = (EntityResponse<Resource>) response;
 			assertThat(entityResponse.entity().getFilename()).isEqualTo(this.resource.getFilename());

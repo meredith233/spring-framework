@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2018 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,22 +19,21 @@ package org.springframework.http.codec.protobuf;
 import java.lang.reflect.Method;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.concurrent.ConcurrentMap;
 
 import com.google.protobuf.Descriptors;
 import com.google.protobuf.Message;
+import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Publisher;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import org.springframework.core.ResolvableType;
-import org.springframework.core.codec.DecodingException;
 import org.springframework.core.codec.Encoder;
+import org.springframework.core.codec.EncodingException;
 import org.springframework.http.MediaType;
 import org.springframework.http.ReactiveHttpOutputMessage;
 import org.springframework.http.codec.EncoderHttpMessageWriter;
 import org.springframework.http.codec.HttpMessageEncoder;
-import org.springframework.lang.Nullable;
 import org.springframework.util.ConcurrentReferenceHashMap;
 
 /**
@@ -55,7 +54,7 @@ public class ProtobufHttpMessageWriter extends EncoderHttpMessageWriter<Message>
 
 	private static final String X_PROTOBUF_MESSAGE_HEADER = "X-Protobuf-Message";
 
-	private static final ConcurrentMap<Class<?>, Method> methodCache = new ConcurrentReferenceHashMap<>();
+	private static final Map<Class<?>, Method> methodCache = new ConcurrentReferenceHashMap<>();
 
 
 	/**
@@ -77,27 +76,21 @@ public class ProtobufHttpMessageWriter extends EncoderHttpMessageWriter<Message>
 	@SuppressWarnings("unchecked")
 	@Override
 	public Mono<Void> write(Publisher<? extends Message> inputStream, ResolvableType elementType,
-			@Nullable MediaType mediaType, ReactiveHttpOutputMessage message, Map<String, Object> hints) {
+			@Nullable MediaType mediaType, ReactiveHttpOutputMessage outputMessage, Map<String, Object> hints) {
 
 		try {
 			Message.Builder builder = getMessageBuilder(elementType.toClass());
 			Descriptors.Descriptor descriptor = builder.getDescriptorForType();
-			message.getHeaders().add(X_PROTOBUF_SCHEMA_HEADER, descriptor.getFile().getName());
-			message.getHeaders().add(X_PROTOBUF_MESSAGE_HEADER, descriptor.getFullName());
+			outputMessage.getHeaders().add(X_PROTOBUF_SCHEMA_HEADER, descriptor.getFile().getName());
+			outputMessage.getHeaders().add(X_PROTOBUF_MESSAGE_HEADER, descriptor.getFullName());
 			if (inputStream instanceof Flux) {
-				if (mediaType == null) {
-					message.getHeaders().setContentType(((HttpMessageEncoder<?>)getEncoder()).getStreamingMediaTypes().get(0));
-				}
-				else if (!ProtobufEncoder.DELIMITED_VALUE.equals(mediaType.getParameters().get(ProtobufEncoder.DELIMITED_KEY))) {
-					Map<String, String> parameters = new HashMap<>(mediaType.getParameters());
-					parameters.put(ProtobufEncoder.DELIMITED_KEY, ProtobufEncoder.DELIMITED_VALUE);
-					message.getHeaders().setContentType(new MediaType(mediaType.getType(), mediaType.getSubtype(), parameters));
-				}
+				outputMessage.getHeaders().setContentType(getStreamingContentType(mediaType));
 			}
-			return super.write(inputStream, elementType, mediaType, message, hints);
+			extendHeaders(outputMessage, hints);
+			return super.write(inputStream, elementType, mediaType, outputMessage, hints);
 		}
 		catch (Exception ex) {
-			return Mono.error(new DecodingException("Could not read Protobuf message: " + ex.getMessage(), ex));
+			return Mono.error(new EncodingException("Could not write Protobuf message: " + ex.getMessage(), ex));
 		}
 	}
 
@@ -105,13 +98,36 @@ public class ProtobufHttpMessageWriter extends EncoderHttpMessageWriter<Message>
 	 * Create a new {@code Message.Builder} instance for the given class.
 	 * <p>This method uses a ConcurrentHashMap for caching method lookups.
 	 */
-	private static Message.Builder getMessageBuilder(Class<?> clazz) throws Exception {
+	protected static Message.Builder getMessageBuilder(Class<?> clazz) throws Exception {
 		Method method = methodCache.get(clazz);
 		if (method == null) {
 			method = clazz.getMethod("newBuilder");
 			methodCache.put(clazz, method);
 		}
 		return (Message.Builder) method.invoke(clazz);
+	}
+
+	/**
+	 * Return the {@code MediaType} to use when the input Publisher is multivalued.
+	 * @since 7.0
+	 */
+	protected MediaType getStreamingContentType(@Nullable MediaType mediaType) {
+		if (mediaType == null) {
+			return ((HttpMessageEncoder<?>) getEncoder()).getStreamingMediaTypes().get(0);
+		}
+		Map<String, String> params = new HashMap<>(mediaType.getParameters());
+		if (!ProtobufEncoder.DELIMITED_VALUE.equals(params.get(ProtobufEncoder.DELIMITED_KEY))) {
+			params.put(ProtobufEncoder.DELIMITED_KEY, ProtobufEncoder.DELIMITED_VALUE);
+			mediaType = new MediaType(mediaType, params);
+		}
+		return mediaType;
+	}
+
+	/**
+	 * Make further updates to headers.
+	 * @since 7.0
+	 */
+	protected void extendHeaders(ReactiveHttpOutputMessage message, Map<String, Object> hints) {
 	}
 
 }

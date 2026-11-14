@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -44,19 +44,19 @@ class RootClassFilterTests {
 	}
 
 	@Test
-	void testEquals() {
+	void equals() {
 		assertThat(filter1).isEqualTo(filter2);
 		assertThat(filter1).isNotEqualTo(filter3);
 	}
 
 	@Test
-	void testHashCode() {
+	void hashCodeBehavior() {
 		assertThat(filter1.hashCode()).isEqualTo(filter2.hashCode());
 		assertThat(filter1.hashCode()).isNotEqualTo(filter3.hashCode());
 	}
 
 	@Test
-	void testToString() {
+	void toStringOutput() {
 		assertThat(filter1.toString()).isEqualTo("org.springframework.aop.support.RootClassFilter: java.lang.Exception");
 		assertThat(filter1.toString()).isEqualTo(filter2.toString());
 	}

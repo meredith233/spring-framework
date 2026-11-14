@@ -7,7 +7,7 @@ xref:overview.adoc[Overview] :: History, Design Philosophy, Feedback,
 Getting Started.
 xref:core.adoc[Core] :: IoC Container, Events, Resources, i18n,
 Validation, Data Binding, Type Conversion, SpEL, AOP, AOT.
-<<testing.adoc#testing, Testing>> :: Mock Objects, TestContext Framework,
+xref:testing.adoc[Testing] :: Mock Objects, TestContext Framework,
 Spring MVC Test, WebTestClient.
 xref:data-access.adoc[Data Access] :: Transactions, DAO Support,
 JDBC, R2DBC, O/R Mapping, XML Marshalling.
@@ -29,8 +29,6 @@ Brannen, Ramnivas Laddad, Arjen Poutsma, Chris Beams, Tareq Abedrabbo, Andy Clem
 Syer, Oliver Gierke, Rossen Stoyanchev, Phillip Webb, Rob Winch, Brian Clozel, Stephane
 Nicoll, Sebastien Deleuze, Jay Bryant, Mark Paluch
 
-Copyright © 2002 - 2024 VMware, Inc. All Rights Reserved.
-
 Copies of this document may be made for your own use and for distribution to others,
 provided that you do not charge any fee for such copies and further provided that each
-copy contains this Copyright Notice, whether distributed in print or electronically.
+copy contains the Copyright Notice, whether distributed in print or electronically.

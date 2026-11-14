@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,6 +16,7 @@
 
 package org.springframework.context.event;
 
+import java.io.Serializable;
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
@@ -105,8 +106,9 @@ class AnnotationDrivenEventListenerTests {
 		this.eventCollector.assertTotalEventsCount(1);
 
 		this.eventCollector.clear();
-		this.context.publishEvent(event);
-		this.eventCollector.assertEvent(listener, event);
+		TestEvent otherEvent = new TestEvent(this, Integer.valueOf(1));
+		this.context.publishEvent(otherEvent);
+		this.eventCollector.assertEvent(listener, otherEvent);
 		this.eventCollector.assertTotalEventsCount(1);
 
 		context.getBean(ApplicationEventMulticaster.class).removeApplicationListeners(l ->
@@ -276,25 +278,6 @@ class AnnotationDrivenEventListenerTests {
 		this.context.publishEvent(event);
 		this.eventCollector.assertEvent(replyEventListener, event);
 		this.eventCollector.assertEvent(listener, "test");
-		this.eventCollector.assertTotalEventsCount(2);
-	}
-
-	@Test
-	@SuppressWarnings("deprecation")
-	void listenableFutureReply() {
-		load(TestEventListener.class, ReplyEventListener.class);
-		org.springframework.util.concurrent.SettableListenableFuture<String> future =
-				new org.springframework.util.concurrent.SettableListenableFuture<>();
-		future.set("dummy");
-		AnotherTestEvent event = new AnotherTestEvent(this, future);
-		ReplyEventListener replyEventListener = this.context.getBean(ReplyEventListener.class);
-		TestEventListener listener = this.context.getBean(TestEventListener.class);
-
-		this.eventCollector.assertNoEventReceived(listener);
-		this.eventCollector.assertNoEventReceived(replyEventListener);
-		this.context.publishEvent(event);
-		this.eventCollector.assertEvent(replyEventListener, event);
-		this.eventCollector.assertEvent(listener, "dummy"); // reply
 		this.eventCollector.assertTotalEventsCount(2);
 	}
 
@@ -742,6 +725,11 @@ class AnnotationDrivenEventListenerTests {
 		public void handleString(String content) {
 			collectEvent(content);
 		}
+
+		@EventListener({Boolean.class, Integer.class})
+		public void handleBooleanOrInteger(Serializable content) {
+			collectEvent(content);
+		}
 	}
 
 
@@ -1009,6 +997,8 @@ class AnnotationDrivenEventListenerTests {
 
 		void handleString(String payload);
 
+		void handleBooleanOrInteger(Serializable content);
+
 		void handleTimestamp(Long timestamp);
 
 		void handleRatio(Double ratio);
@@ -1029,6 +1019,12 @@ class AnnotationDrivenEventListenerTests {
 		@Override
 		public void handleString(String payload) {
 			super.handleString(payload);
+		}
+
+		@EventListener({Boolean.class, Integer.class})
+		@Override
+		public void handleBooleanOrInteger(Serializable content) {
+			super.handleBooleanOrInteger(content);
 		}
 
 		@ConditionalEvent("#root.event.timestamp > #p0")
@@ -1108,16 +1104,6 @@ class AnnotationDrivenEventListenerTests {
 
 		@Override
 		public void registerDestructionCallback(String name, Runnable callback) {
-		}
-
-		@Override
-		public Object resolveContextualObject(String key) {
-			return null;
-		}
-
-		@Override
-		public String getConversationId() {
-			return null;
 		}
 	}
 

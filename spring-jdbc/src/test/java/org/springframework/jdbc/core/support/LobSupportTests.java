@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -41,7 +41,7 @@ import static org.mockito.Mockito.verify;
 class LobSupportTests {
 
 	@Test
-	void testCreatingPreparedStatementCallback() throws SQLException {
+	void creatingPreparedStatementCallback() throws SQLException {
 		LobHandler handler = mock();
 		LobCreator creator = mock();
 		PreparedStatement ps = mock();
@@ -70,7 +70,7 @@ class LobSupportTests {
 	}
 
 	@Test
-	void testAbstractLobStreamingResultSetExtractorNoRows() throws SQLException {
+	void abstractLobStreamingResultSetExtractorNoRows() throws SQLException {
 		ResultSet rs = mock();
 		AbstractLobStreamingResultSetExtractor<Void> lobRse = getResultSetExtractor(false);
 		assertThatExceptionOfType(IncorrectResultSizeDataAccessException.class)
@@ -79,7 +79,7 @@ class LobSupportTests {
 	}
 
 	@Test
-	void testAbstractLobStreamingResultSetExtractorOneRow() throws SQLException {
+	void abstractLobStreamingResultSetExtractorOneRow() throws SQLException {
 		ResultSet rs = mock();
 		given(rs.next()).willReturn(true, false);
 		AbstractLobStreamingResultSetExtractor<Void> lobRse = getResultSetExtractor(false);
@@ -88,7 +88,7 @@ class LobSupportTests {
 	}
 
 	@Test
-	void testAbstractLobStreamingResultSetExtractorMultipleRows() throws SQLException {
+	void abstractLobStreamingResultSetExtractorMultipleRows() throws SQLException {
 		ResultSet rs = mock();
 		given(rs.next()).willReturn(true, true, false);
 		AbstractLobStreamingResultSetExtractor<Void> lobRse = getResultSetExtractor(false);
@@ -98,7 +98,7 @@ class LobSupportTests {
 	}
 
 	@Test
-	void testAbstractLobStreamingResultSetExtractorCorrectException() throws SQLException {
+	void abstractLobStreamingResultSetExtractorCorrectException() throws SQLException {
 		ResultSet rs = mock();
 		given(rs.next()).willReturn(true);
 		AbstractLobStreamingResultSetExtractor<Void> lobRse = getResultSetExtractor(true);

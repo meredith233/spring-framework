@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2023 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,15 +16,9 @@
 
 package org.springframework.web.servlet.mvc.method.annotation;
 
-import java.util.Map;
-import java.util.Set;
+import org.jspecify.annotations.Nullable;
 
-import jakarta.servlet.ServletRequest;
-
-import org.springframework.beans.MutablePropertyValues;
-import org.springframework.lang.Nullable;
 import org.springframework.web.bind.ServletRequestDataBinder;
-import org.springframework.web.bind.WebDataBinder;
 import org.springframework.web.servlet.HandlerMapping;
 
 /**
@@ -33,19 +27,22 @@ import org.springframework.web.servlet.HandlerMapping;
  *
  * <p><strong>WARNING</strong>: Data binding can lead to security issues by exposing
  * parts of the object graph that are not meant to be accessed or modified by
- * external clients. Therefore the design and use of data binding should be considered
+ * external clients. Therefore, the design and use of data binding should be considered
  * carefully with regard to security. For more details, please refer to the dedicated
  * sections on data binding for
- * <a href="https://docs.spring.io/spring-framework/docs/current/reference/html/web.html#mvc-ann-initbinder-model-design">Spring Web MVC</a> and
- * <a href="https://docs.spring.io/spring-framework/docs/current/reference/html/web-reactive.html#webflux-ann-initbinder-model-design">Spring WebFlux</a>
+ * <a href="https://docs.spring.io/spring-framework/reference/web/webmvc/mvc-data-binding.html#mvc-data-binding-design">Spring Web MVC</a> and
+ * <a href="https://docs.spring.io/spring-framework/reference/web/webflux/data-binding.html#webflux-data-binding-design">Spring WebFlux</a>
  * in the reference manual.
  *
  * @author Rossen Stoyanchev
  * @since 3.1
  * @see ServletRequestDataBinder
  * @see HandlerMapping#URI_TEMPLATE_VARIABLES_ATTRIBUTE
+ * @deprecated in favor of the relocated
+ * {@link org.springframework.web.servlet.support.ExtendedServletRequestDataBinder}
  */
-public class ExtendedServletRequestDataBinder extends ServletRequestDataBinder {
+@Deprecated(since = "7.0.2", forRemoval = true)
+public class ExtendedServletRequestDataBinder extends org.springframework.web.servlet.support.ExtendedServletRequestDataBinder {
 
 	/**
 	 * Create a new instance, with default object name.
@@ -66,73 +63,6 @@ public class ExtendedServletRequestDataBinder extends ServletRequestDataBinder {
 	 */
 	public ExtendedServletRequestDataBinder(@Nullable Object target, String objectName) {
 		super(target, objectName);
-	}
-
-
-	@Override
-	protected ServletRequestValueResolver createValueResolver(ServletRequest request) {
-		return new ExtendedServletRequestValueResolver(request, this);
-	}
-
-	/**
-	 * Merge URI variables into the property values to use for data binding.
-	 */
-	@Override
-	protected void addBindValues(MutablePropertyValues mpvs, ServletRequest request) {
-		Map<String, String> uriVars = getUriVars(request);
-		if (uriVars != null) {
-			uriVars.forEach((name, value) -> {
-				if (mpvs.contains(name)) {
-					if (logger.isDebugEnabled()) {
-						logger.debug("URI variable '" + name + "' overridden by request bind value.");
-					}
-				}
-				else {
-					mpvs.addPropertyValue(name, value);
-				}
-			});
-		}
-	}
-
-	@SuppressWarnings("unchecked")
-	@Nullable
-	private static Map<String, String> getUriVars(ServletRequest request) {
-		String attr = HandlerMapping.URI_TEMPLATE_VARIABLES_ATTRIBUTE;
-		return (Map<String, String>) request.getAttribute(attr);
-	}
-
-
-	/**
-	 * Resolver of values that looks up URI path variables.
-	 */
-	private static class ExtendedServletRequestValueResolver extends ServletRequestValueResolver {
-
-		ExtendedServletRequestValueResolver(ServletRequest request, WebDataBinder dataBinder) {
-			super(request, dataBinder);
-		}
-
-		@Override
-		@Nullable
-		protected Object getRequestParameter(String name, Class<?> type) {
-			Object value = super.getRequestParameter(name, type);
-			if (value == null) {
-				Map<String, String> uriVars = getUriVars(getRequest());
-				if (uriVars != null) {
-					value = uriVars.get(name);
-				}
-			}
-			return value;
-		}
-
-		@Override
-		protected Set<String> initParameterNames(ServletRequest request) {
-			Set<String> set = super.initParameterNames(request);
-			Map<String, String> uriVars = getUriVars(getRequest());
-			if (uriVars != null) {
-				set.addAll(uriVars.keySet());
-			}
-			return set;
-		}
 	}
 
 }

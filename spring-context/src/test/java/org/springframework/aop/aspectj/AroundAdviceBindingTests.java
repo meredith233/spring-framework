@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2023 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -67,25 +67,25 @@ class AroundAdviceBindingTests {
 	}
 
 	@Test
-	void testOneIntArg() {
+	void oneIntArg() {
 		testBeanProxy.setAge(5);
 		verify(mockCollaborator).oneIntArg(5);
 	}
 
 	@Test
-	void testOneObjectArgBoundToTarget() {
+	void oneObjectArgBoundToTarget() {
 		testBeanProxy.getAge();
 		verify(mockCollaborator).oneObjectArg(this.testBeanTarget);
 	}
 
 	@Test
-	void testOneIntAndOneObjectArgs() {
+	void oneIntAndOneObjectArgs() {
 		testBeanProxy.setAge(5);
 		verify(mockCollaborator).oneIntAndOneObject(5, this.testBeanProxy);
 	}
 
 	@Test
-	void testJustJoinPoint() {
+	void justJoinPoint() {
 		testBeanProxy.getAge();
 		verify(mockCollaborator).justJoinPoint("getAge");
 	}

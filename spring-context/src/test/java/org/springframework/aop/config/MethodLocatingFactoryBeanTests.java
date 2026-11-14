@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2023 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -40,24 +40,24 @@ class MethodLocatingFactoryBeanTests {
 
 
 	@Test
-	void testIsSingleton() {
+	void isSingleton() {
 		assertThat(factory.isSingleton()).isTrue();
 	}
 
 	@Test
-	void testGetObjectType() {
+	void getObjectType() {
 		assertThat(factory.getObjectType()).isEqualTo(Method.class);
 	}
 
 	@Test
-	void testWithNullTargetBeanName() {
+	void withNullTargetBeanName() {
 		factory.setMethodName("toString()");
 		assertThatIllegalArgumentException().isThrownBy(() ->
 				factory.setBeanFactory(beanFactory));
 	}
 
 	@Test
-	void testWithEmptyTargetBeanName() {
+	void withEmptyTargetBeanName() {
 		factory.setTargetBeanName("");
 		factory.setMethodName("toString()");
 		assertThatIllegalArgumentException().isThrownBy(() ->
@@ -65,14 +65,14 @@ class MethodLocatingFactoryBeanTests {
 	}
 
 	@Test
-	void testWithNullTargetMethodName() {
+	void withNullTargetMethodName() {
 		factory.setTargetBeanName(BEAN_NAME);
 		assertThatIllegalArgumentException().isThrownBy(() ->
 				factory.setBeanFactory(beanFactory));
 	}
 
 	@Test
-	void testWithEmptyTargetMethodName() {
+	void withEmptyTargetMethodName() {
 		factory.setTargetBeanName(BEAN_NAME);
 		factory.setMethodName("");
 		assertThatIllegalArgumentException().isThrownBy(() ->
@@ -80,7 +80,7 @@ class MethodLocatingFactoryBeanTests {
 	}
 
 	@Test
-	void testWhenTargetBeanClassCannotBeResolved() {
+	void whenTargetBeanClassCannotBeResolved() {
 		factory.setTargetBeanName(BEAN_NAME);
 		factory.setMethodName("toString()");
 		assertThatIllegalArgumentException().isThrownBy(() ->
@@ -90,22 +90,21 @@ class MethodLocatingFactoryBeanTests {
 
 	@Test
 	@SuppressWarnings({ "unchecked", "rawtypes" })
-	void testSunnyDayPath() throws Exception {
+	void sunnyDayPath() throws Exception {
 		given(beanFactory.getType(BEAN_NAME)).willReturn((Class)String.class);
 		factory.setTargetBeanName(BEAN_NAME);
 		factory.setMethodName("toString()");
 		factory.setBeanFactory(beanFactory);
 		Object result = factory.getObject();
 		assertThat(result).isNotNull();
-		boolean condition = result instanceof Method;
-		assertThat(condition).isTrue();
+		assertThat(result).isInstanceOf(Method.class);
 		Method method = (Method) result;
 		assertThat(method.invoke("Bingo")).isEqualTo("Bingo");
 	}
 
 	@Test
 	@SuppressWarnings({ "unchecked", "rawtypes" })
-	void testWhereMethodCannotBeResolved() {
+	void whereMethodCannotBeResolved() {
 		given(beanFactory.getType(BEAN_NAME)).willReturn((Class)String.class);
 		factory.setTargetBeanName(BEAN_NAME);
 		factory.setMethodName("loadOfOld()");

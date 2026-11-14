@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -53,7 +53,7 @@ class ListenerWriteProcessorTests {
 
 
 	@Test // SPR-17410
-	public void writePublisherError() {
+	void writePublisherError() {
 
 		// Turn off writing so next item will be cached
 		this.processor.setWritePossible(false);
@@ -68,7 +68,7 @@ class ListenerWriteProcessorTests {
 	}
 
 	@Test // SPR-17410
-	public void ioExceptionDuringWrite() {
+	void ioExceptionDuringWrite() {
 
 		// Fail on next write
 		this.processor.setWritePossible(true);
@@ -83,7 +83,7 @@ class ListenerWriteProcessorTests {
 	}
 
 	@Test // SPR-17410
-	public void onNextWithoutDemand() {
+	void onNextWithoutDemand() {
 
 		// Disable writing: next item will be cached.
 		this.processor.setWritePossible(false);

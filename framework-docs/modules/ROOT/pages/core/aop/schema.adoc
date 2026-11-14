@@ -10,7 +10,7 @@ of advice parameters.
 
 To use the aop namespace tags described in this section, you need to import the
 `spring-aop` schema, as described in xref:core/appendix/xsd-schemas.adoc[XML Schema-based configuration]
-. See xref:core/appendix/xsd-schemas.adoc#aop[the AOP schema]
+. See xref:core/appendix/xsd-schemas.adoc#xsd-schemas-aop[the AOP schema]
 for how to import the tags in the `aop` namespace.
 
 Within your Spring configurations, all aspect and advisor elements must be placed within
@@ -24,7 +24,6 @@ not being woven) if you already use explicit auto-proxying through the use of
 `BeanNameAutoProxyCreator` or something similar. The recommended usage pattern is to
 use either only the `<aop:config>` style or only the `AutoProxyCreator` style and
 never mix them.
-
 
 
 [[aop-schema-declaring-an-aspect]]
@@ -52,7 +51,6 @@ by using the `ref` attribute, as the following example shows:
 
 The bean that backs the aspect (`aBean` in this case) can of course be configured and
 dependency injected just like any other Spring bean.
-
 
 
 [[aop-schema-pointcuts]]
@@ -136,7 +134,7 @@ parameters of the matching names, as follows:
 ======
 Java::
 +
-[source,java,indent=0,subs="verbatim",role="primary"]
+[source,java,indent=0,subs="verbatim"]
 ----
 	public void monitor(Object service) {
 		// ...
@@ -145,7 +143,7 @@ Java::
 
 Kotlin::
 +
-[source,kotlin,indent=0,subs="verbatim",role="secondary"]
+[source,kotlin,indent=0,subs="verbatim"]
 ----
 	fun monitor(service: Any) {
 		// ...
@@ -177,9 +175,7 @@ follows:
 
 Note that pointcuts defined in this way are referred to by their XML `id` and cannot be
 used as named pointcuts to form composite pointcuts. The named pointcut support in the
-schema-based definition style is thus more limited than that offered by the @AspectJ
-style.
-
+schema-based definition style is thus more limited than that offered by the @AspectJ style.
 
 
 [[aop-schema-advice]]
@@ -187,7 +183,6 @@ style.
 
 The schema-based AOP support uses the same five kinds of advice as the @AspectJ style, and they have
 exactly the same semantics.
-
 
 [[aop-schema-advice-before]]
 === Before Advice
@@ -209,7 +204,7 @@ Before advice runs before a matched method execution. It is declared inside an
 ----
 
 In the example above, `dataAccessOperation` is the `id` of a _named pointcut_ defined at
-the top (`<aop:config>`) level (see xref:core/aop/schema.adoc#aop-schema-pointcuts[Declaring a Pointcut]).
+the top (`<aop:config>`) level (see <<aop-schema-pointcuts,Declaring a Pointcut>>).
 
 NOTE: As we noted in the discussion of the @AspectJ style, using _named pointcuts_ can
 significantly improve the readability of your code. See xref:core/aop/ataspectj/pointcuts.adoc#aop-common-pointcuts[Sharing Named Pointcut Definitions] for
@@ -236,7 +231,6 @@ the advice. This method must be defined for the bean referenced by the aspect el
 that contains the advice. Before a data access operation is performed (a method execution
 join point matched by the pointcut expression), the `doAccessCheck` method on the aspect
 bean is invoked.
-
 
 [[aop-schema-advice-after-returning]]
 === After Returning Advice
@@ -282,19 +276,18 @@ example, you can declare the method signature as follows:
 ======
 Java::
 +
-[source,java,indent=0,subs="verbatim",role="primary"]
+[source,java,indent=0,subs="verbatim"]
 ----
 	public void doAccessCheck(Object retVal) {...
 ----
 
 Kotlin::
 +
-[source,kotlin,indent=0,subs="verbatim",role="secondary"]
+[source,kotlin,indent=0,subs="verbatim"]
 ----
 	fun doAccessCheck(retVal: Any) {...
 ----
 ======
-
 
 [[aop-schema-advice-after-throwing]]
 === After Throwing Advice
@@ -340,19 +333,18 @@ The type of this parameter constrains matching in the same way as described for
 ======
 Java::
 +
-[source,java,indent=0,subs="verbatim",role="primary"]
+[source,java,indent=0,subs="verbatim"]
 ----
 	public void doRecoveryActions(DataAccessException dataAccessEx) {...
 ----
 
 Kotlin::
 +
-[source,kotlin,indent=0,subs="verbatim",role="secondary"]
+[source,kotlin,indent=0,subs="verbatim"]
 ----
 	fun doRecoveryActions(dataAccessEx: DataAccessException) {...
 ----
 ======
-
 
 [[aop-schema-advice-after-finally]]
 === After (Finally) Advice
@@ -371,7 +363,6 @@ You can declare it by using the `after` element, as the following example shows:
 		...
 	</aop:aspect>
 ----
-
 
 [[aop-schema-advice-around]]
 === Around Advice
@@ -421,7 +412,7 @@ The implementation of the `doBasicProfiling` advice can be exactly the same as i
 ======
 Java::
 +
-[source,java,indent=0,subs="verbatim",role="primary"]
+[source,java,indent=0,subs="verbatim"]
 ----
 	public Object doBasicProfiling(ProceedingJoinPoint pjp) throws Throwable {
 		// start stopwatch
@@ -433,7 +424,7 @@ Java::
 
 Kotlin::
 +
-[source,kotlin,indent=0,subs="verbatim",role="secondary"]
+[source,kotlin,indent=0,subs="verbatim"]
 ----
 	fun doBasicProfiling(pjp: ProceedingJoinPoint): Any? {
 		// start stopwatch
@@ -444,17 +435,18 @@ Kotlin::
 ----
 ======
 
-
 [[aop-schema-params]]
 === Advice Parameters
 
 The schema-based declaration style supports fully typed advice in the same way as
 described for the @AspectJ support -- by matching pointcut parameters by name against
-advice method parameters. See xref:core/aop/ataspectj/advice.adoc#aop-ataspectj-advice-params[Advice Parameters] for details. If you wish
-to explicitly specify argument names for the advice methods (not relying on the
+advice method parameters. See
+xref:core/aop/ataspectj/advice.adoc#aop-ataspectj-advice-params[Advice Parameters] for details.
+If you wish to explicitly specify argument names for the advice methods (not relying on the
 detection strategies previously described), you can do so by using the `arg-names`
 attribute of the advice element, which is treated in the same manner as the `argNames`
-attribute in an advice annotation (as described in xref:core/aop/ataspectj/advice.adoc#aop-ataspectj-advice-params-names[Determining Argument Names]).
+attribute in an advice annotation (as described in
+xref:core/aop/ataspectj/advice.adoc#aop-ataspectj-advice-params-names[Determining Argument Names]).
 The following example shows how to specify an argument name in XML:
 
 [source,xml,indent=0,subs="verbatim"]
@@ -464,7 +456,8 @@ The following example shows how to specify an argument name in XML:
 		method="audit"
 		arg-names="auditable" />
 ----
-<1> References the `publicMethod` named pointcut defined in xref:core/aop/ataspectj/pointcuts.adoc#aop-pointcuts-combining[Combining Pointcut Expressions].
+<1> References the `publicMethod` named pointcut defined in
+xref:core/aop/ataspectj/pointcuts.adoc#aop-pointcuts-combining[Combining Pointcut Expressions].
 
 The `arg-names` attribute accepts a comma-delimited list of parameter names.
 
@@ -475,7 +468,7 @@ some around advice used in conjunction with a number of strongly typed parameter
 ======
 Java::
 +
-[source,java,indent=0,subs="verbatim",role="primary",chomp="-packages"]
+[source,java,indent=0,subs="verbatim",chomp="-packages"]
 ----
 	package com.xyz.service;
 
@@ -494,7 +487,7 @@ Java::
 
 Kotlin::
 +
-[source,kotlin,indent=0,subs="verbatim",role="secondary",chomp="-packages"]
+[source,kotlin,indent=0,subs="verbatim",chomp="-packages"]
 ----
 	package com.xyz.service
 
@@ -521,7 +514,7 @@ proceed with the method call. The presence of this parameter is an indication th
 ======
 Java::
 +
-[source,java,indent=0,subs="verbatim",role="primary",chomp="-packages"]
+[source,java,indent=0,subs="verbatim",chomp="-packages"]
 ----
 	package com.xyz;
 
@@ -545,7 +538,7 @@ Java::
 
 Kotlin::
 +
-[source,kotlin,indent=0,subs="verbatim",role="secondary",chomp="-packages"]
+[source,kotlin,indent=0,subs="verbatim",chomp="-packages"]
 ----
 	package com.xyz
 
@@ -610,7 +603,7 @@ Consider the following driver script:
 ======
 Java::
 +
-[source,java,indent=0,subs="verbatim",role="primary"]
+[source,java,indent=0,subs="verbatim"]
 ----
 	public class Boot {
 
@@ -624,7 +617,7 @@ Java::
 
 Kotlin::
 +
-[source,kotlin,indent=0,subs="verbatim",role="secondary"]
+[source,kotlin,indent=0,subs="verbatim"]
 ----
 	fun main() {
 		val ctx = ClassPathXmlApplicationContext("beans.xml")
@@ -645,15 +638,15 @@ ms     %     Task name
 00000  ?  execution(getFoo)
 ----
 
-
 [[aop-ordering]]
 === Advice Ordering
 
 When multiple pieces of advice need to run at the same join point (executing method)
-the ordering rules are as described in xref:core/aop/ataspectj/advice.adoc#aop-ataspectj-advice-ordering[Advice Ordering]. The precedence
-between aspects is determined via the `order` attribute in the `<aop:aspect>` element or
-by either adding the `@Order` annotation to the bean that backs the aspect or by having
-the bean implement the `Ordered` interface.
+the ordering rules are as described in
+xref:core/aop/ataspectj/advice.adoc#aop-ataspectj-advice-ordering[Advice Ordering]. The
+precedence between aspects is determined via the `order` attribute in the `<aop:aspect>`
+element or by either adding the `@Order` annotation to the bean that backs the aspect
+or by having the bean implement the `Ordered` interface.
 
 [NOTE]
 ====
@@ -674,7 +667,6 @@ such advice methods into one advice method per join point in each `<aop:aspect>`
 or refactor the pieces of advice into separate `<aop:aspect>` elements that you can order
 at the aspect level.
 ====
-
 
 
 [[aop-schema-introductions]]
@@ -714,7 +706,7 @@ The class that backs the `usageTracking` bean would then contain the following m
 ======
 Java::
 +
-[source,java,indent=0,subs="verbatim",role="primary"]
+[source,java,indent=0,subs="verbatim"]
 ----
 	public void recordUsage(UsageTracked usageTracked) {
 		usageTracked.incrementUseCount();
@@ -723,7 +715,7 @@ Java::
 
 Kotlin::
 +
-[source,kotlin,indent=0,subs="verbatim",role="secondary"]
+[source,kotlin,indent=0,subs="verbatim"]
 ----
 	fun recordUsage(usageTracked: UsageTracked) {
 		usageTracked.incrementUseCount()
@@ -742,19 +734,18 @@ following:
 ======
 Java::
 +
-[source,java,indent=0,subs="verbatim",role="primary"]
+[source,java,indent=0,subs="verbatim"]
 ----
 	UsageTracked usageTracked = context.getBean("myService", UsageTracked.class);
 ----
 
 Kotlin::
 +
-[source,kotlin,indent=0,subs="verbatim",role="secondary"]
+[source,kotlin,indent=0,subs="verbatim"]
 ----
 	val usageTracked = context.getBean("myService", UsageTracked.class)
 ----
 ======
-
 
 
 [[aop-schema-instantiation-models]]
@@ -764,7 +755,6 @@ The only supported instantiation model for schema-defined aspects is the singlet
 model. Other instantiation models may be supported in future releases.
 
 
-
 [[aop-schema-advisors]]
 == Advisors
 
@@ -772,7 +762,8 @@ The concept of "advisors" comes from the AOP support defined in Spring
 and does not have a direct equivalent in AspectJ. An advisor is like a small
 self-contained aspect that has a single piece of advice. The advice itself is
 represented by a bean and must implement one of the advice interfaces described in
-xref:core/aop-api/advice.adoc#aop-api-advice-types[Advice Types in Spring]. Advisors can take advantage of AspectJ pointcut expressions.
+xref:core/aop-api/advice.adoc#aop-api-advice-types[Advice Types in Spring].
+Advisors can take advantage of AspectJ pointcut expressions.
 
 Spring supports the advisor concept with the `<aop:advisor>` element. You most
 commonly see it used in conjunction with transactional advice, which also has its own
@@ -805,7 +796,6 @@ To define the precedence of an advisor so that the advice can participate in ord
 use the `order` attribute to define the `Ordered` value of the advisor.
 
 
-
 [[aop-schema-example]]
 == An AOP Schema Example
 
@@ -829,7 +819,7 @@ call `proceed` multiple times. The following listing shows the basic aspect impl
 ======
 Java::
 +
-[source,java,indent=0,subs="verbatim",role="primary"]
+[source,java,indent=0,subs="verbatim"]
 ----
 	public class ConcurrentOperationExecutor implements Ordered {
 
@@ -869,7 +859,7 @@ Java::
 
 Kotlin::
 +
-[source,kotlin,indent=0,subs="verbatim",role="secondary"]
+[source,kotlin,indent=0,subs="verbatim"]
 ----
 	class ConcurrentOperationExecutor : Ordered {
 
@@ -953,7 +943,7 @@ to annotate the implementation of service operations, as the following example s
 ======
 Java::
 +
-[source,java,indent=0,subs="verbatim",role="primary"]
+[source,java,indent=0,subs="verbatim"]
 ----
 	@Retention(RetentionPolicy.RUNTIME)
 	// marker annotation
@@ -963,7 +953,7 @@ Java::
 
 Kotlin::
 +
-[source,kotlin,indent=0,subs="verbatim",role="secondary"]
+[source,kotlin,indent=0,subs="verbatim"]
 ----
 	@Retention(AnnotationRetention.RUNTIME)
 	// marker annotation
@@ -981,7 +971,3 @@ pointcut expression so that only `@Idempotent` operations match, as follows:
 			expression="execution(* com.xyz.service.*.*(..)) and
 			@annotation(com.xyz.service.Idempotent)"/>
 ----
-
-
-
-

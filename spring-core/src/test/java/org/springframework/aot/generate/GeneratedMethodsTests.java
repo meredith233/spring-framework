@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2022 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -59,7 +59,7 @@ class GeneratedMethodsTests {
 
 	@Test
 	void createWithExistingGeneratorUsesGenerator() {
-		Function<MethodName, String> generator = name -> "__" + name.toString();
+		Function<MethodName, String> generator = name -> "__" + name;
 		GeneratedMethods methods = new GeneratedMethods(TEST_CLASS_NAME, generator);
 		assertThat(methods.add("test", methodSpecCustomizer).getName()).hasToString("__test");
 	}
@@ -119,7 +119,7 @@ class GeneratedMethodsTests {
 		this.methods.add("springBeans", methodSpecCustomizer);
 		this.methods.add("springContext", methodSpecCustomizer);
 		List<String> names = new ArrayList<>();
-		this.methods.doWithMethodSpecs(methodSpec -> names.add(methodSpec.name));
+		this.methods.doWithMethodSpecs(methodSpec -> names.add(methodSpec.name()));
 		assertThat(names).containsExactly("springBeans", "springContext");
 	}
 

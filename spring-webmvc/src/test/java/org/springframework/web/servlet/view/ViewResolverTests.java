@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -34,9 +34,7 @@ import org.junit.jupiter.api.Test;
 
 import org.springframework.beans.MutablePropertyValues;
 import org.springframework.beans.PropertyValue;
-import org.springframework.beans.factory.BeanDefinitionStoreException;
 import org.springframework.beans.testfixture.beans.TestBean;
-import org.springframework.core.io.ClassPathResource;
 import org.springframework.core.io.Resource;
 import org.springframework.web.context.support.ServletContextResource;
 import org.springframework.web.context.support.StaticWebApplicationContext;
@@ -45,26 +43,22 @@ import org.springframework.web.servlet.View;
 import org.springframework.web.servlet.i18n.AcceptHeaderLocaleResolver;
 import org.springframework.web.servlet.i18n.FixedLocaleResolver;
 import org.springframework.web.servlet.support.RequestContext;
-import org.springframework.web.servlet.theme.FixedThemeResolver;
 import org.springframework.web.testfixture.servlet.MockHttpServletRequest;
 import org.springframework.web.testfixture.servlet.MockHttpServletResponse;
 import org.springframework.web.testfixture.servlet.MockRequestDispatcher;
 import org.springframework.web.testfixture.servlet.MockServletContext;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 
 /**
  * Tests for {@link BeanNameViewResolver}, {@link UrlBasedViewResolver},
- * {@link InternalResourceViewResolver}, {@link org.springframework.web.servlet.view.XmlViewResolver},
- * and {@link AbstractCachingViewResolver}.
+ * {@link InternalResourceViewResolver}, and {@link AbstractCachingViewResolver}.
  *
  * @author Juergen Hoeller
  * @author Chris Beams
  * @author Sam Brannen
  * @since 18.06.2003
  */
-@SuppressWarnings("deprecation")
 class ViewResolverTests {
 
 	private final StaticWebApplicationContext wac = new StaticWebApplicationContext();
@@ -177,14 +171,12 @@ class ViewResolverTests {
 
 		this.request.setAttribute(DispatcherServlet.WEB_APPLICATION_CONTEXT_ATTRIBUTE, this.wac);
 		this.request.setAttribute(DispatcherServlet.LOCALE_RESOLVER_ATTRIBUTE, new AcceptHeaderLocaleResolver());
-		this.request.setAttribute(DispatcherServlet.THEME_RESOLVER_ATTRIBUTE, new FixedThemeResolver());
 		Map<String, Object> model = new HashMap<>();
 		TestBean tb = new TestBean();
 		model.put("tb", tb);
 		view.render(model, this.request, this.response);
-		assertThat(tb.equals(this.request.getAttribute("tb"))).as("Correct tb attribute").isTrue();
-		boolean condition = this.request.getAttribute("rc") instanceof RequestContext;
-		assertThat(condition).as("Correct rc attribute").isTrue();
+		assertThat(tb).as("Correct tb attribute").isEqualTo(this.request.getAttribute("tb"));
+		assertThat(this.request.getAttribute("rc")).as("Correct rc attribute").isInstanceOf(RequestContext.class);
 
 		view = vr.resolveViewName("redirect:myUrl", Locale.getDefault());
 		assertThat(view.getClass()).as("Correct view class").isEqualTo(RedirectView.class);
@@ -252,7 +244,7 @@ class ViewResolverTests {
 		model.put("tb", tb);
 		view.render(model, this.request, this.response);
 
-		assertThat(tb.equals(this.request.getAttribute("tb"))).as("Correct tb attribute").isTrue();
+		assertThat(tb).as("Correct tb attribute").isEqualTo(this.request.getAttribute("tb"));
 		assertThat(this.request.getAttribute("rc")).as("Correct rc attribute").isNull();
 		assertThat(this.request.getAttribute("key1")).isEqualTo("value1");
 		assertThat(this.request.getAttribute("key2")).isEqualTo(2);
@@ -355,7 +347,7 @@ class ViewResolverTests {
 		model.put("tb", tb);
 		view.render(model, this.request, this.response);
 
-		assertThat(tb.equals(this.request.getAttribute("tb"))).as("Correct tb attribute").isTrue();
+		assertThat(tb).as("Correct tb attribute").isEqualTo(this.request.getAttribute("tb"));
 		assertThat(this.request.getAttribute("rc")).as("Correct rc attribute").isNull();
 
 		assertThat(Config.get(this.request, Config.FMT_LOCALE)).isEqualTo(locale);
@@ -389,89 +381,13 @@ class ViewResolverTests {
 		model.put("tb", tb);
 		view.render(model, this.request, this.response);
 
-		assertThat(tb.equals(this.request.getAttribute("tb"))).as("Correct tb attribute").isTrue();
+		assertThat(tb).as("Correct tb attribute").isEqualTo(this.request.getAttribute("tb"));
 		assertThat(this.request.getAttribute("rc")).as("Correct rc attribute").isNull();
 
 		assertThat(Config.get(this.request, Config.FMT_LOCALE)).isEqualTo(locale);
 		LocalizationContext lc = (LocalizationContext) Config.get(this.request, Config.FMT_LOCALIZATION_CONTEXT);
 		assertThat(lc.getResourceBundle().getString("code1")).isEqualTo("message1");
 		assertThat(lc.getResourceBundle().getString("code2")).isEqualTo("message2");
-	}
-
-	@Test
-	@SuppressWarnings("deprecation")
-	void xmlViewResolver() throws Exception {
-		this.wac.registerSingleton("testBean", TestBean.class);
-		this.wac.refresh();
-		TestBean testBean = (TestBean) this.wac.getBean("testBean");
-		org.springframework.web.servlet.view.XmlViewResolver vr = new org.springframework.web.servlet.view.XmlViewResolver();
-		vr.setLocation(new ClassPathResource("org/springframework/web/servlet/view/views.xml"));
-		vr.setApplicationContext(this.wac);
-
-		View view1 = vr.resolveViewName("example1", Locale.getDefault());
-		assertThat(TestView.class.equals(view1.getClass())).as("Correct view class").isTrue();
-		assertThat(((InternalResourceView) view1).getUrl()).as("Correct URL").isEqualTo("/example1.jsp");
-
-		View view2 = vr.resolveViewName("example2", Locale.getDefault());
-		assertThat(JstlView.class.equals(view2.getClass())).as("Correct view class").isTrue();
-		assertThat(((InternalResourceView) view2).getUrl()).as("Correct URL").isEqualTo("/example2new.jsp");
-
-		Map<String, Object> model = new HashMap<>();
-		TestBean tb = new TestBean();
-		model.put("tb", tb);
-
-		this.request.setAttribute(DispatcherServlet.WEB_APPLICATION_CONTEXT_ATTRIBUTE, this.wac);
-		this.request.setAttribute(DispatcherServlet.LOCALE_RESOLVER_ATTRIBUTE, new AcceptHeaderLocaleResolver());
-		this.request.setAttribute(DispatcherServlet.THEME_RESOLVER_ATTRIBUTE, new FixedThemeResolver());
-		view1.render(model, this.request, this.response);
-		assertThat(tb.equals(this.request.getAttribute("tb"))).as("Correct tb attribute").isTrue();
-		assertThat(this.request.getAttribute("test1")).as("Correct test1 attribute").isEqualTo("testvalue1");
-		assertThat(testBean.equals(this.request.getAttribute("test2"))).as("Correct test2 attribute").isTrue();
-
-		this.request.clearAttributes();
-		this.request.setAttribute(DispatcherServlet.WEB_APPLICATION_CONTEXT_ATTRIBUTE, this.wac);
-		this.request.setAttribute(DispatcherServlet.LOCALE_RESOLVER_ATTRIBUTE, new AcceptHeaderLocaleResolver());
-		this.request.setAttribute(DispatcherServlet.THEME_RESOLVER_ATTRIBUTE, new FixedThemeResolver());
-		view2.render(model, this.request, this.response);
-		assertThat(tb.equals(this.request.getAttribute("tb"))).as("Correct tb attribute").isTrue();
-		assertThat(this.request.getAttribute("test1")).as("Correct test1 attribute").isEqualTo("testvalue1");
-		assertThat(this.request.getAttribute("test2")).as("Correct test2 attribute").isEqualTo("testvalue2");
-	}
-
-	@Test
-	@SuppressWarnings("deprecation")
-	void xmlViewResolverDefaultLocation() {
-		StaticWebApplicationContext wac = new StaticWebApplicationContext() {
-			@Override
-			protected Resource getResourceByPath(String path) {
-				assertThat(path).as("Correct default location").isEqualTo(XmlViewResolver.DEFAULT_LOCATION);
-				return super.getResourceByPath(path);
-			}
-		};
-		wac.setServletContext(this.sc);
-		wac.refresh();
-		org.springframework.web.servlet.view.XmlViewResolver vr = new org.springframework.web.servlet.view.XmlViewResolver();
-		vr.setApplicationContext(wac);
-		assertThatExceptionOfType(BeanDefinitionStoreException.class).isThrownBy(vr::afterPropertiesSet);
-	}
-
-	@Test
-	@SuppressWarnings("deprecation")
-	void xmlViewResolverWithoutCache() {
-		StaticWebApplicationContext wac = new StaticWebApplicationContext() {
-			@Override
-			protected Resource getResourceByPath(String path) {
-				assertThat(path).as("Correct default location").isEqualTo(XmlViewResolver.DEFAULT_LOCATION);
-				return super.getResourceByPath(path);
-			}
-		};
-		wac.setServletContext(this.sc);
-		wac.refresh();
-		org.springframework.web.servlet.view.XmlViewResolver vr = new org.springframework.web.servlet.view.XmlViewResolver();
-		vr.setCache(false);
-		vr.setApplicationContext(wac);
-		assertThatExceptionOfType(BeanDefinitionStoreException.class).isThrownBy(() ->
-				vr.resolveViewName("example1", Locale.getDefault()));
 	}
 
 	@Test

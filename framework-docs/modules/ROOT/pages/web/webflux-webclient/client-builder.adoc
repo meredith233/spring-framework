@@ -1,7 +1,7 @@
 [[webflux-client-builder]]
 = Configuration
 
-The simplest way to create a `WebClient` is through one of the static factory methods:
+The simplest way to create `WebClient` is through one of the static factory methods:
 
 * `WebClient.create()`
 * `WebClient.create(String baseUrl)`
@@ -12,12 +12,14 @@ You can also use `WebClient.builder()` with further options:
 * `defaultUriVariables`: default values to use when expanding URI templates.
 * `defaultHeader`: Headers for every request.
 * `defaultCookie`: Cookies for every request.
+* `defaultApiVersion`: API version for every request.
 * `defaultRequest`: `Consumer` to customize every request.
 * `filter`: Client filter for every request.
 * `exchangeStrategies`: HTTP message reader/writer customizations.
 * `clientConnector`: HTTP client library settings.
-* `observationRegistry`: the registry to use for enabling xref:integration/observability.adoc#http-client.webclient[Observability support].
-* `observationConvention`: xref:integration/observability.adoc#config[an optional, custom convention to extract metadata] for recorded observations.
+* `apiVersionInserter`: to insert API version values in the request
+* `observationRegistry`: the registry to use for enabling xref:integration/observability.adoc#observability.http-client.webclient[Observability support].
+* `observationConvention`: xref:integration/observability.adoc#observability.config[an optional, custom convention to extract metadata] for recorded observations.
 
 For example:
 
@@ -25,7 +27,7 @@ For example:
 ======
 Java::
 +
-[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+[source,java,indent=0,subs="verbatim,quotes"]
 ----
 	WebClient client = WebClient.builder()
 			.codecs(configurer -> ... )
@@ -34,7 +36,7 @@ Java::
 
 Kotlin::
 +
-[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+[source,kotlin,indent=0,subs="verbatim,quotes"]
 ----
 	val webClient = WebClient.builder()
 			.codecs { configurer -> ... }
@@ -49,7 +51,7 @@ modified copy as follows:
 ======
 Java::
 +
-[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+[source,java,indent=0,subs="verbatim,quotes"]
 ----
 	WebClient client1 = WebClient.builder()
 			.filter(filterA).filter(filterB).build();
@@ -64,7 +66,7 @@ Java::
 
 Kotlin::
 +
-[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+[source,kotlin,indent=0,subs="verbatim,quotes"]
 ----
 	val client1 = WebClient.builder()
 			.filter(filterA).filter(filterB).build()
@@ -77,6 +79,7 @@ Kotlin::
 	// client2 has filterA, filterB, filterC, filterD
 ----
 ======
+
 
 [[webflux-client-builder-maxinmemorysize]]
 == MaxInMemorySize
@@ -95,7 +98,7 @@ To change the limit for default codecs, use the following:
 ======
 Java::
 +
-[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+[source,java,indent=0,subs="verbatim,quotes"]
 ----
 	WebClient webClient = WebClient.builder()
 			.codecs(configurer -> configurer.defaultCodecs().maxInMemorySize(2 * 1024 * 1024))
@@ -104,14 +107,13 @@ Java::
 
 Kotlin::
 +
-[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+[source,kotlin,indent=0,subs="verbatim,quotes"]
 ----
 	val webClient = WebClient.builder()
 			.codecs { configurer -> configurer.defaultCodecs().maxInMemorySize(2 * 1024 * 1024) }
 			.build()
 ----
 ======
-
 
 
 [[webflux-client-builder-reactor]]
@@ -123,7 +125,7 @@ To customize Reactor Netty settings, provide a pre-configured `HttpClient`:
 ======
 Java::
 +
-[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+[source,java,indent=0,subs="verbatim,quotes"]
 ----
 	HttpClient httpClient = HttpClient.create().secure(sslSpec -> ...);
 
@@ -134,7 +136,7 @@ Java::
 
 Kotlin::
 +
-[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+[source,kotlin,indent=0,subs="verbatim,quotes"]
 ----
 	val httpClient = HttpClient.create().secure { ... }
 
@@ -143,7 +145,6 @@ Kotlin::
 		.build()
 ----
 ======
-
 
 [[webflux-client-builder-reactor-resources]]
 === Resources
@@ -165,7 +166,7 @@ as the following example shows:
 ======
 Java::
 +
-[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+[source,java,indent=0,subs="verbatim,quotes"]
 ----
 	@Bean
 	public ReactorResourceFactory reactorResourceFactory() {
@@ -175,7 +176,7 @@ Java::
 
 Kotlin::
 +
-[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+[source,kotlin,indent=0,subs="verbatim,quotes"]
 ----
 	@Bean
 	fun reactorResourceFactory() = ReactorResourceFactory()
@@ -192,7 +193,7 @@ instances use shared resources, as the following example shows:
 ======
 Java::
 +
-[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+[source,java,indent=0,subs="verbatim,quotes"]
 ----
 	@Bean
 	public ReactorResourceFactory resourceFactory() {
@@ -220,7 +221,7 @@ Java::
 
 Kotlin::
 +
-[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+[source,kotlin,indent=0,subs="verbatim,quotes"]
 ----
 	@Bean
 	fun resourceFactory() = ReactorResourceFactory().apply {
@@ -245,7 +246,6 @@ Kotlin::
 ======
 --
 
-
 [[webflux-client-builder-reactor-timeout]]
 === Timeouts
 
@@ -255,7 +255,7 @@ To configure a connection timeout:
 ======
 Java::
 +
-[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+[source,java,indent=0,subs="verbatim,quotes"]
 ----
 	import io.netty.channel.ChannelOption;
 
@@ -269,7 +269,7 @@ Java::
 
 Kotlin::
 +
-[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+[source,kotlin,indent=0,subs="verbatim,quotes"]
 ----
 	import io.netty.channel.ChannelOption
 
@@ -288,7 +288,7 @@ To configure a read or write timeout:
 ======
 Java::
 +
-[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+[source,java,indent=0,subs="verbatim,quotes"]
 ----
 	import io.netty.handler.timeout.ReadTimeoutHandler;
 	import io.netty.handler.timeout.WriteTimeoutHandler;
@@ -304,7 +304,7 @@ Java::
 
 Kotlin::
 +
-[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+[source,kotlin,indent=0,subs="verbatim,quotes"]
 ----
 	import io.netty.handler.timeout.ReadTimeoutHandler
 	import io.netty.handler.timeout.WriteTimeoutHandler
@@ -325,7 +325,7 @@ To configure a response timeout for all requests:
 ======
 Java::
 +
-[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+[source,java,indent=0,subs="verbatim,quotes"]
 ----
 	HttpClient httpClient = HttpClient.create()
 			.responseTimeout(Duration.ofSeconds(2));
@@ -335,7 +335,7 @@ Java::
 
 Kotlin::
 +
-[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+[source,kotlin,indent=0,subs="verbatim,quotes"]
 ----
 	val httpClient = HttpClient.create()
 			.responseTimeout(Duration.ofSeconds(2));
@@ -350,7 +350,7 @@ To configure a response timeout for a specific request:
 ======
 Java::
 +
-[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+[source,java,indent=0,subs="verbatim,quotes"]
 ----
 	WebClient.create().get()
 			.uri("https://example.org/path")
@@ -364,7 +364,7 @@ Java::
 
 Kotlin::
 +
-[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+[source,kotlin,indent=0,subs="verbatim,quotes"]
 ----
 	WebClient.create().get()
 			.uri("https://example.org/path")
@@ -378,7 +378,6 @@ Kotlin::
 ======
 
 
-
 [[webflux-client-builder-jdk-httpclient]]
 == JDK HttpClient
 
@@ -388,34 +387,33 @@ The following example shows how to customize the JDK `HttpClient`:
 ======
 Java::
 +
-[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+[source,java,indent=0,subs="verbatim,quotes"]
 ----
-    HttpClient httpClient = HttpClient.newBuilder()
-        .followRedirects(Redirect.NORMAL)
-        .connectTimeout(Duration.ofSeconds(20))
-        .build();
+	HttpClient httpClient = HttpClient.newBuilder()
+		.followRedirects(Redirect.NORMAL)
+		.connectTimeout(Duration.ofSeconds(20))
+		.build();
 
-    ClientHttpConnector connector =
-            new JdkClientHttpConnector(httpClient, new DefaultDataBufferFactory());
+	ClientHttpConnector connector =
+			new JdkClientHttpConnector(httpClient, new DefaultDataBufferFactory());
 
-    WebClient webClient = WebClient.builder().clientConnector(connector).build();
+	WebClient webClient = WebClient.builder().clientConnector(connector).build();
 ----
 
 Kotlin::
 +
-[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+[source,kotlin,indent=0,subs="verbatim,quotes"]
 ----
-    val httpClient = HttpClient.newBuilder()
-        .followRedirects(Redirect.NORMAL)
-        .connectTimeout(Duration.ofSeconds(20))
-        .build()
+	val httpClient = HttpClient.newBuilder()
+		.followRedirects(Redirect.NORMAL)
+		.connectTimeout(Duration.ofSeconds(20))
+		.build()
 
-    val connector = JdkClientHttpConnector(httpClient, DefaultDataBufferFactory())
+	val connector = JdkClientHttpConnector(httpClient, DefaultDataBufferFactory())
 
-    val webClient = WebClient.builder().clientConnector(connector).build()
+	val webClient = WebClient.builder().clientConnector(connector).build()
 ----
 ======
-
 
 
 [[webflux-client-builder-jetty]]
@@ -428,7 +426,7 @@ The following example shows how to customize Jetty `HttpClient` settings:
 ======
 Java::
 +
-[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+[source,java,indent=0,subs="verbatim,quotes"]
 ----
 	HttpClient httpClient = new HttpClient();
 	httpClient.setCookieStore(...);
@@ -440,7 +438,7 @@ Java::
 
 Kotlin::
 +
-[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+[source,kotlin,indent=0,subs="verbatim,quotes"]
 ----
 	val httpClient = HttpClient()
 	httpClient.cookieStore = ...
@@ -465,7 +463,7 @@ shows:
 ======
 Java::
 +
-[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+[source,java,indent=0,subs="verbatim,quotes"]
 ----
 	@Bean
 	public JettyResourceFactory resourceFactory() {
@@ -489,7 +487,7 @@ Java::
 
 Kotlin::
 +
-[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+[source,kotlin,indent=0,subs="verbatim,quotes"]
 ----
 	@Bean
 	fun resourceFactory() = JettyResourceFactory()
@@ -511,7 +509,6 @@ Kotlin::
 --
 
 
-
 [[webflux-client-builder-http-components]]
 == HttpComponents
 
@@ -521,7 +518,7 @@ The following example shows how to customize Apache HttpComponents `HttpClient` 
 ======
 Java::
 +
-[source,java,indent=0,subs="verbatim,quotes",role="primary"]
+[source,java,indent=0,subs="verbatim,quotes"]
 ----
 	HttpAsyncClientBuilder clientBuilder = HttpAsyncClients.custom();
 	clientBuilder.setDefaultRequestConfig(...);
@@ -534,7 +531,7 @@ Java::
 
 Kotlin::
 +
-[source,kotlin,indent=0,subs="verbatim,quotes",role="secondary"]
+[source,kotlin,indent=0,subs="verbatim,quotes"]
 ----
 	val client = HttpAsyncClients.custom().apply {
 		setDefaultRequestConfig(...)
@@ -543,5 +540,3 @@ Kotlin::
 	val webClient = WebClient.builder().clientConnector(connector).build()
 ----
 ======
-
-

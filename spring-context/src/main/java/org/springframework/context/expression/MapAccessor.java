@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2021 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,105 +16,36 @@
 
 package org.springframework.context.expression;
 
-import java.util.Map;
-
-import org.springframework.asm.MethodVisitor;
-import org.springframework.expression.AccessException;
-import org.springframework.expression.EvaluationContext;
-import org.springframework.expression.TypedValue;
-import org.springframework.expression.spel.CodeFlow;
-import org.springframework.expression.spel.CompilablePropertyAccessor;
-import org.springframework.lang.Nullable;
-import org.springframework.util.Assert;
+import org.springframework.expression.PropertyAccessor;
 
 /**
- * EL property accessor that knows how to traverse the keys
- * of a standard {@link java.util.Map}.
+ * SpEL {@link PropertyAccessor} that knows how to access the keys of a standard
+ * {@link java.util.Map}.
  *
  * @author Juergen Hoeller
  * @author Andy Clement
  * @since 3.0
+ * @deprecated as of Spring Framework 7.0 in favor of {@link org.springframework.expression.spel.support.MapAccessor}.
  */
-public class MapAccessor implements CompilablePropertyAccessor {
-
-	@Override
-	public Class<?>[] getSpecificTargetClasses() {
-		return new Class<?>[] {Map.class};
-	}
-
-	@Override
-	public boolean canRead(EvaluationContext context, @Nullable Object target, String name) throws AccessException {
-		return (target instanceof Map<?, ?> map && map.containsKey(name));
-	}
-
-	@Override
-	public TypedValue read(EvaluationContext context, @Nullable Object target, String name) throws AccessException {
-		Assert.state(target instanceof Map, "Target must be of type Map");
-		Map<?, ?> map = (Map<?, ?>) target;
-		Object value = map.get(name);
-		if (value == null && !map.containsKey(name)) {
-			throw new MapAccessException(name);
-		}
-		return new TypedValue(value);
-	}
-
-	@Override
-	public boolean canWrite(EvaluationContext context, @Nullable Object target, String name) throws AccessException {
-		return true;
-	}
-
-	@Override
-	@SuppressWarnings("unchecked")
-	public void write(EvaluationContext context, @Nullable Object target, String name, @Nullable Object newValue)
-			throws AccessException {
-
-		Assert.state(target instanceof Map, "Target must be a Map");
-		Map<Object, Object> map = (Map<Object, Object>) target;
-		map.put(name, newValue);
-	}
-
-	@Override
-	public boolean isCompilable() {
-		return true;
-	}
-
-	@Override
-	public Class<?> getPropertyType() {
-		return Object.class;
-	}
-
-	@Override
-	public void generateCode(String propertyName, MethodVisitor mv, CodeFlow cf) {
-		String descriptor = cf.lastDescriptor();
-		if (descriptor == null || !descriptor.equals("Ljava/util/Map")) {
-			if (descriptor == null) {
-				cf.loadTarget(mv);
-			}
-			CodeFlow.insertCheckCast(mv, "Ljava/util/Map");
-		}
-		mv.visitLdcInsn(propertyName);
-		mv.visitMethodInsn(INVOKEINTERFACE, "java/util/Map", "get","(Ljava/lang/Object;)Ljava/lang/Object;",true);
-	}
-
+@Deprecated(since = "7.0", forRemoval = true)
+public class MapAccessor extends org.springframework.expression.spel.support.MapAccessor {
 
 	/**
-	 * Exception thrown from {@code read} in order to reset a cached
-	 * PropertyAccessor, allowing other accessors to have a try.
+	 * Create a new {@code MapAccessor} for reading as well as writing.
+	 * @see #MapAccessor(boolean)
 	 */
-	@SuppressWarnings("serial")
-	private static class MapAccessException extends AccessException {
+	public MapAccessor() {
+		this(true);
+	}
 
-		private final String key;
-
-		public MapAccessException(String key) {
-			super("");
-			this.key = key;
-		}
-
-		@Override
-		public String getMessage() {
-			return "Map does not contain a value for key '" + this.key + "'";
-		}
+	/**
+	 * Create a new {@code MapAccessor} for reading and possibly also writing.
+	 * @param allowWrite whether to allow write operations on a target instance
+	 * @since 6.2
+	 * @see #canWrite
+	 */
+	public MapAccessor(boolean allowWrite) {
+		super(allowWrite);
 	}
 
 }

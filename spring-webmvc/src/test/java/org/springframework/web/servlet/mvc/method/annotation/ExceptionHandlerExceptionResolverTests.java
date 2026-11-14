@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -60,6 +60,8 @@ import org.springframework.web.method.support.HandlerMethodReturnValueHandler;
 import org.springframework.web.servlet.DispatcherServlet;
 import org.springframework.web.servlet.FlashMap;
 import org.springframework.web.servlet.ModelAndView;
+import org.springframework.web.servlet.function.HandlerFunction;
+import org.springframework.web.servlet.function.ServerResponse;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import org.springframework.web.servlet.resource.ResourceHttpRequestHandler;
 import org.springframework.web.testfixture.servlet.MockHttpServletRequest;
@@ -71,7 +73,7 @@ import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.mock;
 
 /**
- * Test fixture with {@link ExceptionHandlerExceptionResolver}.
+ * Tests for {@link ExceptionHandlerExceptionResolver}.
  *
  * @author Rossen Stoyanchev
  * @author Arjen Poutsma
@@ -168,7 +170,7 @@ class ExceptionHandlerExceptionResolverTests {
 	@Test
 	void resolveNoExceptionHandlerForException() throws NoSuchMethodException {
 		Exception npe = new NullPointerException();
-		HandlerMethod handlerMethod = new HandlerMethod(new IoExceptionController(), "handle");
+		HandlerMethod handlerMethod = new HandlerMethod(new IOExceptionController(), "handle");
 		this.resolver.afterPropertiesSet();
 		ModelAndView mav = this.resolver.resolveException(this.request, this.response, handlerMethod, npe);
 
@@ -251,6 +253,19 @@ class ExceptionHandlerExceptionResolverTests {
 		IllegalAccessException ex = new IllegalAccessException();
 		HandlerMethod handlerMethod = new HandlerMethod(new ResponseBodyController(), "handle");
 		ModelAndView mav = this.resolver.resolveException(this.request, this.response, handlerMethod, ex);
+
+		assertExceptionHandledAsBody(mav, "AnotherTestExceptionResolver: IllegalAccessException");
+	}
+
+	@Test
+	void resolveExceptionGlobalHandlerForHandlerFunction() throws Exception {
+		loadConfiguration(MyConfig.class);
+
+		IllegalAccessException ex = new IllegalAccessException();
+		HandlerFunction<ServerResponse> handlerFunction = req -> {
+			throw new IllegalAccessException();
+		};
+		ModelAndView mav = this.resolver.resolveException(this.request, this.response, handlerFunction, ex);
 
 		assertExceptionHandledAsBody(mav, "AnotherTestExceptionResolver: IllegalAccessException");
 	}
@@ -419,6 +434,41 @@ class ExceptionHandlerExceptionResolverTests {
 		assertThat(mav.isEmpty()).isTrue();
 	}
 
+	@Test
+	void resolveExceptionJsonMediaType() throws UnsupportedEncodingException, NoSuchMethodException {
+		IllegalArgumentException ex = new IllegalArgumentException();
+		HandlerMethod handlerMethod = new HandlerMethod(new MediaTypeController(), "handle");
+		this.resolver.afterPropertiesSet();
+		this.request.addHeader("Accept", "application/json");
+		ModelAndView mav = this.resolver.resolveException(this.request, this.response, handlerMethod, ex);
+
+		assertExceptionHandledAsBody(mav, "jsonBody");
+	}
+
+	@Test
+	void resolveExceptionHtmlMediaType() throws NoSuchMethodException {
+		IllegalArgumentException ex = new IllegalArgumentException();
+		HandlerMethod handlerMethod = new HandlerMethod(new MediaTypeController(), "handle");
+		this.resolver.afterPropertiesSet();
+		this.request.addHeader("Accept", "text/html");
+		ModelAndView mav = this.resolver.resolveException(this.request, this.response, handlerMethod, ex);
+
+		assertThat(mav).isNotNull();
+		assertThat(mav.getViewName()).isEqualTo("htmlView");
+	}
+
+	@Test
+	void resolveExceptionDefaultMediaType() throws NoSuchMethodException {
+		IllegalArgumentException ex = new IllegalArgumentException();
+		HandlerMethod handlerMethod = new HandlerMethod(new MediaTypeController(), "handle");
+		this.resolver.afterPropertiesSet();
+		this.request.addHeader("Accept", "*/*");
+		ModelAndView mav = this.resolver.resolveException(this.request, this.response, handlerMethod, ex);
+
+		assertThat(mav).isNotNull();
+		assertThat(mav.getViewName()).isEqualTo("htmlView");
+	}
+
 
 	private void assertMethodProcessorCount(int resolverCount, int handlerCount) {
 		assertThat(this.resolver.getArgumentResolvers().getResolvers()).hasSize(resolverCount);
@@ -488,11 +538,11 @@ class ExceptionHandlerExceptionResolverTests {
 
 
 	@Controller
-	static class IoExceptionController {
+	static class IOExceptionController {
 
 		public void handle() {}
 
-		@ExceptionHandler(value = IOException.class)
+		@ExceptionHandler(IOException.class)
 		public void handleException() {
 		}
 	}
@@ -647,6 +697,23 @@ class ExceptionHandlerExceptionResolverTests {
 		public Object beforeBodyWrite(Object body, MethodParameter returnType, MediaType selectedContentType,
 				Class<? extends HttpMessageConverter<?>> selectedConverterType, ServerHttpRequest request, ServerHttpResponse response) {
 			return null;
+		}
+	}
+
+	@Controller
+	static class MediaTypeController {
+
+		public void handle() {}
+
+		@ExceptionHandler(exception = IllegalArgumentException.class, produces = "application/json")
+		@ResponseBody
+		public String handleExceptionJson() {
+			return "jsonBody";
+		}
+
+		@ExceptionHandler(exception = IllegalArgumentException.class, produces = {"text/html", "*/*"})
+		public String handleExceptionHtml() {
+			return "htmlView";
 		}
 	}
 

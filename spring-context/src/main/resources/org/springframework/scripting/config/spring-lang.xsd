@@ -11,7 +11,8 @@
 		<xsd:documentation><![CDATA[
 	Defines the elements used in the Spring Framework's dynamic language
 	support, which allows bean definitions that are backed by classes
-	written in a language other than Java.
+	written in a language other than Java. Deprecated as of Spring
+	Framework 7.0.
 		]]></xsd:documentation>
 	</xsd:annotation>
 
@@ -131,7 +132,7 @@
 
 	Singletons are most commonly used, and are ideal for multi-threaded
 	service objects. Further scopes, such as "request" or "session", might
-	be supported by extended bean factories (e.g. in a web environment).
+	be supported by extended bean factories (for example, in a web environment).
 						]]></xsd:documentation>
 					</xsd:annotation>
 				</xsd:attribute>

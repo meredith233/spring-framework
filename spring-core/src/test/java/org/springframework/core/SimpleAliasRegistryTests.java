@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -221,6 +221,26 @@ class SimpleAliasRegistryTests {
 				.isThrownBy(() -> registry.resolveAliases(valueResolver))
 				.withMessage("Cannot register resolved alias '%s' (original: '%s') for name '%s': " +
 						"It is already registered for name '%s'.", ALIAS2, ALIAS1, NAME1, NAME2);
+	}
+
+	@Test
+	void resolveAliasesWithPlaceholderReplacementCircularReference() {
+		StringValueResolver valueResolver = new StubStringValueResolver(Map.of(NAME1, ALIAS2));
+
+		registerAlias(NAME1, ALIAS1);
+		registerAlias(ALIAS1, ALIAS2);
+
+		// Original state:
+		// ALIAS1 -> NAME1
+		// ALIAS2 -> ALIAS1
+
+		// State after processing original entry (ALIAS1 -> NAME1):
+		// ALIAS1 -> ALIAS2 --> Circular reference: ALIAS2 already points to ALIAS1
+		// ALIAS2 -> ALIAS1
+
+		assertThatIllegalStateException()
+				.isThrownBy(() -> registry.resolveAliases(valueResolver))
+				.withMessageContaining("'%s' is a direct or indirect alias for '%s'", ALIAS2, ALIAS1);
 	}
 
 	@ParameterizedTest

@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2023 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,6 +20,7 @@ import java.util.Locale;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.jspecify.annotations.Nullable;
 import reactor.core.publisher.Mono;
 
 import org.springframework.context.MessageSource;
@@ -29,7 +30,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
-import org.springframework.lang.Nullable;
+import org.springframework.http.server.reactive.observation.ServerRequestObservationContext;
 import org.springframework.validation.method.MethodValidationException;
 import org.springframework.web.ErrorResponse;
 import org.springframework.web.ErrorResponseException;
@@ -50,7 +51,7 @@ import org.springframework.web.server.UnsupportedMediaTypeStatusException;
 /**
  * A class with an {@code @ExceptionHandler} method that handles all Spring
  * WebFlux raised exceptions by returning a {@link ResponseEntity} with
- * RFC 7807 formatted error details in the body.
+ * RFC 9457 formatted error details in the body.
  *
  * <p>Convenient as a base class of an {@link ControllerAdvice @ControllerAdvice}
  * for global exception handling in an application. Subclasses can override
@@ -69,8 +70,7 @@ public abstract class ResponseEntityExceptionHandler implements MessageSourceAwa
 	 */
 	protected final Log logger = LogFactory.getLog(getClass());
 
-	@Nullable
-	private MessageSource messageSource;
+	private @Nullable MessageSource messageSource;
 
 
 	@Override
@@ -82,14 +82,13 @@ public abstract class ResponseEntityExceptionHandler implements MessageSourceAwa
 	 * Get the {@link MessageSource} that this exception handler uses.
 	 * @since 6.0.3
 	 */
-	@Nullable
-	protected MessageSource getMessageSource() {
+	protected @Nullable MessageSource getMessageSource() {
 		return this.messageSource;
 	}
 
 
 	/**
-	 * Handle all exceptions raised within Spring MVC handling of the request.
+	 * Handle all exceptions raised within Spring WebFlux handling of the request.
 	 * @param ex the exception to handle
 	 * @param exchange the current request-response
 	 */
@@ -361,7 +360,7 @@ public abstract class ResponseEntityExceptionHandler implements MessageSourceAwa
 	 */
 	protected ProblemDetail createProblemDetail(
 			Exception ex, HttpStatusCode status, String defaultDetail, @Nullable String detailMessageCode,
-			@Nullable Object[] detailMessageArguments, ServerWebExchange exchange) {
+			Object @Nullable [] detailMessageArguments, ServerWebExchange exchange) {
 
 		ErrorResponse.Builder builder = ErrorResponse.builder(ex, status, defaultDetail);
 		if (detailMessageCode != null) {
@@ -384,8 +383,10 @@ public abstract class ResponseEntityExceptionHandler implements MessageSourceAwa
 	 * <p>The default implementation does the following:
 	 * <ul>
 	 * <li>return {@code null} if response is already committed
-	 * <li>set the {@code "jakarta.servlet.error.exception"} request attribute
-	 * if the response status is 500 (INTERNAL_SERVER_ERROR).
+	 * <li>record the exception as the error of the current HTTP server observation,
+	 * if any, when the response status is a 5xx server error, since it signals
+	 * a server failure. Exceptions resulting in other statuses, for example, 4xx
+	 * client errors, are not recorded as errors.
 	 * <li>extract the {@link ErrorResponse#getBody() body} from
 	 * {@link ErrorResponse} exceptions, if the {@code body} is {@code null}.
 	 * </ul>
@@ -408,13 +409,17 @@ public abstract class ResponseEntityExceptionHandler implements MessageSourceAwa
 			body = errorResponse.updateAndGetBody(this.messageSource, getLocale(exchange));
 		}
 
+		if (status.is5xxServerError()) {
+			ServerRequestObservationContext.recordHandledException(exchange.getAttributes(), ex);
+		}
+
 		return createResponseEntity(body, headers, status, exchange);
 	}
 
 	/**
 	 * Create the {@link ResponseEntity} to use from the given body, headers,
 	 * and statusCode. Subclasses can override this method to inspect and possibly
-	 * modify the body, headers, or statusCode, e.g. to re-create an instance of
+	 * modify the body, headers, or statusCode, for example, to re-create an instance of
 	 * {@link ProblemDetail} as an extension of {@link ProblemDetail}.
 	 * @param body the body to use for the response
 	 * @param headers the headers to use for the response

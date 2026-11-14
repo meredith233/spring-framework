@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -69,6 +69,7 @@ class ServletRequestMethodArgumentResolverTests {
 
 
 	@BeforeEach
+	@SuppressWarnings("deprecation")
 	void setup() throws Exception {
 		resolver = new ServletRequestMethodArgumentResolver();
 		mavContainer = new ModelAndViewContainer();
@@ -126,7 +127,7 @@ class ServletRequestMethodArgumentResolverTests {
 	}
 
 	@Test // gh-25780
-	public void annotatedPrincipal() throws Exception {
+	void annotatedPrincipal() throws Exception {
 		Principal principal = () -> "Foo";
 		servletRequest.setUserPrincipal(principal);
 		Method principalMethod = getClass().getMethod("supportedParamsWithAnnotatedPrincipal", Principal.class);
@@ -241,6 +242,7 @@ class ServletRequestMethodArgumentResolverTests {
 	}
 
 	@Test
+	@SuppressWarnings("deprecation")
 	void pushBuilder() throws Exception {
 		final PushBuilder pushBuilder = mock();
 		servletRequest = new MockHttpServletRequest("GET", "") {
@@ -259,7 +261,7 @@ class ServletRequestMethodArgumentResolverTests {
 	}
 
 
-	@SuppressWarnings("unused")
+	@SuppressWarnings({"unused", "deprecation"})
 	public void supportedParams(ServletRequest p0,
 								MultipartRequest p1,
 								HttpSession p2,

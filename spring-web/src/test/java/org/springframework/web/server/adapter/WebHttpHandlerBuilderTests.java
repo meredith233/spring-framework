@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,7 +23,6 @@ import java.util.function.BiFunction;
 import java.util.function.Function;
 
 import io.micrometer.observation.tck.TestObservationRegistry;
-import io.micrometer.observation.tck.TestObservationRegistryAssert;
 import org.junit.jupiter.api.Test;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
@@ -67,8 +66,7 @@ class WebHttpHandlerBuilderTests {
 		context.refresh();
 
 		HttpHandler httpHandler = WebHttpHandlerBuilder.applicationContext(context).build();
-		boolean condition = httpHandler instanceof HttpWebHandlerAdapter;
-		assertThat(condition).isTrue();
+		assertThat(httpHandler).isInstanceOf(HttpWebHandlerAdapter.class);
 		assertThat(((HttpWebHandlerAdapter) httpHandler).getApplicationContext()).isSameAs(context);
 
 		MockServerHttpRequest request = MockServerHttpRequest.get("/").build();
@@ -171,8 +169,8 @@ class WebHttpHandlerBuilderTests {
 		handler.handle(MockServerHttpRequest.get("/").build(), response).block();
 
 		TestObservationRegistry observationRegistry = applicationContext.getBean(TestObservationRegistry.class);
-		TestObservationRegistryAssert.assertThat(observationRegistry).hasObservationWithNameEqualTo("http.server.requests")
-				.that().hasLowCardinalityKeyValue("uri", "UNKNOWN");
+		assertThat(observationRegistry).hasObservationWithNameEqualTo("http.server.requests").that()
+				.hasLowCardinalityKeyValue("uri", "UNKNOWN");
 	}
 
 	@Test
@@ -181,6 +179,37 @@ class WebHttpHandlerBuilderTests {
 				DuplicateConventionObservationConfig.class);
 		assertThatThrownBy(() -> WebHttpHandlerBuilder.applicationContext(applicationContext).build())
 				.isInstanceOf(NoUniqueBeanDefinitionException.class);
+	}
+
+	@Test
+	void defaultHtmlEscape() {
+		HttpHandler httpHandler = WebHttpHandlerBuilder
+				.webHandler(exchange -> Mono.empty())
+				.defaultHtmlEscape(true)
+				.build();
+
+		assertThat(httpHandler).isInstanceOf(HttpWebHandlerAdapter.class);
+		assertThat(((HttpWebHandlerAdapter) httpHandler).getDefaultHtmlEscape()).isTrue();
+	}
+
+	@Test
+	void defaultHtmlEscapeNotConfigured() {
+		HttpHandler httpHandler = WebHttpHandlerBuilder
+				.webHandler(exchange -> Mono.empty())
+				.build();
+
+		assertThat(httpHandler).isInstanceOf(HttpWebHandlerAdapter.class);
+		assertThat(((HttpWebHandlerAdapter) httpHandler).getDefaultHtmlEscape()).isNull();
+	}
+
+	@Test
+	void cloneWithDefaultHtmlEscape() {
+		WebHttpHandlerBuilder builder = WebHttpHandlerBuilder
+				.webHandler(exchange -> Mono.empty())
+				.defaultHtmlEscape(true);
+
+		assertThat(((HttpWebHandlerAdapter) builder.build()).getDefaultHtmlEscape()).isTrue();
+		assertThat(((HttpWebHandlerAdapter) builder.clone().build()).getDefaultHtmlEscape()).isTrue();
 	}
 
 	private static Mono<Void> writeToResponse(ServerWebExchange exchange, String value) {
@@ -287,7 +316,7 @@ class WebHttpHandlerBuilderTests {
 
 		@Bean
 		public ForwardedHeaderTransformer forwardedHeaderTransformer() {
-			return new ForwardedHeaderTransformer();
+			return new ForwardedHeaderTransformer(true);
 		}
 
 		@Bean
@@ -309,7 +338,7 @@ class WebHttpHandlerBuilderTests {
 	static class ObservationConfig {
 
 		@Bean
-		public TestObservationRegistry testObservationRegistry() {
+		public TestObservationRegistry observationRegistry() {
 			return TestObservationRegistry.create();
 		}
 

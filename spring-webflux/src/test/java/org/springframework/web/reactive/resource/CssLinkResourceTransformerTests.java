@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -167,11 +167,24 @@ class CssLinkResourceTransformerTests {
 	@Test // https://github.com/spring-projects/spring-framework/issues/22602
 	void transformEmptyUrlFunction() {
 		MockServerWebExchange exchange = MockServerWebExchange.from(get("/static/empty_url_function.css"));
-		Resource css = getResource("empty_url_function.css");
+		Resource expected = getResource("empty_url_function.css");
+
+		// An empty url() is not a link at all, so the resource is left untouched,
+		// exactly like a CSS file that has no link in it at all.
+		StepVerifier.create(this.transformerChain.transform(exchange, expected))
+				.consumeNextWith(resource -> assertThat(resource).isSameAs(expected))
+				.expectComplete()
+				.verify();
+	}
+
+	@Test
+	void transformUnclosedUrlFunction() {
+		MockServerWebExchange exchange = MockServerWebExchange.from(get("/static/unclosed_url_function.css"));
+		Resource css = getResource("unclosed_url_function.css");
 		String expected = """
-						.fooStyle {
-							background: transparent url() no-repeat left top;
-						}""";
+				body { background: url("/static/images/image-f448cd1d5dba82b774f3202c878230b3.png?#iefix") }
+				div { background: url(images/image.png
+				""";
 
 		StepVerifier.create(this.transformerChain.transform(exchange, css)
 				.cast(TransformedResource.class))

@@ -19,7 +19,7 @@ matches the execution of any method named `transfer`:
 ======
 Java::
 +
-[source,java,indent=0,subs="verbatim",role="primary"]
+[source,java,indent=0,subs="verbatim"]
 ----
 	@Pointcut("execution(* transfer(..))") // the pointcut expression
 	private void anyOldTransfer() {} // the pointcut signature
@@ -27,7 +27,7 @@ Java::
 
 Kotlin::
 +
-[source,kotlin,indent=0,subs="verbatim",role="secondary"]
+[source,kotlin,indent=0,subs="verbatim"]
 ----
 	@Pointcut("execution(* transfer(..))") // the pointcut expression
 	private fun anyOldTransfer() {} // the pointcut signature
@@ -104,7 +104,7 @@ Note that pointcut definitions are generally matched against any intercepted met
 If a pointcut is strictly meant to be public-only, even in a CGLIB proxy scenario with
 potential non-public interactions through proxies, it needs to be defined accordingly.
 
-If your interception needs include method calls or even constructors within the target
+If your interception needs to include method calls or even constructors within the target
 class, consider the use of Spring-driven xref:core/aop/using-aspectj.adoc#aop-aj-ltw[native AspectJ weaving] instead
 of Spring's proxy-based AOP framework. This constitutes a different mode of AOP usage
 with different characteristics, so be sure to make yourself familiar with weaving
@@ -150,7 +150,7 @@ pointcut expressions by name. The following example shows three pointcut express
 ======
 Java::
 +
-[source,java,indent=0,subs="verbatim",role="primary",chomp="-packages"]
+[source,java,indent=0,subs="verbatim",chomp="-packages"]
 ----
 	package com.xyz;
 
@@ -174,7 +174,7 @@ trading module.
 
 Kotlin::
 +
-[source,kotlin,indent=0,subs="verbatim",role="secondary",chomp="-packages"]
+[source,kotlin,indent=0,subs="verbatim",chomp="-packages"]
 ----
 	package com.xyz
 
@@ -217,7 +217,7 @@ expressions for this purpose. Such a class typically resembles the following
 ======
 Java::
 +
-[source,java,indent=0,subs="verbatim",role="primary",chomp="-packages",fold="none"]
+[source,java,indent=0,subs="verbatim",chomp="-packages",fold="none"]
 ----
 	package com.xyz;
 
@@ -279,7 +279,7 @@ Java::
 
 Kotlin::
 +
-[source,kotlin,indent=0,subs="verbatim",role="secondary",chomp="-packages",fold="none"]
+[source,kotlin,indent=0,subs="verbatim",chomp="-packages",fold="none"]
 ----
 	package com.xyz
 
@@ -581,6 +581,3 @@ performance (time and memory used), due to extra processing and analysis. Scopin
 designators are very fast to match, and using them means AspectJ can very quickly
 dismiss groups of join points that should not be further processed. A good
 pointcut should always include one if possible.
-
-
-

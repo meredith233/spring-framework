@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2020 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,8 +21,8 @@ import java.util.Map;
 import javax.xml.xpath.XPathExpressionException;
 
 import org.hamcrest.Matcher;
+import org.jspecify.annotations.Nullable;
 
-import org.springframework.lang.Nullable;
 import org.springframework.test.web.servlet.ResultMatcher;
 import org.springframework.util.AntPathMatcher;
 import org.springframework.web.util.UriComponentsBuilder;
@@ -85,7 +85,8 @@ public abstract class MockMvcResultMatchers {
 	/**
 	 * Asserts the request was forwarded to the given URL.
 	 * <p>This method accepts only exact matches.
-	 * @param expectedUrl the exact URL expected
+	 * @param expectedUrl the exact URL expected; or {@code null} to assert
+	 * that no forwarding occurred
 	 */
 	public static ResultMatcher forwardedUrl(@Nullable String expectedUrl) {
 		return result -> assertEquals("Forwarded URL", expectedUrl, result.getResponse().getForwardedUrl());
@@ -98,7 +99,7 @@ public abstract class MockMvcResultMatchers {
 	 * @param uriVars zero or more URI variables to populate the template
 	 * @see UriComponentsBuilder#fromUriString(String)
 	 */
-	public static ResultMatcher forwardedUrlTemplate(String urlTemplate, Object... uriVars) {
+	public static ResultMatcher forwardedUrlTemplate(String urlTemplate, @Nullable Object... uriVars) {
 		String uri = UriComponentsBuilder.fromUriString(urlTemplate).buildAndExpand(uriVars).encode().toUriString();
 		return forwardedUrl(uri);
 	}
@@ -124,9 +125,10 @@ public abstract class MockMvcResultMatchers {
 	/**
 	 * Asserts the request was redirected to the given URL.
 	 * <p>This method accepts only exact matches.
-	 * @param expectedUrl the exact URL expected
+	 * @param expectedUrl the exact URL expected; or {@code null} to assert
+	 * that no redirect occurred
 	 */
-	public static ResultMatcher redirectedUrl(String expectedUrl) {
+	public static ResultMatcher redirectedUrl(@Nullable String expectedUrl) {
 		return result -> assertEquals("Redirected URL", expectedUrl, result.getResponse().getRedirectedUrl());
 	}
 
@@ -137,7 +139,7 @@ public abstract class MockMvcResultMatchers {
 	 * @param uriVars zero or more URI variables to populate the template
 	 * @see UriComponentsBuilder#fromUriString(String)
 	 */
-	public static ResultMatcher redirectedUrlTemplate(String urlTemplate, Object... uriVars) {
+	public static ResultMatcher redirectedUrlTemplate(String urlTemplate, @Nullable Object... uriVars) {
 		String uri = UriComponentsBuilder.fromUriString(urlTemplate).buildAndExpand(uriVars).encode().toUriString();
 		return redirectedUrl(uri);
 	}

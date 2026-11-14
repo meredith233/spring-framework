@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -39,14 +39,13 @@ import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException
 class AspectProxyFactoryTests {
 
 	@Test
-	void testWithNonAspect() {
+	void withNonAspect() {
 		AspectJProxyFactory proxyFactory = new AspectJProxyFactory(new TestBean());
-		assertThatIllegalArgumentException().isThrownBy(() ->
-				proxyFactory.addAspect(TestBean.class));
+		assertThatIllegalArgumentException().isThrownBy(() -> proxyFactory.addAspect(TestBean.class));
 	}
 
 	@Test
-	void testWithSimpleAspect() {
+	void withSimpleAspect() {
 		TestBean bean = new TestBean();
 		bean.setAge(2);
 		AspectJProxyFactory proxyFactory = new AspectJProxyFactory(bean);
@@ -56,7 +55,7 @@ class AspectProxyFactoryTests {
 	}
 
 	@Test
-	void testWithPerThisAspect() {
+	void withPerThisAspect() {
 		TestBean bean1 = new TestBean();
 		TestBean bean2 = new TestBean();
 
@@ -76,15 +75,14 @@ class AspectProxyFactoryTests {
 	}
 
 	@Test
-	void testWithInstanceWithNonAspect() {
+	void withInstanceWithNonAspect() {
 		AspectJProxyFactory pf = new AspectJProxyFactory();
-		assertThatIllegalArgumentException().isThrownBy(() ->
-				pf.addAspect(new TestBean()));
+		assertThatIllegalArgumentException().isThrownBy(() -> pf.addAspect(new TestBean()));
 	}
 
 	@Test
 	@SuppressWarnings("unchecked")
-	void testSerializable() throws Exception {
+	void serializable() throws Exception {
 		AspectJProxyFactory proxyFactory = new AspectJProxyFactory(new TestBean());
 		proxyFactory.addAspect(LoggingAspectOnVarargs.class);
 		ITestBean proxy = proxyFactory.getProxy();
@@ -94,7 +92,7 @@ class AspectProxyFactoryTests {
 	}
 
 	@Test
-	void testWithInstance() throws Exception {
+	void withInstance() throws Exception {
 		MultiplyReturnValue aspect = new MultiplyReturnValue();
 		int multiple = 3;
 		aspect.setMultiple(multiple);
@@ -113,13 +111,14 @@ class AspectProxyFactoryTests {
 	}
 
 	@Test
-	void testWithNonSingletonAspectInstance() {
+	void withNonSingletonAspectInstance() {
 		AspectJProxyFactory pf = new AspectJProxyFactory();
 		assertThatIllegalArgumentException().isThrownBy(() -> pf.addAspect(new PerThisAspect()));
 	}
 
 	@Test  // SPR-13328
-	public void testProxiedVarargsWithEnumArray() {
+	@SuppressWarnings("unchecked")
+	void proxiedVarargsWithEnumArray() {
 		AspectJProxyFactory proxyFactory = new AspectJProxyFactory(new TestBean());
 		proxyFactory.addAspect(LoggingAspectOnVarargs.class);
 		ITestBean proxy = proxyFactory.getProxy();
@@ -127,7 +126,8 @@ class AspectProxyFactoryTests {
 	}
 
 	@Test  // SPR-13328
-	public void testUnproxiedVarargsWithEnumArray() {
+	@SuppressWarnings("unchecked")
+	void unproxiedVarargsWithEnumArray() {
 		AspectJProxyFactory proxyFactory = new AspectJProxyFactory(new TestBean());
 		proxyFactory.addAspect(LoggingAspectOnSetter.class);
 		ITestBean proxy = proxyFactory.getProxy();

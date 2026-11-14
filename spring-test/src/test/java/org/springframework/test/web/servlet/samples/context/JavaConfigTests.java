@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2023 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -68,8 +68,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 	@ContextConfiguration(classes = RootConfig.class),
 	@ContextConfiguration(classes = WebConfig.class)
 })
-@DisabledInAotMode // @ContextHierarchy is not supported in AOT.
-public class JavaConfigTests {
+@DisabledInAotMode("@ContextHierarchy is not supported in AOT")
+class JavaConfigTests {
 
 	@Autowired
 	private WebApplicationContext wac;
@@ -84,26 +84,26 @@ public class JavaConfigTests {
 
 
 	@BeforeEach
-	public void setup() {
+	void setup() {
 		this.mockMvc = MockMvcBuilders.webAppContextSetup(this.wac).build();
 		verifyRootWacSupport();
 		given(this.personDao.getPerson(5L)).willReturn(new Person("Joe"));
 	}
 
 	@Test
-	public void person() throws Exception {
+	void person() throws Exception {
 		this.mockMvc.perform(get("/person/5").accept(MediaType.APPLICATION_JSON))
 			.andDo(print())
 			.andExpectAll(
 				status().isOk(),
 				request().asyncNotStarted(),
-				content().string("{\"name\":\"Joe\",\"someDouble\":0.0,\"someBoolean\":false}"),
+				content().string("{\"name\":\"Joe\",\"someBoolean\":false,\"someDouble\":0.0}"),
 				jsonPath("$.name").value("Joe")
 			);
 	}
 
 	@Test
-	public void andExpectAllWithOneFailure() {
+	void andExpectAllWithOneFailure() {
 		assertThatExceptionOfType(AssertionError.class)
 			.isThrownBy(() -> this.mockMvc.perform(get("/person/5").accept(MediaType.APPLICATION_JSON))
 					.andExpectAll(
@@ -115,7 +115,7 @@ public class JavaConfigTests {
 	}
 
 	@Test
-	public void andExpectAllWithMultipleFailures() {
+	void andExpectAllWithMultipleFailures() {
 		assertThatExceptionOfType(AssertionError.class).isThrownBy(() ->
 			this.mockMvc.perform(get("/person/5").accept(MediaType.APPLICATION_JSON))
 				.andExpectAll(

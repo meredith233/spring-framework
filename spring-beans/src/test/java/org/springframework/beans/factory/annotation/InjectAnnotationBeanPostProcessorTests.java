@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -80,7 +80,7 @@ class InjectAnnotationBeanPostProcessorTests {
 
 
 	@Test
-	void testIncompleteBeanDefinition() {
+	void incompleteBeanDefinition() {
 		bf.registerBeanDefinition("testBean", new GenericBeanDefinition());
 		try {
 			bf.getBean("testBean");
@@ -91,7 +91,7 @@ class InjectAnnotationBeanPostProcessorTests {
 	}
 
 	@Test
-	void testResourceInjection() {
+	void resourceInjection() {
 		RootBeanDefinition bd = new RootBeanDefinition(ResourceInjectionBean.class);
 		bd.setScope(BeanDefinition.SCOPE_PROTOTYPE);
 		bf.registerBeanDefinition("annotatedBean", bd);
@@ -108,7 +108,7 @@ class InjectAnnotationBeanPostProcessorTests {
 	}
 
 	@Test
-	void testExtendedResourceInjection() {
+	void extendedResourceInjection() {
 		RootBeanDefinition bd = new RootBeanDefinition(TypedExtendedResourceInjectionBean.class);
 		bd.setScope(BeanDefinition.SCOPE_PROTOTYPE);
 		bf.registerBeanDefinition("annotatedBean", bd);
@@ -135,7 +135,7 @@ class InjectAnnotationBeanPostProcessorTests {
 	}
 
 	@Test
-	void testExtendedResourceInjectionWithOverriding() {
+	void extendedResourceInjectionWithOverriding() {
 		RootBeanDefinition annotatedBd = new RootBeanDefinition(TypedExtendedResourceInjectionBean.class);
 		TestBean tb2 = new TestBean();
 		annotatedBd.getPropertyValues().add("testBean2", tb2);
@@ -155,7 +155,7 @@ class InjectAnnotationBeanPostProcessorTests {
 	}
 
 	@Test
-	void testConstructorResourceInjection() {
+	void constructorResourceInjection() {
 		RootBeanDefinition bd = new RootBeanDefinition(ConstructorResourceInjectionBean.class);
 		bd.setScope(BeanDefinition.SCOPE_PROTOTYPE);
 		bf.registerBeanDefinition("annotatedBean", bd);
@@ -182,7 +182,7 @@ class InjectAnnotationBeanPostProcessorTests {
 	}
 
 	@Test
-	void testConstructorResourceInjectionWithMultipleCandidatesAsCollection() {
+	void constructorResourceInjectionWithMultipleCandidatesAsCollection() {
 		bf.registerBeanDefinition("annotatedBean",
 				new RootBeanDefinition(ConstructorsCollectionResourceInjectionBean.class));
 		TestBean tb = new TestBean();
@@ -199,7 +199,7 @@ class InjectAnnotationBeanPostProcessorTests {
 	}
 
 	@Test
-	void testConstructorResourceInjectionWithMultipleCandidatesAndFallback() {
+	void constructorResourceInjectionWithMultipleCandidatesAndFallback() {
 		bf.registerBeanDefinition("annotatedBean", new RootBeanDefinition(ConstructorsResourceInjectionBean.class));
 		TestBean tb = new TestBean();
 		bf.registerSingleton("testBean", tb);
@@ -210,7 +210,7 @@ class InjectAnnotationBeanPostProcessorTests {
 	}
 
 	@Test
-	void testConstructorInjectionWithMap() {
+	void constructorInjectionWithMap() {
 		RootBeanDefinition bd = new RootBeanDefinition(MapConstructorInjectionBean.class);
 		bd.setScope(BeanDefinition.SCOPE_PROTOTYPE);
 		bf.registerBeanDefinition("annotatedBean", bd);
@@ -235,7 +235,7 @@ class InjectAnnotationBeanPostProcessorTests {
 	}
 
 	@Test
-	void testFieldInjectionWithMap() {
+	void fieldInjectionWithMap() {
 		RootBeanDefinition bd = new RootBeanDefinition(MapFieldInjectionBean.class);
 		bd.setScope(BeanDefinition.SCOPE_PROTOTYPE);
 		bf.registerBeanDefinition("annotatedBean", bd);
@@ -260,7 +260,7 @@ class InjectAnnotationBeanPostProcessorTests {
 	}
 
 	@Test
-	void testMethodInjectionWithMap() {
+	void methodInjectionWithMap() {
 		RootBeanDefinition bd = new RootBeanDefinition(MapMethodInjectionBean.class);
 		bd.setScope(BeanDefinition.SCOPE_PROTOTYPE);
 		bf.registerBeanDefinition("annotatedBean", bd);
@@ -281,7 +281,7 @@ class InjectAnnotationBeanPostProcessorTests {
 	}
 
 	@Test
-	void testMethodInjectionWithMapAndMultipleMatches() {
+	void methodInjectionWithMapAndMultipleMatches() {
 		bf.registerBeanDefinition("annotatedBean", new RootBeanDefinition(MapMethodInjectionBean.class));
 		bf.registerBeanDefinition("testBean1", new RootBeanDefinition(TestBean.class));
 		bf.registerBeanDefinition("testBean2", new RootBeanDefinition(TestBean.class));
@@ -290,7 +290,7 @@ class InjectAnnotationBeanPostProcessorTests {
 	}
 
 	@Test
-	void testMethodInjectionWithMapAndMultipleMatchesButOnlyOneAutowireCandidate() {
+	void methodInjectionWithMapAndMultipleMatchesButOnlyOneAutowireCandidate() {
 		bf.registerBeanDefinition("annotatedBean", new RootBeanDefinition(MapMethodInjectionBean.class));
 		bf.registerBeanDefinition("testBean1", new RootBeanDefinition(TestBean.class));
 		RootBeanDefinition rbd2 = new RootBeanDefinition(TestBean.class);
@@ -306,7 +306,7 @@ class InjectAnnotationBeanPostProcessorTests {
 	}
 
 	@Test
-	void testObjectFactoryInjection() {
+	void objectFactoryInjection() {
 		bf.registerBeanDefinition("annotatedBean", new RootBeanDefinition(ObjectFactoryQualifierFieldInjectionBean.class));
 		RootBeanDefinition bd = new RootBeanDefinition(TestBean.class);
 		bd.addQualifier(new AutowireCandidateQualifier(Qualifier.class, "testBean"));
@@ -318,7 +318,7 @@ class InjectAnnotationBeanPostProcessorTests {
 	}
 
 	@Test
-	void testObjectFactoryQualifierInjection() {
+	void objectFactoryQualifierInjection() {
 		bf.registerBeanDefinition("annotatedBean", new RootBeanDefinition(ObjectFactoryQualifierFieldInjectionBean.class));
 		RootBeanDefinition bd = new RootBeanDefinition(TestBean.class);
 		bd.addQualifier(new AutowireCandidateQualifier(Qualifier.class, "testBean"));
@@ -329,7 +329,7 @@ class InjectAnnotationBeanPostProcessorTests {
 	}
 
 	@Test
-	void testObjectFactoryFieldInjectionIntoPrototypeBean() {
+	void objectFactoryFieldInjectionIntoPrototypeBean() {
 		RootBeanDefinition annotatedBeanDefinition = new RootBeanDefinition(ObjectFactoryQualifierFieldInjectionBean.class);
 		annotatedBeanDefinition.setScope(BeanDefinition.SCOPE_PROTOTYPE);
 		bf.registerBeanDefinition("annotatedBean", annotatedBeanDefinition);
@@ -346,7 +346,7 @@ class InjectAnnotationBeanPostProcessorTests {
 	}
 
 	@Test
-	void testObjectFactoryMethodInjectionIntoPrototypeBean() {
+	void objectFactoryMethodInjectionIntoPrototypeBean() {
 		RootBeanDefinition annotatedBeanDefinition = new RootBeanDefinition(ObjectFactoryQualifierMethodInjectionBean.class);
 		annotatedBeanDefinition.setScope(BeanDefinition.SCOPE_PROTOTYPE);
 		bf.registerBeanDefinition("annotatedBean", annotatedBeanDefinition);
@@ -363,31 +363,65 @@ class InjectAnnotationBeanPostProcessorTests {
 	}
 
 	@Test
-	void testObjectFactoryWithBeanField() throws Exception {
+	void objectFactoryWithBeanField() throws Exception {
 		bf.registerBeanDefinition("annotatedBean", new RootBeanDefinition(ObjectFactoryFieldInjectionBean.class));
 		bf.registerBeanDefinition("testBean", new RootBeanDefinition(TestBean.class));
 		bf.setSerializationId("test");
 
 		ObjectFactoryFieldInjectionBean bean = (ObjectFactoryFieldInjectionBean) bf.getBean("annotatedBean");
 		assertThat(bean.getTestBean()).isSameAs(bf.getBean("testBean"));
+		assertThat(bean.getTestBean()).isSameAs(bf.getBean("testBean"));
 		bean = SerializationTestUtils.serializeAndDeserialize(bean);
+		assertThat(bean.getTestBean()).isSameAs(bf.getBean("testBean"));
 		assertThat(bean.getTestBean()).isSameAs(bf.getBean("testBean"));
 	}
 
 	@Test
-	void testObjectFactoryWithBeanMethod() throws Exception {
+	void objectFactoryWithBeanFieldAgainstFrozen() throws Exception {
+		bf.registerBeanDefinition("annotatedBean", new RootBeanDefinition(ObjectFactoryFieldInjectionBean.class));
+		bf.registerBeanDefinition("testBean", new RootBeanDefinition(TestBean.class));
+		bf.setSerializationId("test");
+		bf.freezeConfiguration();
+
+		ObjectFactoryFieldInjectionBean bean = (ObjectFactoryFieldInjectionBean) bf.getBean("annotatedBean");
+		assertThat(bean.getTestBean()).isSameAs(bf.getBean("testBean"));
+		assertThat(bean.getTestBean()).isSameAs(bf.getBean("testBean"));
+		bean = SerializationTestUtils.serializeAndDeserialize(bean);
+		assertThat(bean.getTestBean()).isSameAs(bf.getBean("testBean"));
+		assertThat(bean.getTestBean()).isSameAs(bf.getBean("testBean"));
+	}
+
+	@Test
+	void objectFactoryWithBeanMethod() throws Exception {
 		bf.registerBeanDefinition("annotatedBean", new RootBeanDefinition(ObjectFactoryMethodInjectionBean.class));
 		bf.registerBeanDefinition("testBean", new RootBeanDefinition(TestBean.class));
 		bf.setSerializationId("test");
 
 		ObjectFactoryMethodInjectionBean bean = (ObjectFactoryMethodInjectionBean) bf.getBean("annotatedBean");
 		assertThat(bean.getTestBean()).isSameAs(bf.getBean("testBean"));
+		assertThat(bean.getTestBean()).isSameAs(bf.getBean("testBean"));
 		bean = SerializationTestUtils.serializeAndDeserialize(bean);
+		assertThat(bean.getTestBean()).isSameAs(bf.getBean("testBean"));
 		assertThat(bean.getTestBean()).isSameAs(bf.getBean("testBean"));
 	}
 
 	@Test
-	void testObjectFactoryWithTypedListField() throws Exception {
+	void objectFactoryWithBeanMethodAgainstFrozen() throws Exception {
+		bf.registerBeanDefinition("annotatedBean", new RootBeanDefinition(ObjectFactoryMethodInjectionBean.class));
+		bf.registerBeanDefinition("testBean", new RootBeanDefinition(TestBean.class));
+		bf.setSerializationId("test");
+		bf.freezeConfiguration();
+
+		ObjectFactoryMethodInjectionBean bean = (ObjectFactoryMethodInjectionBean) bf.getBean("annotatedBean");
+		assertThat(bean.getTestBean()).isSameAs(bf.getBean("testBean"));
+		assertThat(bean.getTestBean()).isSameAs(bf.getBean("testBean"));
+		bean = SerializationTestUtils.serializeAndDeserialize(bean);
+		assertThat(bean.getTestBean()).isSameAs(bf.getBean("testBean"));
+		assertThat(bean.getTestBean()).isSameAs(bf.getBean("testBean"));
+	}
+
+	@Test
+	void objectFactoryWithTypedListField() throws Exception {
 		bf.registerBeanDefinition("annotatedBean", new RootBeanDefinition(ObjectFactoryListFieldInjectionBean.class));
 		bf.registerBeanDefinition("testBean", new RootBeanDefinition(TestBean.class));
 		bf.setSerializationId("test");
@@ -399,7 +433,7 @@ class InjectAnnotationBeanPostProcessorTests {
 	}
 
 	@Test
-	void testObjectFactoryWithTypedListMethod() throws Exception {
+	void objectFactoryWithTypedListMethod() throws Exception {
 		bf.registerBeanDefinition("annotatedBean", new RootBeanDefinition(ObjectFactoryListMethodInjectionBean.class));
 		bf.registerBeanDefinition("testBean", new RootBeanDefinition(TestBean.class));
 		bf.setSerializationId("test");
@@ -411,7 +445,7 @@ class InjectAnnotationBeanPostProcessorTests {
 	}
 
 	@Test
-	void testObjectFactoryWithTypedMapField() throws Exception {
+	void objectFactoryWithTypedMapField() throws Exception {
 		bf.registerBeanDefinition("annotatedBean", new RootBeanDefinition(ObjectFactoryMapFieldInjectionBean.class));
 		bf.registerBeanDefinition("testBean", new RootBeanDefinition(TestBean.class));
 		bf.setSerializationId("test");
@@ -423,7 +457,7 @@ class InjectAnnotationBeanPostProcessorTests {
 	}
 
 	@Test
-	void testObjectFactoryWithTypedMapMethod() throws Exception {
+	void objectFactoryWithTypedMapMethod() throws Exception {
 		bf.registerBeanDefinition("annotatedBean", new RootBeanDefinition(ObjectFactoryMapMethodInjectionBean.class));
 		bf.registerBeanDefinition("testBean", new RootBeanDefinition(TestBean.class));
 		bf.setSerializationId("test");
@@ -440,12 +474,12 @@ class InjectAnnotationBeanPostProcessorTests {
 	 * specifically addressing SPR-4040.
 	 */
 	@Test
-	void testBeanAutowiredWithFactoryBean() {
+	void beanAutowiredWithFactoryBean() {
 		bf.registerBeanDefinition("factoryBeanDependentBean", new RootBeanDefinition(FactoryBeanDependentBean.class));
 		bf.registerSingleton("stringFactoryBean", new StringFactoryBean());
 
-		final StringFactoryBean factoryBean = (StringFactoryBean) bf.getBean("&stringFactoryBean");
-		final FactoryBeanDependentBean bean = (FactoryBeanDependentBean) bf.getBean("factoryBeanDependentBean");
+		StringFactoryBean factoryBean = (StringFactoryBean) bf.getBean("&stringFactoryBean");
+		FactoryBeanDependentBean bean = (FactoryBeanDependentBean) bf.getBean("factoryBeanDependentBean");
 
 		assertThat(factoryBean).as("The singleton StringFactoryBean should have been registered.").isNotNull();
 		assertThat(bean).as("The factoryBeanDependentBean should have been registered.").isNotNull();
@@ -453,16 +487,17 @@ class InjectAnnotationBeanPostProcessorTests {
 	}
 
 	@Test
-	void testNullableFieldInjectionWithBeanAvailable() {
+	void nullableFieldInjectionWithBeanAvailable() {
 		bf.registerBeanDefinition("annotatedBean", new RootBeanDefinition(NullableFieldInjectionBean.class));
 		bf.registerBeanDefinition("testBean", new RootBeanDefinition(TestBean.class));
 
 		NullableFieldInjectionBean bean = (NullableFieldInjectionBean) bf.getBean("annotatedBean");
 		assertThat(bean.getTestBean()).isSameAs(bf.getBean("testBean"));
+		assertThat(bf.getDependentBeans("testBean")).contains("annotatedBean");
 	}
 
 	@Test
-	void testNullableFieldInjectionWithBeanNotAvailable() {
+	void nullableFieldInjectionWithBeanNotAvailable() {
 		bf.registerBeanDefinition("annotatedBean", new RootBeanDefinition(NullableFieldInjectionBean.class));
 
 		NullableFieldInjectionBean bean = (NullableFieldInjectionBean) bf.getBean("annotatedBean");
@@ -470,16 +505,17 @@ class InjectAnnotationBeanPostProcessorTests {
 	}
 
 	@Test
-	void testNullableMethodInjectionWithBeanAvailable() {
+	void nullableMethodInjectionWithBeanAvailable() {
 		bf.registerBeanDefinition("annotatedBean", new RootBeanDefinition(NullableMethodInjectionBean.class));
 		bf.registerBeanDefinition("testBean", new RootBeanDefinition(TestBean.class));
 
 		NullableMethodInjectionBean bean = (NullableMethodInjectionBean) bf.getBean("annotatedBean");
 		assertThat(bean.getTestBean()).isSameAs(bf.getBean("testBean"));
+		assertThat(bf.getDependentBeans("testBean")).contains("annotatedBean");
 	}
 
 	@Test
-	void testNullableMethodInjectionWithBeanNotAvailable() {
+	void nullableMethodInjectionWithBeanNotAvailable() {
 		bf.registerBeanDefinition("annotatedBean", new RootBeanDefinition(NullableMethodInjectionBean.class));
 
 		NullableMethodInjectionBean bean = (NullableMethodInjectionBean) bf.getBean("annotatedBean");
@@ -487,17 +523,18 @@ class InjectAnnotationBeanPostProcessorTests {
 	}
 
 	@Test
-	void testOptionalFieldInjectionWithBeanAvailable() {
+	void optionalFieldInjectionWithBeanAvailable() {
 		bf.registerBeanDefinition("annotatedBean", new RootBeanDefinition(OptionalFieldInjectionBean.class));
 		bf.registerBeanDefinition("testBean", new RootBeanDefinition(TestBean.class));
 
 		OptionalFieldInjectionBean bean = (OptionalFieldInjectionBean) bf.getBean("annotatedBean");
 		assertThat(bean.getTestBean()).isPresent();
 		assertThat(bean.getTestBean().get()).isSameAs(bf.getBean("testBean"));
+		assertThat(bf.getDependentBeans("testBean")).contains("annotatedBean");
 	}
 
 	@Test
-	void testOptionalFieldInjectionWithBeanNotAvailable() {
+	void optionalFieldInjectionWithBeanNotAvailable() {
 		bf.registerBeanDefinition("annotatedBean", new RootBeanDefinition(OptionalFieldInjectionBean.class));
 
 		OptionalFieldInjectionBean bean = (OptionalFieldInjectionBean) bf.getBean("annotatedBean");
@@ -505,17 +542,18 @@ class InjectAnnotationBeanPostProcessorTests {
 	}
 
 	@Test
-	void testOptionalMethodInjectionWithBeanAvailable() {
+	void optionalMethodInjectionWithBeanAvailable() {
 		bf.registerBeanDefinition("annotatedBean", new RootBeanDefinition(OptionalMethodInjectionBean.class));
 		bf.registerBeanDefinition("testBean", new RootBeanDefinition(TestBean.class));
 
 		OptionalMethodInjectionBean bean = (OptionalMethodInjectionBean) bf.getBean("annotatedBean");
 		assertThat(bean.getTestBean()).isPresent();
 		assertThat(bean.getTestBean().get()).isSameAs(bf.getBean("testBean"));
+		assertThat(bf.getDependentBeans("testBean")).contains("annotatedBean");
 	}
 
 	@Test
-	void testOptionalMethodInjectionWithBeanNotAvailable() {
+	void optionalMethodInjectionWithBeanNotAvailable() {
 		bf.registerBeanDefinition("annotatedBean", new RootBeanDefinition(OptionalMethodInjectionBean.class));
 
 		OptionalMethodInjectionBean bean = (OptionalMethodInjectionBean) bf.getBean("annotatedBean");
@@ -523,17 +561,18 @@ class InjectAnnotationBeanPostProcessorTests {
 	}
 
 	@Test
-	void testOptionalListFieldInjectionWithBeanAvailable() {
+	void optionalListFieldInjectionWithBeanAvailable() {
 		bf.registerBeanDefinition("annotatedBean", new RootBeanDefinition(OptionalListFieldInjectionBean.class));
 		bf.registerBeanDefinition("testBean", new RootBeanDefinition(TestBean.class));
 
 		OptionalListFieldInjectionBean bean = (OptionalListFieldInjectionBean) bf.getBean("annotatedBean");
 		assertThat(bean.getTestBean()).hasValueSatisfying(list ->
 				assertThat(list).containsExactly(bf.getBean("testBean", TestBean.class)));
+		assertThat(bf.getDependentBeans("testBean")).contains("annotatedBean");
 	}
 
 	@Test
-	void testOptionalListFieldInjectionWithBeanNotAvailable() {
+	void optionalListFieldInjectionWithBeanNotAvailable() {
 		bf.registerBeanDefinition("annotatedBean", new RootBeanDefinition(OptionalListFieldInjectionBean.class));
 
 		OptionalListFieldInjectionBean bean = (OptionalListFieldInjectionBean) bf.getBean("annotatedBean");
@@ -541,17 +580,18 @@ class InjectAnnotationBeanPostProcessorTests {
 	}
 
 	@Test
-	void testOptionalListMethodInjectionWithBeanAvailable() {
+	void optionalListMethodInjectionWithBeanAvailable() {
 		bf.registerBeanDefinition("annotatedBean", new RootBeanDefinition(OptionalListMethodInjectionBean.class));
 		bf.registerBeanDefinition("testBean", new RootBeanDefinition(TestBean.class));
 
 		OptionalListMethodInjectionBean bean = (OptionalListMethodInjectionBean) bf.getBean("annotatedBean");
 		assertThat(bean.getTestBean()).hasValueSatisfying(list ->
 				assertThat(list).containsExactly(bf.getBean("testBean", TestBean.class)));
+		assertThat(bf.getDependentBeans("testBean")).contains("annotatedBean");
 	}
 
 	@Test
-	void testOptionalListMethodInjectionWithBeanNotAvailable() {
+	void optionalListMethodInjectionWithBeanNotAvailable() {
 		bf.registerBeanDefinition("annotatedBean", new RootBeanDefinition(OptionalListMethodInjectionBean.class));
 
 		OptionalListMethodInjectionBean bean = (OptionalListMethodInjectionBean) bf.getBean("annotatedBean");
@@ -559,17 +599,18 @@ class InjectAnnotationBeanPostProcessorTests {
 	}
 
 	@Test
-	void testProviderOfOptionalFieldInjectionWithBeanAvailable() {
+	void providerOfOptionalFieldInjectionWithBeanAvailable() {
 		bf.registerBeanDefinition("annotatedBean", new RootBeanDefinition(ProviderOfOptionalFieldInjectionBean.class));
 		bf.registerBeanDefinition("testBean", new RootBeanDefinition(TestBean.class));
 
 		ProviderOfOptionalFieldInjectionBean bean = (ProviderOfOptionalFieldInjectionBean) bf.getBean("annotatedBean");
 		assertThat(bean.getTestBean()).isPresent();
 		assertThat(bean.getTestBean().get()).isSameAs(bf.getBean("testBean"));
+		assertThat(bf.getDependentBeans("testBean")).doesNotContain("annotatedBean");
 	}
 
 	@Test
-	void testProviderOfOptionalFieldInjectionWithBeanNotAvailable() {
+	void providerOfOptionalFieldInjectionWithBeanNotAvailable() {
 		bf.registerBeanDefinition("annotatedBean", new RootBeanDefinition(ProviderOfOptionalFieldInjectionBean.class));
 
 		ProviderOfOptionalFieldInjectionBean bean = (ProviderOfOptionalFieldInjectionBean) bf.getBean("annotatedBean");
@@ -577,17 +618,18 @@ class InjectAnnotationBeanPostProcessorTests {
 	}
 
 	@Test
-	void testProviderOfOptionalMethodInjectionWithBeanAvailable() {
+	void providerOfOptionalMethodInjectionWithBeanAvailable() {
 		bf.registerBeanDefinition("annotatedBean", new RootBeanDefinition(ProviderOfOptionalMethodInjectionBean.class));
 		bf.registerBeanDefinition("testBean", new RootBeanDefinition(TestBean.class));
 
 		ProviderOfOptionalMethodInjectionBean bean = (ProviderOfOptionalMethodInjectionBean) bf.getBean("annotatedBean");
 		assertThat(bean.getTestBean()).isPresent();
 		assertThat(bean.getTestBean().get()).isSameAs(bf.getBean("testBean"));
+		assertThat(bf.getDependentBeans("testBean")).doesNotContain("annotatedBean");
 	}
 
 	@Test
-	void testProviderOfOptionalMethodInjectionWithBeanNotAvailable() {
+	void providerOfOptionalMethodInjectionWithBeanNotAvailable() {
 		bf.registerBeanDefinition("annotatedBean", new RootBeanDefinition(ProviderOfOptionalMethodInjectionBean.class));
 
 		ProviderOfOptionalMethodInjectionBean bean = (ProviderOfOptionalMethodInjectionBean) bf.getBean("annotatedBean");
@@ -595,7 +637,7 @@ class InjectAnnotationBeanPostProcessorTests {
 	}
 
 	@Test
-	void testAnnotatedDefaultConstructor() {
+	void annotatedDefaultConstructor() {
 		bf.registerBeanDefinition("annotatedBean", new RootBeanDefinition(AnnotatedDefaultConstructorBean.class));
 
 		assertThat(bf.getBean("annotatedBean")).isNotNull();
@@ -787,7 +829,6 @@ class InjectAnnotationBeanPostProcessorTests {
 		private NestedTestBean nestedTestBean;
 
 		private ConfigurableListableBeanFactory beanFactory;
-
 
 		public ConstructorResourceInjectionBean() {
 			throw new UnsupportedOperationException();

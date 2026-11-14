@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2022 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -26,13 +26,16 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
+import org.jspecify.annotations.Nullable;
 
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.server.ServletServerHttpRequest;
-import org.springframework.lang.Nullable;
 import org.springframework.util.Assert;
+import org.springframework.util.LinkedMultiValueMap;
+import org.springframework.util.MultiValueMap;
 import org.springframework.util.StringUtils;
 import org.springframework.web.util.ContentCachingRequestWrapper;
+import org.springframework.web.util.UriComponentsBuilder;
 import org.springframework.web.util.WebUtils;
 
 /**
@@ -99,8 +102,9 @@ public abstract class AbstractRequestLoggingFilter extends OncePerRequestFilter 
 
 	private boolean includePayload = false;
 
-	@Nullable
-	private Predicate<String> headerPredicate;
+	private @Nullable Predicate<String> queryParamPredicate;
+
+	private @Nullable Predicate<String> headerPredicate;
 
 	private int maxPayloadLength = DEFAULT_MAX_PAYLOAD_LENGTH;
 
@@ -184,9 +188,32 @@ public abstract class AbstractRequestLoggingFilter extends OncePerRequestFilter 
 	}
 
 	/**
+	 * Configure a predicate for selecting which query parameters should be logged
+	 * if {@link #setIncludeQueryString(boolean)} is set to {@code true}.
+	 * <p>By default this is not set, in which case all query parameters are logged.
+	 * <p>The predicate will be applied once per query parameter name. Thus, if
+	 * there are multiple values for the same query parameter name, the logged query
+	 * string will contain fewer {@code name=value} mappings than the one returned by
+	 * {@link HttpServletRequest#getQueryString()}.
+	 * @param queryParamPredicate the predicate to use
+	 * @since 7.0
+	 */
+	public void setQueryParamPredicate(@Nullable Predicate<String> queryParamPredicate) {
+		this.queryParamPredicate = queryParamPredicate;
+	}
+
+	/**
+	 * The configured {@link #setQueryParamPredicate(Predicate) queryParamPredicate}.
+	 * @since 7.0
+	 */
+	protected @Nullable Predicate<String> getQueryParamPredicate() {
+		return this.queryParamPredicate;
+	}
+
+	/**
 	 * Configure a predicate for selecting which headers should be logged if
 	 * {@link #setIncludeHeaders(boolean)} is set to {@code true}.
-	 * <p>By default this is not set in which case all headers are logged.
+	 * <p>By default this is not set, in which case all headers are logged.
 	 * @param headerPredicate the predicate to use
 	 * @since 5.2
 	 */
@@ -198,8 +225,7 @@ public abstract class AbstractRequestLoggingFilter extends OncePerRequestFilter 
 	 * The configured {@link #setHeaderPredicate(Predicate) headerPredicate}.
 	 * @since 5.2
 	 */
-	@Nullable
-	protected Predicate<String> getHeaderPredicate() {
+	protected @Nullable Predicate<String> getHeaderPredicate() {
 		return this.headerPredicate;
 	}
 
@@ -328,6 +354,23 @@ public abstract class AbstractRequestLoggingFilter extends OncePerRequestFilter 
 		if (isIncludeQueryString()) {
 			String queryString = request.getQueryString();
 			if (queryString != null) {
+				if (getQueryParamPredicate() != null) {
+					MultiValueMap<String, String> queryParams = UriComponentsBuilder.fromUriString("?" + queryString)
+							.build()
+							.getQueryParams();
+
+					MultiValueMap<String, String> updatedQueryParams = new LinkedMultiValueMap<>(queryParams);
+					for (String name : queryParams.keySet()) {
+						if (!getQueryParamPredicate().test(name)) {
+							updatedQueryParams.set(name, "masked");
+						}
+					}
+
+					queryString = UriComponentsBuilder.newInstance()
+							.queryParams(updatedQueryParams)
+							.build()
+							.getQuery();
+				}
 				msg.append('?').append(queryString);
 			}
 		}
@@ -378,8 +421,7 @@ public abstract class AbstractRequestLoggingFilter extends OncePerRequestFilter 
 	 * {@link #isIncludePayload()} returns true.
 	 * @since 5.0.3
 	 */
-	@Nullable
-	protected String getMessagePayload(HttpServletRequest request) {
+	protected @Nullable String getMessagePayload(HttpServletRequest request) {
 		ContentCachingRequestWrapper wrapper =
 				WebUtils.getNativeRequest(request, ContentCachingRequestWrapper.class);
 		if (wrapper != null) {

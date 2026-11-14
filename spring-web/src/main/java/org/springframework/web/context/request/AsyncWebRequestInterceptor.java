@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2017 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,7 +22,7 @@ package org.springframework.web.context.request;
  *
  * <p>When a handler starts asynchronous request handling, the DispatcherServlet
  * exits without invoking {@code postHandle} and {@code afterCompletion}, as it
- * normally does, since the results of request handling (e.g. ModelAndView) are
+ * normally does, since the results of request handling (for example, ModelAndView) are
  * not available in the current thread and handling is not yet complete.
  * In such scenarios, the {@link #afterConcurrentHandlingStarted(WebRequest)}
  * method is invoked instead allowing implementations to perform tasks such as

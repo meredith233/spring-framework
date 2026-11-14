@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2023 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,12 +20,12 @@ import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
-import org.springframework.lang.Nullable;
+import org.jspecify.annotations.Nullable;
+
 import org.springframework.util.Assert;
 import org.springframework.util.CollectionUtils;
 import org.springframework.util.LinkedMultiValueMap;
@@ -41,14 +41,11 @@ import org.springframework.util.StringUtils;
  */
 final class DefaultPathContainer implements PathContainer {
 
-	private static final PathContainer EMPTY_PATH = new DefaultPathContainer("", Collections.emptyList());
+	private static final PathContainer EMPTY_PATH = new DefaultPathContainer("", List.of());
 
-	private static final Map<Character, DefaultSeparator> SEPARATORS = new HashMap<>(2);
-
-	static {
-		SEPARATORS.put('/', new DefaultSeparator('/', "%2F"));
-		SEPARATORS.put('.', new DefaultSeparator('.', "%2E"));
-	}
+	private static final Map<Character, DefaultSeparator> SEPARATORS = Map.of(
+			'/', new DefaultSeparator('/', "%2F"),
+			'.', new DefaultSeparator('.', "%2E"));
 
 
 	private final String path;

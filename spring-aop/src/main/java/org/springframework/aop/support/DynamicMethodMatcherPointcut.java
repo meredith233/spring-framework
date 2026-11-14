@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2012 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -24,7 +24,7 @@ import org.springframework.aop.Pointcut;
  * Convenient superclass when we want to force subclasses to
  * implement MethodMatcher interface, but subclasses
  * will want to be pointcuts. The getClassFilter() method can
- * be overridden to customize ClassFilter behaviour as well.
+ * be overridden to customize ClassFilter behavior as well.
  *
  * @author Rod Johnson
  */

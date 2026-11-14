@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,6 +19,7 @@ package org.springframework.aop.support;
 import java.lang.reflect.Method;
 import java.util.List;
 
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 
 import org.springframework.aop.ClassFilter;
@@ -31,7 +32,6 @@ import org.springframework.aop.testfixture.interceptor.NopInterceptor;
 import org.springframework.beans.testfixture.beans.TestBean;
 import org.springframework.core.ResolvableType;
 import org.springframework.core.testfixture.io.SerializationTestUtils;
-import org.springframework.lang.Nullable;
 import org.springframework.util.ReflectionUtils;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -45,7 +45,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class AopUtilsTests {
 
 	@Test
-	void testPointcutCanNeverApply() {
+	void pointcutCanNeverApply() {
 		class TestPointcut extends StaticMethodMatcherPointcut {
 			@Override
 			public boolean matches(Method method, @Nullable Class<?> clazzy) {
@@ -58,13 +58,13 @@ class AopUtilsTests {
 	}
 
 	@Test
-	void testPointcutAlwaysApplies() {
+	void pointcutAlwaysApplies() {
 		assertThat(AopUtils.canApply(new DefaultPointcutAdvisor(new NopInterceptor()), Object.class)).isTrue();
 		assertThat(AopUtils.canApply(new DefaultPointcutAdvisor(new NopInterceptor()), TestBean.class)).isTrue();
 	}
 
 	@Test
-	void testPointcutAppliesToOneMethodOnObject() {
+	void pointcutAppliesToOneMethodOnObject() {
 		class TestPointcut extends StaticMethodMatcherPointcut {
 			@Override
 			public boolean matches(Method method, @Nullable Class<?> clazz) {
@@ -84,7 +84,7 @@ class AopUtilsTests {
 	 * that's subverted the singleton construction limitation.
 	 */
 	@Test
-	void testCanonicalFrameworkClassesStillCanonicalOnDeserialization() throws Exception {
+	void canonicalFrameworkClassesStillCanonicalOnDeserialization() throws Exception {
 		assertThat(SerializationTestUtils.serializeAndDeserialize(MethodMatcher.TRUE)).isSameAs(MethodMatcher.TRUE);
 		assertThat(SerializationTestUtils.serializeAndDeserialize(ClassFilter.TRUE)).isSameAs(ClassFilter.TRUE);
 		assertThat(SerializationTestUtils.serializeAndDeserialize(Pointcut.TRUE)).isSameAs(Pointcut.TRUE);
@@ -95,7 +95,7 @@ class AopUtilsTests {
 	}
 
 	@Test
-	void testInvokeJoinpointUsingReflection() throws Throwable {
+	void invokeJoinpointUsingReflection() throws Throwable {
 		String name = "foo";
 		TestBean testBean = new TestBean(name);
 		Method method = ReflectionUtils.findMethod(TestBean.class, "getName");
@@ -125,6 +125,7 @@ class AopUtilsTests {
 
 	static class WithInterface implements ProxyInterface {
 
+		@Override
 		public void handle(List<String> list) {
 		}
 	}

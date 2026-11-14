@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2023 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,12 +19,21 @@ package org.springframework.web.servlet.tags.form;
 import java.util.Map;
 
 import jakarta.servlet.jsp.JspException;
-
-import org.springframework.lang.Nullable;
+import org.jspecify.annotations.Nullable;
 
 /**
  * The {@code <input>} tag renders an HTML 'input' tag with type 'text' using
  * the bound value.
+ *
+ * <p>A different {@code type}, such as {@code email}, {@code tel}, {@code date},
+ * or {@code range}, may be supplied as a dynamic attribute. The bound value is
+ * rendered as-is for any supported {@code type}. {@code checkbox} and
+ * {@code radio} are not supported; use the {@code <checkbox>} and {@code <radio>}
+ * tags instead.
+ *
+ * <p><strong>NOTE:</strong> Do not use this tag with {@code type="password"}.
+ * Use the {@code <password>} tag ({@link PasswordInputTag}) for password fields,
+ * since it does not render the bound value unless explicitly configured to do so.
  *
  * <h3>Attribute Summary</h3>
  * <table>
@@ -247,20 +256,15 @@ public class InputTag extends AbstractHtmlInputElementTag {
 	public static final String AUTOCOMPLETE_ATTRIBUTE = "autocomplete";
 
 
-	@Nullable
-	private String size;
+	private @Nullable String size;
 
-	@Nullable
-	private String maxlength;
+	private @Nullable String maxlength;
 
-	@Nullable
-	private String alt;
+	private @Nullable String alt;
 
-	@Nullable
-	private String onselect;
+	private @Nullable String onselect;
 
-	@Nullable
-	private String autocomplete;
+	private @Nullable String autocomplete;
 
 
 	/**
@@ -274,8 +278,7 @@ public class InputTag extends AbstractHtmlInputElementTag {
 	/**
 	 * Get the value of the '{@code size}' attribute.
 	 */
-	@Nullable
-	protected String getSize() {
+	protected @Nullable String getSize() {
 		return this.size;
 	}
 
@@ -290,8 +293,7 @@ public class InputTag extends AbstractHtmlInputElementTag {
 	/**
 	 * Get the value of the '{@code maxlength}' attribute.
 	 */
-	@Nullable
-	protected String getMaxlength() {
+	protected @Nullable String getMaxlength() {
 		return this.maxlength;
 	}
 
@@ -306,8 +308,7 @@ public class InputTag extends AbstractHtmlInputElementTag {
 	/**
 	 * Get the value of the '{@code alt}' attribute.
 	 */
-	@Nullable
-	protected String getAlt() {
+	protected @Nullable String getAlt() {
 		return this.alt;
 	}
 
@@ -322,8 +323,7 @@ public class InputTag extends AbstractHtmlInputElementTag {
 	/**
 	 * Get the value of the '{@code onselect}' attribute.
 	 */
-	@Nullable
-	protected String getOnselect() {
+	protected @Nullable String getOnselect() {
 		return this.onselect;
 	}
 
@@ -338,8 +338,7 @@ public class InputTag extends AbstractHtmlInputElementTag {
 	/**
 	 * Get the value of the '{@code autocomplete}' attribute.
 	 */
-	@Nullable
-	protected String getAutocomplete() {
+	protected @Nullable String getAutocomplete() {
 		return this.autocomplete;
 	}
 
@@ -392,6 +391,8 @@ public class InputTag extends AbstractHtmlInputElementTag {
 	/**
 	 * Flags {@code type="checkbox"} and {@code type="radio"} as illegal
 	 * dynamic attributes.
+	 * <p>Any other {@code type} is permitted, but {@code type="password"} should
+	 * not be used with this tag. Use {@link PasswordInputTag} instead.
 	 */
 	@Override
 	protected boolean isValidDynamicAttribute(String localName, Object value) {

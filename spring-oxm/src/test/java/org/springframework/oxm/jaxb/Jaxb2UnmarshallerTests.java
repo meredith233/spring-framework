@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -112,7 +112,7 @@ class Jaxb2UnmarshallerTests extends AbstractUnmarshallerTests<Jaxb2Marshaller> 
 	@Test
 	@Override
 	@SuppressWarnings("unchecked")
-	public void unmarshalPartialStaxSourceXmlStreamReader() throws Exception {
+	protected void unmarshalPartialStaxSourceXmlStreamReader() throws Exception {
 		XMLInputFactory inputFactory = XMLInputFactory.newInstance();
 		XMLStreamReader streamReader = inputFactory.createXMLStreamReader(new StringReader(INPUT_STRING));
 		streamReader.nextTag(); // skip to flights
@@ -125,7 +125,7 @@ class Jaxb2UnmarshallerTests extends AbstractUnmarshallerTests<Jaxb2Marshaller> 
 
 	@Test
 	@SuppressWarnings("unchecked")
-	public void unmarshalAnXmlReferringToAWrappedXmlElementDecl() throws Exception {
+	void unmarshalAnXmlReferringToAWrappedXmlElementDecl() throws Exception {
 		// SPR-10714
 		unmarshaller = new Jaxb2Marshaller();
 		unmarshaller.setPackagesToScan("org.springframework.oxm.jaxb");

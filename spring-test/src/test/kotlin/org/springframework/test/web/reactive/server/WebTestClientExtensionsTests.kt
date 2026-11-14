@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2020 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,6 +23,7 @@ import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.reactivestreams.Publisher
 import org.springframework.core.ParameterizedTypeReference
+import org.springframework.http.MediaType
 import org.springframework.web.reactive.function.server.router
 import java.util.concurrent.CompletableFuture
 
@@ -93,6 +94,14 @@ class WebTestClientExtensionsTests {
 	fun `ResponseSpec#expectBodyList with reified type parameters`() {
 		responseSpec.expectBodyList<Foo>()
 		verify { responseSpec.expectBodyList(object : ParameterizedTypeReference<Foo>() {}) }
+	}
+
+	@Test
+	fun `ResponseSpec#expectBodyList with null value`() {
+		WebTestClient
+			.bindToRouterFunction( router { GET("/") { ok().contentType(MediaType.APPLICATION_JSON).bodyValue("[null]") } } )
+			.build()
+			.get().uri("/").exchange().expectBodyList<Foo?>().hasSize(0)
 	}
 
 	@Test

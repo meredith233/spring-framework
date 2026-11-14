@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,8 +19,8 @@ package org.springframework.test.web.servlet.assertj;
 import org.springframework.mock.web.MockHttpServletRequest;
 
 /**
- * AssertJ {@link org.assertj.core.api.Assert assertions} that can be applied to
- * {@link MockHttpServletRequest}.
+ * AssertJ {@linkplain org.assertj.core.api.Assert assertions} that can be applied
+ * to {@link MockHttpServletRequest}.
  *
  * @author Stephane Nicoll
  * @since 6.2
